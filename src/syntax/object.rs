@@ -10,6 +10,14 @@ pub enum ObjectType {
 }
 
 #[derive(Debug)]
+pub struct ObjectJoin {
+    pub object_name: String,
+    pub join_name: String,
+    pub local_field: String,
+    pub foreign_field: String,
+}
+
+#[derive(Debug)]
 pub struct Object {
     pub object_type: ObjectType,
     pub name: String,
@@ -19,6 +27,7 @@ pub struct Object {
     pub table_name: Option<String>,
     pub reuse_all: bool,
     pub reuse_exclude: Vec<String>,
+    pub joins: Vec<ObjectJoin>,
 }
 impl Object {
     pub fn read_from_contents(typ: ObjectType, contents: &mut FileContents) -> Object {
@@ -35,6 +44,7 @@ impl Object {
         let mut table_name = None;
         let mut reuse_all = false;
         let mut reuse_exclude = Vec::new();
+        let mut joins: Vec<ObjectJoin> = Vec::new();
 
         'header: while let Some(token) = contents.next() {
             match token {
@@ -80,6 +90,54 @@ impl Object {
                         reuse_exclude.push(lit.to_string());
                     }
                 }
+                Token::Plus => {
+                    let Some(Token::Literal(val)) = contents.take() else {
+                        continue;
+                    };
+                    let Some(Token::Period) = contents.next() else {
+                        continue;
+                    };
+                    let Some(Token::Literal(field)) = contents.take() else {
+                        continue;
+                    };
+                    let mut alias = None;
+                    if let Some(Token::As) = contents.next() {
+                        if let Some(Token::Literal(lit)) = contents.take() {
+                            alias = Some(lit.to_string());
+                        }
+                    }
+                    let field = Field::from_join(val, field, alias);
+                    fields.push(field);
+                }
+                Token::Ampersand => {
+                    let Some(Token::Literal(foreign_object)) = contents.take() else {
+                        continue;
+                    };
+                    let Some(Token::Ampersand) = contents.take() else {
+                        continue;
+                    };
+                    let Some(Token::Literal(join_name)) = contents.take() else {
+                        continue;
+                    };
+                    let Some(Token::Where) = contents.take() else {
+                        continue;
+                    };
+                    let Some(Token::Literal(local_field)) = contents.take() else {
+                        continue;
+                    };
+                    let Some(Token::Equals) = contents.take() else {
+                        continue;
+                    };
+                    let Some(Token::Literal(foreign_field)) = contents.take() else {
+                        continue;
+                    };
+                    joins.push(ObjectJoin {
+                        object_name: foreign_object,
+                        join_name: join_name,
+                        local_field: local_field,
+                        foreign_field: foreign_field,
+                    });
+                }
                 _ => {}
             }
         }
@@ -93,6 +151,7 @@ impl Object {
             reuse_all,
             reuse_exclude,
             categories,
+            joins,
         }
     }
 
@@ -113,9 +172,8 @@ impl Object {
         if self.object_type == ObjectType::Record {
             for field in &self.fields {
                 if let FieldType::Custom(_) = &field.field_type {
-                    errors.push(
-                        self.field_error(FieldValidationErrorType::CustomNotAllowed, field),
-                    );
+                    errors
+                        .push(self.field_error(FieldValidationErrorType::CustomNotAllowed, field));
                 }
                 if field.optional && field.commands.contains(&FieldCommand::PrimaryKey) {
                     errors.push(
@@ -148,18 +206,6 @@ impl Object {
         }
         for field in &self.fields {
             match &field.field_type {
-                FieldType::Ref(object_name, field_name) => {
-                    if let Some(object) = result.objects.iter().find(|o| o.name == *object_name) {
-                        if !object.fields.iter().any(|f| f.name == *field_name) {
-                            errors.push(
-                                self.field_error(FieldValidationErrorType::InvalidRefField, field),
-                            );
-                        }
-                    } else {
-                        errors
-                            .push(self.field_error(FieldValidationErrorType::InvalidRefObject, field));
-                    }
-                }
                 FieldType::Custom(object_name) => {
                     if !result.objects.iter().any(|o| o.name == *object_name) {
                         errors.push(
@@ -177,14 +223,18 @@ impl Object {
         }
     }
 
-
     pub fn depends_on(&self) -> Vec<String> {
         let mut dependencies = Vec::new();
         for field in &self.fields {
-            if let FieldType::Ref(object_name, _) = &field.field_type {
-                if !dependencies.contains(object_name) {
-                    dependencies.push(object_name.clone());
+            if let Some(reference) = &field.reference {
+                if !dependencies.contains(&reference.object_name) {
+                    dependencies.push(reference.object_name.clone());
                 }
+            }
+        }
+        for join in &self.joins {
+            if !dependencies.contains(&join.object_name) {
+                dependencies.push(join.object_name.clone());
             }
         }
         dependencies

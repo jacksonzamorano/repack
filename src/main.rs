@@ -1,3 +1,5 @@
+use std::process::exit;
+
 use outputs::OutputDescription;
 use profiles::OutputProfile;
 use syntax::FileContents;
@@ -7,9 +9,15 @@ mod profiles;
 mod syntax;
 
 fn main() {
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() < 2 {
+        eprintln!("Usage: {} <input_file>", args[0]);
+        exit(1);
+    }
+    let input_file = &args[1];
     let mut contents = FileContents::new();
-    contents.read("test.repack");
-    let parse_result = syntax::ParseResult::from_contents(contents);
+    contents.read(input_file);
+    let parse_result = syntax::ParseResult::from_contents(contents).unwrap();
     parse_result.validate(true);
 
     for output in &parse_result.languages {

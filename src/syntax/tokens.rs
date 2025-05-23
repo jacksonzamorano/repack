@@ -1,4 +1,4 @@
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Token {
     OpenParen,
     CloseParen,
@@ -18,12 +18,17 @@ pub enum Token {
     Colon,
     Minus,
     Semicolon,
+    Ampersand,
+    Equals,
 
     Literal(String),
     OutputType,
     RecordType,
     StructType,
     Ref,
+    From,
+    As,
+    Where,
 }
 impl Token {
     pub fn from_byte(byte: u8) -> Option<Token> {
@@ -46,6 +51,8 @@ impl Token {
             b':' => Some(Token::Colon),
             b'-' => Some(Token::Minus),
             b';' => Some(Token::Semicolon),
+            b'&' => Some(Token::Ampersand),
+            b'=' => Some(Token::Equals),
             _ => None,
         }
     }
@@ -54,7 +61,11 @@ impl Token {
             "output" => Token::OutputType,
             "record" => Token::RecordType,
             "struct" => Token::StructType,
+            "from" => Token::From,
             "ref"  => Token::Ref,
+            "as" => Token::As,
+            "where" => Token::Where,
+
             _ => Token::Literal(string.trim().to_string()),
         }
     }

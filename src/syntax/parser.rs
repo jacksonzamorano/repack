@@ -60,4 +60,14 @@ impl FileContents {
             None
         }
     }
+
+    pub fn take(&mut self) -> Option<Token> {
+        if self.index < self.contents.len() {
+            let token = self.contents.get(self.index)?;
+            self.index += 1;
+            Some(token.clone())
+        } else {
+            None
+        }
+    }
 }

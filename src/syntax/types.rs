@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum FieldType {
     String,
     Int64,
@@ -8,8 +8,8 @@ pub enum FieldType {
     Float64,
     Boolean,
     DateTime,
-    Ref(String, String),
-    Custom(String)
+    Custom(String),
+    Unresolved,
 }
 impl Display for FieldType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -20,7 +20,7 @@ impl Display for FieldType {
             FieldType::Float64 => "float64".to_string(),
             FieldType::Boolean => "boolean".to_string(),
             FieldType::DateTime => "datetime".to_string(),
-            FieldType::Ref(object_name, field_name) => format!("{}:{}", object_name, field_name),
+            FieldType::Unresolved => "unresolved".to_string(),
             FieldType::Custom(s) => s.clone()
         };
         write!(f, "{}", res)
@@ -37,6 +37,12 @@ impl FieldType {
             "boolean" => FieldType::Boolean,
             "datetime" => FieldType::DateTime,
             _ => FieldType::Custom(s.to_string())
+        }
+    }
+    pub fn unresolved(&self) -> bool {
+        match self {
+            FieldType::Unresolved => true,
+            _ => false
         }
     }
 }

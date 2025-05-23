@@ -1,5 +1,6 @@
 use super::{FieldValidationError, LanguageValidationError, ObjectValidationError};
 
+#[derive(Debug)]
 pub enum ValidationError {
     Object(ObjectValidationError),
     Field(FieldValidationError),

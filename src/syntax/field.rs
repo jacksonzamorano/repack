@@ -1,6 +1,10 @@
-use crate::outputs::{OutputBuilderError, OutputDescription};
+use super::{FieldCommand, FieldType, FileContents, Token};
 
-use super::{FieldCommand, FieldType, FileContents, Object, Token};
+#[derive(Debug)]
+pub struct FieldReference {
+    pub object_name: String,
+    pub field_name: String,
+}
 
 #[derive(Debug)]
 pub struct Field {
@@ -8,24 +12,26 @@ pub struct Field {
     pub field_type: FieldType,
     pub optional: bool,
     pub commands: Vec<FieldCommand>,
+    pub from: Option<FieldReference>,
+    pub reference: Option<FieldReference>,
 }
 impl Field {
-    pub fn resolve_type<'a>(
-        &'a self,
-        object: &Object,
-        description: &'a OutputDescription,
-    ) -> Result<&'a FieldType, OutputBuilderError> {
-        match &self.field_type {
-            FieldType::Ref(object_name, field_name) => description
-                .field(object, self, object_name, field_name)
-                .map(|x| &x.field_type),
-            _ => Ok(&self.field_type),
+    pub fn from_join(join: String, field: String, alias: Option<String>) -> Field {
+        Field {
+            name: alias.unwrap_or(field.clone()),
+            field_type: FieldType::Unresolved,
+            optional: true,
+            from: Some(FieldReference {
+                object_name: join.clone(),
+                field_name: field.clone(),
+            }),
+            reference: None,
+            commands: Vec::new(),
         }
     }
-}
-impl Field {
     pub fn from_contents(name: String, contents: &mut FileContents) -> Option<Field> {
         let type_token = contents.next()?;
+        let mut reference: Option<FieldReference> = None;
         let field_type: FieldType = match type_token {
             Token::Literal(literal) => FieldType::from_string(literal),
             Token::Ref => {
@@ -49,7 +55,11 @@ impl Field {
                         }
                     }
                 }
-                FieldType::Ref(object_name, field_name)
+                reference = Some(FieldReference {
+                    object_name,
+                    field_name,
+                });
+                FieldType::Unresolved
             }
             _ => {
                 return None;
@@ -86,6 +96,8 @@ impl Field {
             field_type,
             optional,
             commands,
+            from: None,
+            reference,
         })
     }
 }

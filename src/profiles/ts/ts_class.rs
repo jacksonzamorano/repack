@@ -11,8 +11,7 @@ impl OutputBuilder for TypescriptClassBuilder {
             let mut output = String::new();
             output.push_str(&format!("export class {} {{\n", object.name));
             for field in &object.fields {
-                let resolved_typ = field.resolve_type(object, description)?;
-                let ts_type = type_to_ts(resolved_typ).ok_or(
+                let ts_type = type_to_ts(&field.field_type).ok_or(
                     OutputBuilderError::UnsupportedFieldType(crate::outputs::OutputBuilderFieldError::new(
                         object, field,
                     )),
@@ -27,7 +26,7 @@ impl OutputBuilder for TypescriptClassBuilder {
                 } else {
                     ""
                 };
-                if let crate::syntax::FieldType::Custom(name) = resolved_typ {
+                if let crate::syntax::FieldType::Custom(name) = &field.field_type {
                     if !imports.contains(name) {
                         imports.push(name.clone());
                     }

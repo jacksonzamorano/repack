@@ -1,5 +1,6 @@
 use crate::syntax::Output;
 
+#[derive(Debug)]
 pub enum LanguageValidationErrorType {
     UnknownLanguage = 1,
 }
@@ -16,6 +17,7 @@ impl LanguageValidationError {
     }
 }
 
+#[derive(Debug)]
 pub struct LanguageValidationError {
     error_type: LanguageValidationErrorType,
     language_name: String,

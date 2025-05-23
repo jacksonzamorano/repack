@@ -1,6 +1,7 @@
 use crate::syntax::Object;
 
 
+#[derive(Debug)]
 pub enum ObjectValidationErrorType {
     CannotInherit = 1,
     CannotReuse,
@@ -37,6 +38,7 @@ impl ObjectValidationError {
 }
 
 
+#[derive(Debug)]
 pub struct ObjectValidationError {
     error_type: ObjectValidationErrorType,
     object_name: String,

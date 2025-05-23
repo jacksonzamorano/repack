@@ -31,19 +31,19 @@ impl OutputBuilder for PostgresBuilder {
             let mut constraints = String::new();
             sql.push_str(&format!("CREATE TABLE {} (\n", object.table()));
             for field in &object.fields {
-                let nullability = if field.optional {
-                    ""
-                } else {
-                    " NOT NULL"
-                };
-                let resolved_type = field.resolve_type(object, description)?;
-                let typ = type_to_psql(resolved_type).ok_or(
+                let nullability = if field.optional { "" } else { " NOT NULL" };
+                let typ = type_to_psql(&field.field_type).ok_or(
                     OutputBuilderError::UnsupportedFieldType(OutputBuilderFieldError::new(
                         object, field,
                     )),
                 )?;
-                if let FieldType::Ref(foreign_obj, foreign_field) = &field.field_type {
-                    let ref_field = description.field_result(object, field, foreign_obj, foreign_field)?;
+                if let Some(reference) = &field.reference {
+                    let ref_field = description.field_result(
+                        object,
+                        field,
+                        &reference.object_name,
+                        &reference.field_name,
+                    )?;
                     let cascade = if field.commands.contains(&FieldCommand::Cascade) {
                         " ON DELETE CASCADE"
                     } else {

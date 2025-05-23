@@ -1,5 +1,6 @@
 use crate::syntax::{Field, Object};
 
+#[derive(Debug)]
 pub enum FieldValidationErrorType {
     InvalidRefObject = 1,
     InvalidRefField,
@@ -40,6 +41,7 @@ impl FieldValidationError {
 }
 
 
+#[derive(Debug)]
 pub struct FieldValidationError {
     error_type: FieldValidationErrorType,
     object_name: String,

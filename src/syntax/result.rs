@@ -1,5 +1,8 @@
+use super::{
+    FieldValidationError, FileContents, Object, ObjectType, Output, Token, ValidationError,
+    dependancies::graph_valid, language,
+};
 use std::process::exit;
-use super::{dependancies::graph_valid, language, FileContents, Object, ObjectType, Output, Token};
 
 #[derive(Debug)]
 pub struct ParseResult {
@@ -8,7 +11,7 @@ pub struct ParseResult {
 }
 
 impl ParseResult {
-    pub fn from_contents(mut contents: FileContents) -> ParseResult {
+    pub fn from_contents(mut contents: FileContents) -> Result<ParseResult, ValidationError> {
         let mut objects = Vec::new();
         let mut languages = Vec::new();
 
@@ -25,7 +28,7 @@ impl ParseResult {
                         ObjectType::Struct,
                         &mut contents,
                     ));
-                },
+                }
                 Token::OutputType => {
                     if let Some(language) = language::Output::from_contents(&mut contents) {
                         languages.push(language);
@@ -35,7 +38,72 @@ impl ParseResult {
             }
         }
 
-        ParseResult { objects, languages }
+        let mut object_idx: usize = 0;
+        while object_idx < objects.len() {
+            let mut field_idx: usize = 0;
+            while field_idx < objects[object_idx].fields.len() {
+                if !objects[object_idx].fields[field_idx]
+                    .field_type
+                    .unresolved()
+                {
+                    field_idx += 1;
+                    continue;
+                }
+
+                if let Some(reference) = &objects[object_idx].fields[field_idx].reference {
+                    let referenced_object = &objects
+                        .iter()
+                        .find(|obj| obj.name == reference.object_name)
+                        .ok_or(ValidationError::Field(FieldValidationError::new(
+                            super::FieldValidationErrorType::InvalidRefObject,
+                            &objects[object_idx],
+                            &objects[object_idx].fields[field_idx],
+                        )))?;
+                    let referenced_field = referenced_object
+                        .fields
+                        .iter()
+                        .find(|f| f.name == reference.field_name)
+                        .ok_or(ValidationError::Field(FieldValidationError::new(
+                            super::FieldValidationErrorType::InvalidRefField,
+                            &objects[object_idx],
+                            &objects[object_idx].fields[field_idx],
+                        )))?;
+
+                    let field_type = referenced_field.field_type.clone();
+                    let optional = referenced_field.optional;
+                    objects[object_idx].fields[field_idx].field_type = field_type;
+                    objects[object_idx].fields[field_idx].optional = optional;
+                }
+                if let Some(reference) = &objects[object_idx].fields[field_idx].from {
+                    let referenced_object = &objects
+                        .iter()
+                        .find(|obj| obj.name == reference.object_name)
+                        .ok_or(ValidationError::Field(FieldValidationError::new(
+                            super::FieldValidationErrorType::InvalidRefObject,
+                            &objects[object_idx],
+                            &objects[object_idx].fields[field_idx],
+                        )))?;
+                    let referenced_field = referenced_object
+                        .fields
+                        .iter()
+                        .find(|f| f.name == reference.field_name)
+                        .ok_or(ValidationError::Field(FieldValidationError::new(
+                            super::FieldValidationErrorType::InvalidRefField,
+                            &objects[object_idx],
+                            &objects[object_idx].fields[field_idx],
+                        )))?;
+
+                    let field_type = referenced_field.field_type.clone();
+                    let optional = referenced_field.optional;
+                    objects[object_idx].fields[field_idx].field_type = field_type;
+                    objects[object_idx].fields[field_idx].optional = optional;
+                }
+                field_idx += 1;
+            }
+            object_idx += 1;
+        }
+
+        Ok(ParseResult { objects, languages })
     }
 
     pub fn validate(&self, should_exit: bool) {

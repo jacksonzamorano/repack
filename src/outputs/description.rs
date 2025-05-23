@@ -1,8 +1,4 @@
-use std::{
-    collections::HashMap,
-    env::current_dir,
-    fs,
-};
+use std::{collections::HashMap, env::current_dir, fs};
 
 use crate::syntax::{Field, Object, Output, ParseResult};
 
@@ -106,9 +102,30 @@ impl<'a> OutputDescription<'a> {
             .iter()
             .find(|obj| obj.name == name)
             .copied()
-            .ok_or(OutputBuilderError::ReferenceNotIncluded(
+            .ok_or(OutputBuilderError::FieldReferenceNotIncluded(
                 OutputBuilderFieldError::new(obj, field),
             ))
+    }
+
+    pub fn fields(&self, obj: &'a Object) -> Result<Vec<&'a Field>, OutputBuilderError> {
+        let mut fields = Vec::<&'a Field>::new();
+        for field in &obj.fields {
+            fields.push(field);
+        }
+        if let Some(inherit_name) = &obj.inherits {
+            let parent = self.objects.iter().find(|o| o.name == *inherit_name).ok_or(
+                OutputBuilderError::InheritenceReferenceNotIncluded(
+                    obj.name.clone(),
+                    inherit_name.clone(),
+                ),
+            );
+            if obj.reuse_all {
+                let mut parent_fields = self.fields(parent?)?;
+                parent_fields.retain(|x| !obj.reuse_exclude.contains(&x.name));
+                fields.append(&mut parent_fields);
+            }
+        }
+        return Ok(fields);
     }
 
     pub fn field(
