@@ -21,7 +21,7 @@ impl OutputBuilder for PostgresBuilder {
     fn build(&self, description: &mut OutputDescription) -> Result<(), OutputBuilderError> {
         let mut sql = String::new();
         sql.push_str("BEGIN;\n\n");
-        for object in description.objects() {
+        for object in description.objects().iter().rev() {
             sql.push_str("DROP TABLE IF EXISTS ");
             sql.push_str(object.table());
             sql.push_str(";\n");

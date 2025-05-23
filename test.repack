@@ -18,7 +18,6 @@ record User @users #backend {
 	password string
 	last_login datetime?
 	organization_id ref(Organization.id) #cascade
-	sent_email_id ref(SentEmail.id)
 }
 
 record Organization @orgs #backend {
