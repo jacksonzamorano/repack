@@ -41,7 +41,7 @@ impl OutputBuilder for TypescriptClassBuilder {
                 description.append(&file_name, format!("import {{ {} }} from './{}';\n", import, import));
             }
             description.append(&file_name, output);
-            if make_index(&description) {
+            if make_index(description) {
                 description.append("index.ts", format!("export {{ {} }} from './{}';\n", object.name, object.name));
             }
         }

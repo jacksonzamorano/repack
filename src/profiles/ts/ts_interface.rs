@@ -41,7 +41,7 @@ impl OutputBuilder for TypescriptInterfaceBuilder {
                 description.append(&file_name, format!("import type {{ {} }} from './{}';\n", import, import));
             }
             description.append(&file_name, output);
-            if make_index(&description) {
+            if make_index(description) {
                 description.append("index.ts", format!("export type {{ {} }} from './{}';\n", object.name, object.name));
             }
         }

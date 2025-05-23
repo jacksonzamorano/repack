@@ -2,13 +2,14 @@ output description @test/ {
 	print_commands false
 }
 
-output postgres @test/ #backend;
+output postgres @test/postgres #backend;
 output typescript_class @test/ts_classes {
 	make_index true
 }
 output typescript_interface @test/ts_interfaces {
 	make_index true
 }
+output rust @test/rust_vanilla;
 
 record SentEmail @sentemails #backend {
 	id int32 #pk #increment
