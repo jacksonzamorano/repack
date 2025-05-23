@@ -176,4 +176,17 @@ impl Object {
             Some(errors)
         }
     }
+
+
+    pub fn depends_on(&self) -> Vec<String> {
+        let mut dependencies = Vec::new();
+        for field in &self.fields {
+            if let FieldType::Ref(object_name, _) = &field.field_type {
+                if !dependencies.contains(object_name) {
+                    dependencies.push(object_name.clone());
+                }
+            }
+        }
+        dependencies
+    }
 }

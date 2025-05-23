@@ -27,9 +27,8 @@ impl OutputBuilder for PostgresBuilder {
             sql.push_str(";\n");
         }
 
-        let mut constraints = String::new();
-
         for object in description.objects() {
+            let mut constraints = String::new();
             sql.push_str(&format!("CREATE TABLE {} (\n", object.table()));
             for field in &object.fields {
                 let nullability = if field.optional {

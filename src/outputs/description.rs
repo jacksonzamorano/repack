@@ -1,4 +1,8 @@
-use std::{collections::HashMap, env::current_dir, fs};
+use std::{
+    collections::HashMap,
+    env::current_dir,
+    fs,
+};
 
 use crate::syntax::{Field, Object, Output, ParseResult};
 
@@ -9,15 +13,56 @@ pub struct FieldResult<'a> {
     pub object: &'a Object,
 }
 pub struct OutputDescription<'a> {
-    objects: &'a Vec<Object>,
+    objects: Vec<&'a Object>,
     pub output: &'a Output,
     pub buffers: HashMap<String, String>,
 }
 
 impl<'a> OutputDescription<'a> {
     pub fn new(result: &'a ParseResult, output: &'a Output) -> Self {
+        let mut objs = result
+            .objects
+            .iter()
+            .filter(|obj| {
+                // If the output has categories, filter the objects.
+                if !output.categories.is_empty()
+                    && !obj
+                        .categories
+                        .iter()
+                        .any(|cat| output.categories.contains(cat))
+                {
+                    return false;
+                }
+                if output.exclude.contains(&obj.name) {
+                    return false;
+                }
+                true
+            })
+            .collect::<Vec<_>>();
+
+        let mut i = 0;
+        while i < objs.len() {
+            let mut found_issue = false;
+            'dep_search: for dependancy in objs[i].depends_on() {
+                let mut x = i;
+                while x < objs.len() {
+                    if objs[x].name == dependancy {
+                        found_issue = true;
+                        break 'dep_search;
+                    }
+                    x += 1;
+                }
+            }
+            if found_issue {
+                let dep = objs.remove(i);
+                objs.push(dep);
+                i = 0
+            } else {
+                i += 1;
+            }
+        }
         Self {
-            objects: &result.objects,
+            objects: objs,
             output,
             buffers: HashMap::new(),
         }
@@ -47,64 +92,54 @@ impl<'a> OutputDescription<'a> {
         Ok(())
     }
 
-    fn _obj_is_valid(&self, obj: &Object) -> bool {
-        if !self.output.categories.is_empty() // Output is categorized
-            && !obj
-                .categories
-                .iter()
-                .any(|cat| self.output.categories.contains(cat))
-        {
-            return false;
-        }
-        if self.output.exclude.contains(&obj.name) {
-            return false;
-        }
-        true
+    pub fn objects(&self) -> Vec<&'a Object> {
+        self.objects.clone()
     }
 
-    pub fn objects(&self) -> Vec<&'a Object> {
+    pub fn object(
+        &self,
+        obj: &Object,
+        field: &Field,
+        name: &str,
+    ) -> Result<&'a Object, OutputBuilderError> {
         self.objects
             .iter()
-            .flat_map(|obj| {
-                if self._obj_is_valid(obj) {
-                    return Some(obj);
-                }
-                None
-            })
-            .collect()
+            .find(|obj| obj.name == name)
+            .copied()
+            .ok_or(OutputBuilderError::ReferenceNotIncluded(
+                OutputBuilderFieldError::new(obj, field),
+            ))
     }
 
-    pub fn object(&self, obj: &Object, field: &Field, name: &str) -> Result<&'a Object, OutputBuilderError> {
-        self.objects.iter().find(|obj| {
-            if self._obj_is_valid(obj) && obj.name == name {
-                return true;
-            }
-            false
-        }).ok_or(OutputBuilderError::ReferenceNotIncluded(
-            OutputBuilderFieldError::new(obj, field),
-        ))
+    pub fn field(
+        &self,
+        obj: &Object,
+        field: &Field,
+        name: &str,
+        field_name: &str,
+    ) -> Result<&'a Field, OutputBuilderError> {
+        self.object(obj, field, name).and_then(|obj| {
+            obj.fields.iter().find(|f| f.name == field_name).ok_or(
+                OutputBuilderError::FieldNotFound(OutputBuilderFieldError::new(obj, field)),
+            )
+        })
     }
 
-
-    pub fn field(&self, obj: &Object, field: &Field, name: &str, field_name: &str) -> Result<&'a Field, OutputBuilderError> {
-        self.object(obj, field, name)
-            .and_then(|obj| {
-                obj.fields.iter().find(|f| f.name == field_name).ok_or(
+    pub fn field_result(
+        &self,
+        obj: &Object,
+        field: &Field,
+        name: &str,
+        field_name: &str,
+    ) -> Result<FieldResult<'a>, OutputBuilderError> {
+        self.object(obj, field, name).and_then(|obj| {
+            Ok(FieldResult {
+                field: obj.fields.iter().find(|f| f.name == field_name).ok_or(
                     OutputBuilderError::FieldNotFound(OutputBuilderFieldError::new(obj, field)),
-                )
+                )?,
+                object: obj,
             })
-    }
-
-    pub fn field_result(&self, obj: &Object, field: &Field, name: &str, field_name: &str) -> Result<FieldResult<'a>, OutputBuilderError> {
-        self.object(obj, field, name)
-            .and_then(|obj| {
-                Ok(FieldResult {
-                    field: obj.fields.iter().find(|f| f.name == field_name).ok_or(
-                        OutputBuilderError::FieldNotFound(OutputBuilderFieldError::new(obj, field)),
-                    )?,
-                    object: obj,
-                })
-            })
+        })
     }
 
     pub fn bool(&self, key: &str, default: bool) -> bool {

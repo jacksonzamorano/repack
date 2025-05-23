@@ -1,5 +1,5 @@
 use std::process::exit;
-use super::{language, FileContents, Output, Object, ObjectType, Token};
+use super::{dependancies::graph_valid, language, FileContents, Object, ObjectType, Output, Token};
 
 #[derive(Debug)]
 pub struct ParseResult {
@@ -56,6 +56,10 @@ impl ParseResult {
                     println!("{}", error.message());
                 }
             }
+        }
+        if let Err(e) = graph_valid(&self.objects) {
+            has_errors = true;
+            println!("[ERROR] {}", e.message());
         }
         if has_errors {
             println!("Compilation failed.");

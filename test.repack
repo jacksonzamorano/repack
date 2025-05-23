@@ -5,11 +5,12 @@ output postgres @test/ #backend {
 	
 }
 
-record Organization @orgs #backend {
+record SentEmail @sentemails #backend {
 	id int32 #pk #increment
-	name string
-	email string
+	user_id ref(User.id)
+	org_id ref(Organization.id)
 }
+
 record User @users #backend {
 	id int32 #pk #increment
 	name string
@@ -17,6 +18,13 @@ record User @users #backend {
 	password string
 	last_login datetime?
 	organization_id ref(Organization.id) #cascade
+	sent_email_id ref(SentEmail.id)
+}
+
+record Organization @orgs #backend {
+	id int32 #pk #increment
+	name string
+	email string
 }
 
 struct OrganizationUser {

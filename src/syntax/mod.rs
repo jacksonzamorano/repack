@@ -6,6 +6,7 @@ mod parser;
 mod result;
 mod tokens;
 mod types;
+mod dependancies;
 
 pub use errors::*;
 pub use field::Field;
