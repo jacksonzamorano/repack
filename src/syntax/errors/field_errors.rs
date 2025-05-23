@@ -1,0 +1,56 @@
+use crate::syntax::{Field, Object};
+
+pub enum FieldValidationErrorType {
+    InvalidRefObject = 1,
+    InvalidRefField,
+    CustomNotAllowed,
+    CustomTypeNotFound,
+    ManyNotAllowed,
+    PrimaryKeyOptional,
+}
+
+impl FieldValidationError {
+    pub fn message(self) -> String {
+        let err = match self.error_type {
+            FieldValidationErrorType::InvalidRefField => {
+                "Reference field doesn't exist in the object.".to_string()
+            }
+            FieldValidationErrorType::InvalidRefObject => {
+                "Reference object doesn't exist.".to_string()
+            }
+            FieldValidationErrorType::CustomNotAllowed => {
+                "Custom types are not allowed in this context.".to_string()
+            }
+            FieldValidationErrorType::PrimaryKeyOptional => {
+                "Primary key cannot be optional.".to_string()
+            }
+            FieldValidationErrorType::ManyNotAllowed => {
+                "Many-to-many relationships are not allowed in this context.".to_string()
+            }
+            FieldValidationErrorType::CustomTypeNotFound => {
+                "Custom type not found.".to_string()
+            }
+        };
+
+        format!(
+            "[FE{:04}] {}.{}: {}",
+            self.error_type as u8, self.object_name, self.field_name, err
+        )
+    }
+}
+
+
+pub struct FieldValidationError {
+    error_type: FieldValidationErrorType,
+    object_name: String,
+    field_name: String,
+}
+impl FieldValidationError {
+    pub fn new(error_type: FieldValidationErrorType, object: &Object, field: &Field) -> Self {
+        Self {
+            error_type,
+            object_name: object.name.clone(),
+            field_name: field.name.clone(),
+        }
+    }
+}

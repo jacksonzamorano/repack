@@ -1,15 +1,17 @@
+mod errors;
 mod field;
-mod types;
+mod language;
 mod object;
 mod parser;
-mod syntax;
+mod result;
 mod tokens;
-mod error;
+mod types;
 
+pub use errors::*;
 pub use field::Field;
-pub use types::*;
+pub use language::Output;
 pub use object::{Object, ObjectType};
 pub use parser::FileContents;
-pub use syntax::ParseResult;
+pub use result::ParseResult;
 pub use tokens::*;
-pub use error::*;
+pub use types::*;

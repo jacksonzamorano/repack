@@ -19,8 +19,9 @@ pub enum Token {
     Minus,
 
     Literal(String),
-    Language,
+    OutputType,
     RecordType,
+    StructType,
     Ref,
 }
 impl Token {
@@ -48,8 +49,9 @@ impl Token {
     }
     pub fn from_string(string: &str) -> Token {
         match string.trim() {
-            "language" => Token::Language,
+            "output" => Token::OutputType,
             "record" => Token::RecordType,
+            "struct" => Token::StructType,
             "ref"  => Token::Ref,
             _ => Token::Literal(string.trim().to_string()),
         }

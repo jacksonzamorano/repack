@@ -1,15 +1,5 @@
-language go {
-	output test/go
-	file model
-	dto yes
-}
-language typescript {
-	output test/ts
-	make_index yes
-	constructors yes
-}
-language postgres {
-	output test/postgres
+output description {
+
 }
 
 record Organization @orgs {
@@ -17,11 +7,16 @@ record Organization @orgs {
 	name string
 	email string
 }
-record User @users {
+record User @users #backend {
 	id int32 #pk #increment
 	name string
 	email string?
 	password string
 	last_login datetime?
 	organization_id ref(Organization.id) #cascade
+}
+
+struct OrganizationUser {
+	organization Organization
+	user User
 }

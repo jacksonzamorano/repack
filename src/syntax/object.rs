@@ -15,6 +15,7 @@ pub struct Object {
     pub name: String,
     pub fields: Vec<Field>,
     pub inherits: Option<String>,
+    pub categories: Vec<String>,
     pub table_name: Option<String>,
     pub reuse_all: bool,
     pub reuse_exclude: Vec<String>,
@@ -29,6 +30,7 @@ impl Object {
         };
         let name = name_ref.to_string();
         let mut fields = Vec::new();
+        let mut categories = Vec::new();
         let mut inherits = None;
         let mut table_name = None;
         let mut reuse_all = false;
@@ -47,6 +49,11 @@ impl Object {
                         Some(Token::Literal(lit)) => Some(lit.to_string()),
                         _ => None,
                     };
+                }
+                Token::Pound => {
+                    if let Some(Token::Literal(lit)) = contents.next() {
+                        categories.push(lit.to_string());
+                    }
                 }
                 Token::OpenBrace => {
                     break 'header;
@@ -85,6 +92,7 @@ impl Object {
             table_name,
             reuse_all,
             reuse_exclude,
+            categories,
         }
     }
 
@@ -135,17 +143,27 @@ impl Object {
             }
         }
         for field in &self.fields {
-            if let FieldType::Ref(object_name, field_name) = &field.field_type {
-                if let Some(object) = result.objects.iter().find(|o| o.name == *object_name) {
-                    if object.fields.iter().all(|f| f.name != *field_name) {
+            match &field.field_type {
+                FieldType::Ref(object_name, field_name) => {
+                    if let Some(object) = result.objects.iter().find(|o| o.name == *object_name) {
+                        if !object.fields.iter().any(|f| f.name == *field_name) {
+                            errors.push(
+                                self.field_error(FieldValidationErrorType::InvalidRefField, field),
+                            );
+                        }
+                    } else {
+                        errors
+                            .push(self.field_error(FieldValidationErrorType::InvalidRefObject, field));
+                    }
+                }
+                FieldType::Custom(object_name) => {
+                    if !result.objects.iter().any(|o| o.name == *object_name) {
                         errors.push(
-                            self.field_error(FieldValidationErrorType::InvalidRefField, field),
+                            self.field_error(FieldValidationErrorType::CustomTypeNotFound, field),
                         );
                     }
-                } else {
-                    errors
-                        .push(self.field_error(FieldValidationErrorType::InvalidRefObject, field));
                 }
+                _ => {}
             }
         }
         if errors.is_empty() {

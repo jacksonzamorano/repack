@@ -1,11 +1,12 @@
-use language::FileContents;
+use syntax::FileContents;
 
-mod language;
+mod syntax;
+mod outputs;
 
 fn main() {
     let mut contents = FileContents::new();
     contents.read("test.repack");
-    let parse_result = language::ParseResult::from_contents(contents);
+    let parse_result = syntax::ParseResult::from_contents(contents);
     parse_result.validate(false);
-    // dbg!(parse_result);
+    dbg!(parse_result.languages);
 }
