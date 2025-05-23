@@ -17,6 +17,7 @@ pub enum Token {
     At,
     Colon,
     Minus,
+    Semicolon,
 
     Literal(String),
     OutputType,
@@ -44,6 +45,7 @@ impl Token {
             b'@' => Some(Token::At),
             b':' => Some(Token::Colon),
             b'-' => Some(Token::Minus),
+            b';' => Some(Token::Semicolon),
             _ => None,
         }
     }

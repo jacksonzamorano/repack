@@ -1,11 +1,13 @@
 use crate::outputs::OutputBuilder;
 
-use super::{DescriptionBuilder, PostgresBuilder};
+use super::{DescriptionBuilder, PostgresBuilder, TypescriptClassBuilder, TypescriptInterfaceBuilder};
 
 #[derive(Debug)]
 pub enum OutputProfile {
     Description,
     PostgresInit,
+    TypescriptClass,
+    TypescriptInterface
 }
 
 impl OutputProfile {
@@ -13,6 +15,8 @@ impl OutputProfile {
         match keyword {
             "description" => Some(OutputProfile::Description),
             "postgres" => Some(OutputProfile::PostgresInit),
+            "typescript_class" => Some(OutputProfile::TypescriptClass),
+            "typescript_interface" => Some(OutputProfile::TypescriptInterface),
             _ => None,
         }
     }
@@ -20,6 +24,8 @@ impl OutputProfile {
         match self {
             OutputProfile::Description => Box::new(DescriptionBuilder {}),
             OutputProfile::PostgresInit => Box::new(PostgresBuilder {}),
+            OutputProfile::TypescriptClass => Box::new(TypescriptClassBuilder {}),
+            OutputProfile::TypescriptInterface => Box::new(TypescriptInterfaceBuilder {}),
         }
     }
 }

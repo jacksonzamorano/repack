@@ -1,6 +1,8 @@
-use std::collections::HashMap;
+use super::{
+    FileContents, LanguageValidationError, LanguageValidationErrorType, Token, ValidationError,
+};
 use crate::profiles::OutputProfile;
-use super::{FileContents, LanguageValidationError, LanguageValidationErrorType, Token, ValidationError};
+use std::collections::HashMap;
 
 #[derive(Debug)]
 pub struct Output {
@@ -23,7 +25,8 @@ impl Output {
         let mut options = HashMap::new();
         let mut categories = Vec::new();
         let mut exclude = Vec::new();
-        
+
+        let mut empty = false;
         while let Some(token) = contents.next() {
             match token {
                 Token::At => {
@@ -39,31 +42,37 @@ impl Output {
                 Token::OpenBrace => {
                     break;
                 }
+                Token::Semicolon => {
+                    empty = true;
+                    break;
+                }
                 _ => {}
             }
         }
 
-        while let Some(token) = contents.next() {
-            match token {
-                Token::Minus => {
-                    if let Some(Token::Literal(lit)) = contents.next() {
-                        exclude.push(lit.to_string());
+        if !empty {
+            while let Some(token) = contents.next() {
+                match token {
+                    Token::Minus => {
+                        if let Some(Token::Literal(lit)) = contents.next() {
+                            exclude.push(lit.to_string());
+                        }
                     }
+                    Token::Literal(lit) => {
+                        let key = lit.to_string();
+                        let value = match contents.next() {
+                            Some(Token::Literal(lit)) => lit.to_string(),
+                            _ => {
+                                continue;
+                            }
+                        };
+                        options.insert(key, value);
+                    }
+                    Token::CloseBrace => {
+                        break;
+                    }
+                    _ => {}
                 }
-                Token::Literal(lit) => {
-                    let key = lit.to_string();
-                    let value = match contents.next() {
-                        Some(Token::Literal(lit)) => lit.to_string(),
-                        _ => {
-                            continue;
-                        },
-                    };
-                    options.insert(key, value);
-                }
-                Token::CloseBrace => {
-                    break;
-                }
-                _ => {}
             }
         }
 
@@ -76,10 +85,7 @@ impl Output {
         })
     }
 
-    fn make_error(
-        &self,
-        error_type: LanguageValidationErrorType,
-    ) -> ValidationError {
+    fn make_error(&self, error_type: LanguageValidationErrorType) -> ValidationError {
         ValidationError::Language(LanguageValidationError::new(error_type, self))
     }
 

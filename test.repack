@@ -1,8 +1,13 @@
 output description @test/ {
 	print_commands false
 }
-output postgres @test/ #backend {
-	
+
+output postgres @test/ #backend;
+output typescript_class @test/ts_classes {
+	make_index true
+}
+output typescript_interface @test/ts_interfaces {
+	make_index true
 }
 
 record SentEmail @sentemails #backend {
@@ -29,4 +34,9 @@ record Organization @orgs #backend {
 struct OrganizationUser {
 	organization Organization
 	user User
+}
+
+struct OrganizationDirectory {
+	organization Organization
+	user User #many
 }
