@@ -8,14 +8,6 @@ pub enum ObjectType {
     Record,
     Struct,
 }
-impl ToString for ObjectType {
-    fn to_string(&self) -> String {
-        match self {
-            ObjectType::Record => "Record".to_string(),
-            ObjectType::Struct => "Struct".to_string(),
-        }
-    }
-}
 
 #[derive(Debug)]
 pub struct Object {
@@ -87,7 +79,7 @@ impl Object {
 
         Object {
             object_type: typ,
-            name: name,
+            name,
             fields,
             inherits,
             table_name,
@@ -108,13 +100,10 @@ impl Object {
         let mut errors = Vec::new();
         if self.object_type == ObjectType::Record {
             for field in &self.fields {
-                match &field.field_type {
-                    FieldType::Custom(_) => {
-                        errors.push(
-                            self.field_error(FieldValidationErrorType::CustomNotAllowed, field),
-                        );
-                    }
-                    _ => {}
+                if let FieldType::Custom(_) = &field.field_type {
+                    errors.push(
+                        self.field_error(FieldValidationErrorType::CustomNotAllowed, field),
+                    );
                 }
                 if field.optional && field.commands.contains(&FieldCommand::PrimaryKey) {
                     errors.push(

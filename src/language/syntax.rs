@@ -11,14 +11,11 @@ impl ParseResult {
         let mut objects = Vec::new();
 
         while let Some(token) = contents.next() {
-            match *token {
-                Token::RecordType => {
-                    objects.push(Object::read_from_contents(
-                        ObjectType::Record,
-                        &mut contents,
-                    ));
-                }
-                _ => {}
+            if *token == Token::RecordType {
+                objects.push(Object::read_from_contents(
+                    ObjectType::Record,
+                    &mut contents,
+                ));
             }
         }
 
@@ -31,7 +28,7 @@ impl ParseResult {
             if let Some(errors) = object.errors(self) {
                 has_errors = true;
                 for error in errors {
-                    println!("{}", error.to_string());
+                    println!("{}", error.message());
                 }
             }
         }

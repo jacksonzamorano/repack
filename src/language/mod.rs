@@ -1,5 +1,5 @@
 mod field;
-mod language;
+mod types;
 mod object;
 mod parser;
 mod syntax;
@@ -7,7 +7,7 @@ mod tokens;
 mod error;
 
 pub use field::Field;
-pub use language::*;
+pub use types::*;
 pub use object::{Object, ObjectType};
 pub use parser::FileContents;
 pub use syntax::ParseResult;

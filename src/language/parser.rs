@@ -34,12 +34,10 @@ impl FileContents {
                         None => {
                             if !b.is_ascii_whitespace() {
                                 buf.push(b as char);
-                            } else {
-                                if !buf.is_empty() {
-                                    // Handle the buffer content
-                                    self.contents.push(Token::from_string(&buf));
-                                    buf.clear();
-                                }
+                            } else if !buf.is_empty() {
+                                // Handle the buffer content
+                                self.contents.push(Token::from_string(&buf));
+                                buf.clear();
                             }
                         }
                     }

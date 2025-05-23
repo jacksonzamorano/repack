@@ -1,14 +1,67 @@
 use super::{Field, Object};
+impl ObjectValidationError {
+    pub fn message(self) -> String {
+        let err = match self.error_type {
+            ObjectValidationErrorType::CannotInherit => {
+                "Struct types don't support inheritance.".to_string()
+            }
+            ObjectValidationErrorType::CannotReuse => {
+                "Reuse is not allowed in this context.".to_string()
+            }
+            ObjectValidationErrorType::TableNameRequired => {
+                "Records must have a table name.".to_string()
+            }
+            ObjectValidationErrorType::TableNameNotAllowed => {
+                "Structs cannot have a table name.".to_string()
+            }
+            ObjectValidationErrorType::NoFields => {
+                "Records must have at least one field.".to_string()
+            }
+        };
+
+        format!(
+            "[OE{:04}] {}: {}",
+            self.error_type as u8, self.object_name, err
+        )
+    }
+}
+
+impl FieldValidationError {
+    fn message(self) -> String {
+        let err = match self.error_type {
+            FieldValidationErrorType::InvalidRefField => {
+                "Reference field doesn't exist in the object.".to_string()
+            }
+            FieldValidationErrorType::InvalidRefObject => {
+                "Reference object doesn't exist.".to_string()
+            }
+            FieldValidationErrorType::CustomNotAllowed => {
+                "Custom types are not allowed in this context.".to_string()
+            }
+            FieldValidationErrorType::PrimaryKeyOptional => {
+                "Primary key cannot be optional.".to_string()
+            }
+            FieldValidationErrorType::ManyNotAllowed => {
+                "Many-to-many relationships are not allowed in this context.".to_string()
+            }
+        };
+
+        format!(
+            "[FE{:04}] {}.{}: {}",
+            self.error_type as u8, self.object_name, self.field_name, err
+        )
+    }
+}
 
 pub enum ValidationError {
     Object(ObjectValidationError),
     Field(FieldValidationError),
 }
 impl ValidationError {
-    pub fn to_string(self) -> String {
+    pub fn message(self) -> String {
         match self {
-            ValidationError::Object(err) => err.to_string(),
-            ValidationError::Field(err) => err.to_string(),
+            ValidationError::Object(err) => err.message(),
+            ValidationError::Field(err) => err.message(),
         }
     }
 }
@@ -39,28 +92,6 @@ impl ObjectValidationError {
             object_name: object.name.clone(),
         }
     }
-
-    pub fn to_string(self) -> String {
-        let err = match self.error_type {
-            ObjectValidationErrorType::CannotInherit => {
-                format!("Struct types don't support inheritance.")
-            }
-            ObjectValidationErrorType::CannotReuse => {
-                format!("Reuse is not allowed in this context.")
-            }
-            ObjectValidationErrorType::TableNameRequired => {
-                format!("Records must have a table name.")
-            }
-            ObjectValidationErrorType::TableNameNotAllowed => {
-                format!("Structs cannot have a table name.")
-            }
-            ObjectValidationErrorType::NoFields => {
-                format!("Records must have at least one field.")
-            }
-        };
-
-        return format!("[OE{:04}] {}: {}", self.error_type as u8, self.object_name, err);
-    }
 }
 pub struct FieldValidationError {
     error_type: FieldValidationErrorType,
@@ -74,27 +105,5 @@ impl FieldValidationError {
             object_name: object.name.clone(),
             field_name: field.name.clone(),
         }
-    }
-
-    pub fn to_string(self) -> String {
-        let err = match self.error_type {
-            FieldValidationErrorType::InvalidRefField => {
-                format!("Reference field doesn't exist in the object.")
-            },
-            FieldValidationErrorType::InvalidRefObject => {
-                format!("Reference object doesn't exist.")
-            }
-            FieldValidationErrorType::CustomNotAllowed => {
-                format!("Custom types are not allowed in this context.")
-            }
-            FieldValidationErrorType::PrimaryKeyOptional => {
-                format!("Primary key cannot be optional.")
-            }
-            FieldValidationErrorType::ManyNotAllowed => {
-                format!("Many-to-many relationships are not allowed in this context.")
-            }
-        };
-
-        return format!("[FE{:04}] {}.{}: {}", self.error_type as u8, self.object_name, self.field_name, err);
     }
 }

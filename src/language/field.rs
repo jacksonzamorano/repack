@@ -9,11 +9,9 @@ pub struct Field {
 }
 impl Field {
     pub fn from_contents(name: String, contents: &mut FileContents) -> Option<Field> {
-        let Some(type_token) = contents.next() else {
-            return None;
-        };
+        let type_token = contents.next()?;
         let field_type: FieldType = match type_token {
-            Token::Literal(literal) => FieldType::from_string(&literal),
+            Token::Literal(literal) => FieldType::from_string(literal),
             Token::Ref => {
                 let mut object_name = String::new();
                 let mut field_name = String::new();
@@ -55,7 +53,7 @@ impl Field {
             match token {
                 Token::Pound => {
                     if let Some(Token::Literal(cmd)) = contents.next() {
-                        if let Some(command) = FieldCommand::from_string(&cmd) {
+                        if let Some(command) = FieldCommand::from_string(cmd) {
                             commands.push(command);
                         }
                     }
