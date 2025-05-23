@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 
 use super::{Object, ValidationError};
 
-pub fn graph_valid(objects: &Vec<Object>) -> Result<(), ValidationError> {
+pub fn graph_valid(objects: &[Object]) -> Result<(), ValidationError> {
     let mut graph: VecDeque<Vec<String>> = VecDeque::new();
     for obj in objects.iter() {
         graph.push_back(vec![obj.name.clone()]);
