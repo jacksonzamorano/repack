@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 #[derive(Debug, PartialEq)]
 pub enum FieldType {
     String,
@@ -9,7 +11,22 @@ pub enum FieldType {
     Ref(String, String),
     Custom(String)
 }
+impl Display for FieldType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let res = match self {
+            FieldType::String => "string".to_string(),
+            FieldType::Int64 => "int64".to_string(),
+            FieldType::Int32 => "int32".to_string(),
+            FieldType::Float64 => "float64".to_string(),
+            FieldType::Boolean => "boolean".to_string(),
+            FieldType::DateTime => "datetime".to_string(),
+            FieldType::Ref(object_name, field_name) => format!("{}:{}", object_name, field_name),
+            FieldType::Custom(s) => s.clone()
+        };
+        write!(f, "{}", res)
+    }
 
+}
 impl FieldType {
     pub fn from_string(s: &str) -> FieldType {
         match s {

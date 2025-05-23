@@ -1,8 +1,11 @@
 output description @test/ {
 	print_commands false
 }
+output postgres @test/ #backend {
+	
+}
 
-record Organization @orgs {
+record Organization @orgs #backend {
 	id int32 #pk #increment
 	name string
 	email string

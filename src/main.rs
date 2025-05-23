@@ -1,4 +1,4 @@
-use outputs::{OutputBuilder, OutputDescription};
+use outputs::OutputDescription;
 use profiles::OutputProfile;
 use syntax::FileContents;
 
