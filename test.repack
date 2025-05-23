@@ -1,0 +1,27 @@
+language go {
+	output test/go
+	file model
+	dto yes
+}
+language typescript {
+	output test/ts
+	make_index yes
+	constructors yes
+}
+language postgres {
+	output test/postgres
+}
+
+record Organization @orgs {
+	id int32 #pk #increment
+	name string
+	email string
+}
+record User @users {
+	id int32 #pk #increment
+	name string
+	email string?
+	password string
+	last_login datetime?
+	organization_id ref(Organization.id) #cascade
+}

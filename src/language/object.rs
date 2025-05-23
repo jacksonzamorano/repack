@@ -1,0 +1,168 @@
+use super::{
+    Field, FieldCommand, FieldType, FieldValidationError, FieldValidationErrorType, FileContents,
+    ObjectValidationError, ObjectValidationErrorType, ParseResult, Token, ValidationError,
+};
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum ObjectType {
+    Record,
+    Struct,
+}
+impl ToString for ObjectType {
+    fn to_string(&self) -> String {
+        match self {
+            ObjectType::Record => "Record".to_string(),
+            ObjectType::Struct => "Struct".to_string(),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Object {
+    pub object_type: ObjectType,
+    pub name: String,
+    pub fields: Vec<Field>,
+    pub inherits: Option<String>,
+    pub table_name: Option<String>,
+    pub reuse_all: bool,
+    pub reuse_exclude: Vec<String>,
+}
+impl Object {
+    pub fn read_from_contents(typ: ObjectType, contents: &mut FileContents) -> Object {
+        let Some(name_opt) = contents.next() else {
+            panic!("Read record type, expected a name but got end of file.");
+        };
+        let Token::Literal(name_ref) = name_opt else {
+            panic!("Read record type, expected a name but got {:?}", name_opt);
+        };
+        let name = name_ref.to_string();
+        let mut fields = Vec::new();
+        let mut inherits = None;
+        let mut table_name = None;
+        let mut reuse_all = false;
+        let mut reuse_exclude = Vec::new();
+
+        'header: while let Some(token) = contents.next() {
+            match token {
+                Token::At => {
+                    table_name = match contents.next() {
+                        Some(Token::Literal(lit)) => Some(lit.to_string()),
+                        _ => None,
+                    };
+                }
+                Token::Colon => {
+                    inherits = match contents.next() {
+                        Some(Token::Literal(lit)) => Some(lit.to_string()),
+                        _ => None,
+                    };
+                }
+                Token::OpenBrace => {
+                    break 'header;
+                }
+                _ => {}
+            }
+        }
+
+        'cmd: while let Some(token) = contents.next() {
+            match token {
+                Token::CloseBrace => {
+                    break 'cmd;
+                }
+                Token::Literal(lit) => {
+                    if let Some(field) = Field::from_contents(lit.to_string(), contents) {
+                        fields.push(field);
+                    }
+                }
+                Token::Star => {
+                    reuse_all = true;
+                }
+                Token::Minus => {
+                    if let Some(Token::Literal(lit)) = contents.next() {
+                        reuse_exclude.push(lit.to_string());
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        Object {
+            object_type: typ,
+            name: name,
+            fields,
+            inherits,
+            table_name,
+            reuse_all,
+            reuse_exclude,
+        }
+    }
+
+    fn field_error(&self, error: FieldValidationErrorType, field: &Field) -> ValidationError {
+        ValidationError::Field(FieldValidationError::new(error, self, field))
+    }
+
+    fn object_error(&self, error: ObjectValidationErrorType) -> ValidationError {
+        ValidationError::Object(ObjectValidationError::new(error, self))
+    }
+
+    pub fn errors(&self, result: &ParseResult) -> Option<Vec<ValidationError>> {
+        let mut errors = Vec::new();
+        if self.object_type == ObjectType::Record {
+            for field in &self.fields {
+                match &field.field_type {
+                    FieldType::Custom(_) => {
+                        errors.push(
+                            self.field_error(FieldValidationErrorType::CustomNotAllowed, field),
+                        );
+                    }
+                    _ => {}
+                }
+                if field.optional && field.commands.contains(&FieldCommand::PrimaryKey) {
+                    errors.push(
+                        self.field_error(FieldValidationErrorType::PrimaryKeyOptional, field),
+                    );
+                }
+                if field.commands.contains(&FieldCommand::Many) {
+                    errors.push(self.field_error(FieldValidationErrorType::ManyNotAllowed, field));
+                }
+            }
+            if self.table_name.is_none() {
+                errors.push(self.object_error(ObjectValidationErrorType::TableNameRequired));
+            }
+            if self.fields.is_empty() {
+                errors.push(self.object_error(ObjectValidationErrorType::NoFields));
+            }
+        } else if self.object_type == ObjectType::Struct {
+            if self.inherits.is_some() {
+                errors.push(self.object_error(ObjectValidationErrorType::CannotInherit));
+            }
+            if self.reuse_all {
+                errors.push(self.object_error(ObjectValidationErrorType::CannotReuse));
+            }
+            if !self.reuse_exclude.is_empty() {
+                errors.push(self.object_error(ObjectValidationErrorType::CannotReuse));
+            }
+            if self.table_name.is_some() {
+                errors.push(self.object_error(ObjectValidationErrorType::TableNameNotAllowed));
+            }
+        }
+        for field in &self.fields {
+            if let FieldType::Ref(object_name, field_name) = &field.field_type {
+                if let Some(object) = result.objects.iter().find(|o| o.name == *object_name) {
+                    if object.fields.iter().all(|f| f.name != *field_name) {
+                        errors.push(
+                            self.field_error(FieldValidationErrorType::InvalidRefField, field),
+                        );
+                    }
+                } else {
+                    errors
+                        .push(self.field_error(FieldValidationErrorType::InvalidRefObject, field));
+                }
+            }
+        }
+        if errors.is_empty() {
+            None
+        } else {
+            Some(errors)
+        }
+    }
+}
