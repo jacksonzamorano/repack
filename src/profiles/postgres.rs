@@ -1,6 +1,6 @@
 use crate::{
     outputs::{OutputBuilder, OutputBuilderError, OutputBuilderFieldError, OutputDescription},
-    syntax::FieldType,
+    syntax::{FieldCommand, FieldType},
 };
 
 fn type_to_psql(field_type: &FieldType) -> Option<String> {
@@ -44,11 +44,17 @@ impl OutputBuilder for PostgresBuilder {
                 )?;
                 if let FieldType::Ref(foreign_obj, foreign_field) = &field.field_type {
                     let ref_field = description.field_result(object, field, foreign_obj, foreign_field)?;
+                    let cascade = if field.commands.contains(&FieldCommand::Cascade) {
+                        " ON DELETE CASCADE"
+                    } else {
+                        ""
+                    };
                     constraints.push_str(&format!(
-                        "\tFOREIGN KEY ({}) REFERENCES {}({}),\n",
+                        "\tFOREIGN KEY ({}) REFERENCES {}({}){},\n",
                         field.name,
                         ref_field.object.table(),
                         ref_field.field.name,
+                        cascade
                     ));
                 }
                 sql.push_str(&format!("\t{} {}{},\n", field.name, typ, nullability));

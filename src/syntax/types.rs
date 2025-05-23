@@ -47,6 +47,7 @@ pub enum FieldCommand {
     Many,
     PrimaryKey,
     Increment,
+    Cascade,
 }
 impl  FieldCommand {
     pub fn string(&self) -> String {
@@ -55,6 +56,7 @@ impl  FieldCommand {
             FieldCommand::Many => "Many".to_string(),
             FieldCommand::PrimaryKey => "Primary Key".to_string(),
             FieldCommand::Increment => "Auto Increment".to_string(),
+            FieldCommand::Cascade => "Cascade".to_string(),
         }
     }
 }
@@ -65,6 +67,7 @@ impl FieldCommand {
             "many" => Some(FieldCommand::Many),
             "pk" => Some(FieldCommand::PrimaryKey),
             "increment" => Some(FieldCommand::Increment),
+            "cascade" => Some(FieldCommand::Cascade),
             _ => None
         }
     }
