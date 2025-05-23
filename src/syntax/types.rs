@@ -31,6 +31,16 @@ pub enum FieldCommand {
     PrimaryKey,
     Increment,
 }
+impl  FieldCommand {
+    pub fn string(&self) -> String {
+        match self {
+            FieldCommand::Default => "Default Value".to_string(),
+            FieldCommand::Many => "Many".to_string(),
+            FieldCommand::PrimaryKey => "Primary Key".to_string(),
+            FieldCommand::Increment => "Auto Increment".to_string(),
+        }
+    }
+}
 impl FieldCommand {
     pub fn from_string(s: &str) -> Option<FieldCommand> {
         match s {

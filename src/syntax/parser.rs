@@ -16,34 +16,28 @@ impl FileContents {
     }
 
     pub fn read(&mut self, filename: &str) {
-        let file = std::fs::File::open(filename).expect("Unable to open file");
-        let contents = file.bytes();
+        let mut file = std::fs::File::open(filename).expect("Unable to open file");
+        let mut contents = vec![];
+        _ = file.read_to_end(&mut contents);
 
         let mut buf: String = String::new();
         for byte in contents {
-            match byte {
-                Ok(b) => {
-                    match Token::from_byte(b) {
-                        Some(token) => {
-                            if !buf.is_empty() {
-                                self.contents.push(Token::from_string(&buf));
-                                buf.clear();
-                            }
-                            self.contents.push(token);
-                        }
-                        None => {
-                            if !b.is_ascii_whitespace() {
-                                buf.push(b as char);
-                            } else if !buf.is_empty() {
-                                // Handle the buffer content
-                                self.contents.push(Token::from_string(&buf));
-                                buf.clear();
-                            }
-                        }
+            match Token::from_byte(byte) {
+                Some(token) => {
+                    if !buf.is_empty() {
+                        self.contents.push(Token::from_string(&buf));
+                        buf.clear();
                     }
+                    self.contents.push(token);
                 }
-                Err(e) => {
-                    eprintln!("Error reading byte: {}", e);
+                None => {
+                    if !byte.is_ascii_whitespace() {
+                        buf.push(byte as char);
+                    } else if !buf.is_empty() {
+                        // Handle the buffer content
+                        self.contents.push(Token::from_string(&buf));
+                        buf.clear();
+                    }
                 }
             }
         }

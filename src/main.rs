@@ -2,9 +2,9 @@ use outputs::{OutputBuilder, OutputDescription};
 use profiles::OutputProfile;
 use syntax::FileContents;
 
+mod outputs;
 mod profiles;
 mod syntax;
-mod outputs;
 
 fn main() {
     let mut contents = FileContents::new();
@@ -16,12 +16,16 @@ fn main() {
         let mut description = OutputDescription::new(&parse_result, output);
         let profile = OutputProfile::from_keyword(&output.profile).unwrap();
         let builder = profile.builder();
-        match builder.build(output, &mut description) {
+        match builder.build(&mut description) {
             Ok(_) => {
-                println!("[{}] Built successfully!", output.profile);
+                if let Err(e) = description.flush() {
+                    println!("[{}] Failed to build: {}", output.profile, e.description());
+                } else {
+                    println!("[{}] Built successfully!", output.profile);
+                }
             }
             Err(e) => {
-                eprintln!("[{}] Failed to build: {}", output.profile, e.to_string());
+                println!("[{}] Failed to build: {}", output.profile, e.description());
             }
         };
     }

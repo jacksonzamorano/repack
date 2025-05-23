@@ -1,5 +1,5 @@
-output description {
-
+output description @test/ {
+	print_commands false
 }
 
 record Organization @orgs {
