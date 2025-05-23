@@ -1,14 +1,11 @@
 use std::collections::HashMap;
-
-
-use crate::outputs::OutputProfile;
-
+use crate::profiles::OutputProfile;
 use super::{FileContents, LanguageValidationError, LanguageValidationErrorType, Token, ValidationError};
 
 #[derive(Debug)]
 pub struct Output {
     pub profile: String,
-    pub location: String,
+    pub location: Option<String>,
     pub categories: Vec<String>,
     pub options: HashMap<String, String>,
     pub exclude: Vec<String>,
@@ -22,7 +19,7 @@ impl Output {
             panic!("Read record type, expected a name but got {:?}", name_opt);
         };
         let output_language = name_ref.to_string();
-        let mut location = "./".to_string();
+        let mut location = None;
         let mut options = HashMap::new();
         let mut categories = Vec::new();
         let mut exclude = Vec::new();
@@ -31,7 +28,7 @@ impl Output {
             match token {
                 Token::At => {
                     if let Some(Token::Literal(lit)) = contents.next() {
-                        location = lit.to_string();
+                        location = Some(lit.to_string());
                     }
                 }
                 Token::Pound => {
