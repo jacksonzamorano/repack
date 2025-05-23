@@ -97,7 +97,7 @@ impl Object {
     }
 
     pub fn table(&self) -> &String {
-        return self.table_name.as_ref().unwrap()
+        self.table_name.as_ref().unwrap()
     }
 
     fn field_error(&self, error: FieldValidationErrorType, field: &Field) -> ValidationError {

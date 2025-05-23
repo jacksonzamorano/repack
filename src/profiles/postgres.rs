@@ -23,7 +23,7 @@ impl OutputBuilder for PostgresBuilder {
         sql.push_str("BEGIN;\n\n");
         for object in description.objects() {
             sql.push_str("DROP TABLE IF EXISTS ");
-            sql.push_str(&object.table());
+            sql.push_str(object.table());
             sql.push_str(";\n");
         }
 
@@ -44,7 +44,7 @@ impl OutputBuilder for PostgresBuilder {
                     )),
                 )?;
                 if let FieldType::Ref(foreign_obj, foreign_field) = &field.field_type {
-                    let ref_field = description.field_result(object, field, &foreign_obj, &foreign_field)?;
+                    let ref_field = description.field_result(object, field, foreign_obj, foreign_field)?;
                     constraints.push_str(&format!(
                         "\tFOREIGN KEY ({}) REFERENCES {}({}),\n",
                         field.name,

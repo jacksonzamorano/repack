@@ -1,6 +1,6 @@
 use std::{collections::HashMap, env::current_dir, fs};
 
-use crate::syntax::{Field, Object, ObjectValidationError, Output, ParseResult};
+use crate::syntax::{Field, Object, Output, ParseResult};
 
 use super::{OutputBuilderError, OutputBuilderFieldError};
 
