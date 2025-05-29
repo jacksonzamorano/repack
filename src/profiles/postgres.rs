@@ -1,6 +1,6 @@
 use crate::{
     outputs::{OutputBuilder, OutputBuilderError, OutputBuilderFieldError, OutputDescription},
-    syntax::{FieldCommand, FieldType},
+    syntax::{FieldCommand, FieldReferenceKind, FieldType},
 };
 
 fn type_to_psql(field_type: &FieldType) -> Option<String> {
@@ -32,30 +32,29 @@ impl OutputBuilder for PostgresBuilder {
             sql.push_str(&format!("CREATE TABLE {} (\n", object.table()));
             for field in &object.fields {
                 let nullability = if field.optional { "" } else { " NOT NULL" };
-                let typ = type_to_psql(&field.field_type).ok_or(
+                let typ = type_to_psql(field.field_type()).ok_or(
                     OutputBuilderError::UnsupportedFieldType(OutputBuilderFieldError::new(
                         object, field,
                     )),
                 )?;
-                if let Some(reference) = &field.reference {
-                    let ref_field = description.field_result(
-                        object,
-                        field,
-                        &reference.object_name,
-                        &reference.field_name,
-                    )?;
-                    let cascade = if field.commands.contains(&FieldCommand::Cascade) {
-                        " ON DELETE CASCADE"
-                    } else {
-                        ""
-                    };
-                    constraints.push_str(&format!(
-                        "\tFOREIGN KEY ({}) REFERENCES {}({}){},\n",
-                        field.name,
-                        ref_field.object.table(),
-                        ref_field.field.name,
-                        cascade
-                    ));
+                match &field.location.reference {
+                    FieldReferenceKind::FieldType(table_ref) => {
+                        let ref_obj = description.object_by_name(table_ref)?;
+                        let ref_field = description.field_by_name(ref_obj, &field.location.name)?;
+                        let cascade = if field.commands.contains(&FieldCommand::Cascade) {
+                            " ON DELETE CASCADE"
+                        } else {
+                            ""
+                        };
+                        constraints.push_str(&format!(
+                            "\tFOREIGN KEY ({}) REFERENCES {}({}){},\n",
+                            field.name,
+                            ref_obj.table(),
+                            ref_field.name,
+                            cascade
+                        ));
+                    }
+                    _ => {}
                 }
                 sql.push_str(&format!("\t{} {}{},\n", field.name, typ, nullability));
             }

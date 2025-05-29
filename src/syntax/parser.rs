@@ -70,4 +70,8 @@ impl FileContents {
             None
         }
     }
+
+    pub fn skip(&mut self) {
+        self.index += 1;
+    }
 }

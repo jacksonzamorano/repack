@@ -12,7 +12,7 @@ impl OutputBuilderFieldError {
         OutputBuilderFieldError {
             object_name: object.name.clone(),
             field_name: field.name.clone(),
-            field_type: field.field_type.to_string(),
+            field_type: field.field_type().to_string(),
         }
     }
 }
@@ -23,6 +23,7 @@ pub enum OutputBuilderError {
     InheritenceReferenceNotIncluded(String, String),
     FieldReferenceNotIncluded(OutputBuilderFieldError),
     FieldNotFound(OutputBuilderFieldError),
+    ObjectNotIncluded(String),
 }
 
 impl OutputBuilderError {
@@ -41,6 +42,9 @@ impl OutputBuilderError {
             OutputBuilderError::FieldNotFound(err) => {
                 format!("{}.{} requests type {} but the field couldn't be found.", err.object_name, err.field_name, err.field_type)
             },
+            OutputBuilderError::ObjectNotIncluded(obj) => {
+                format!("Expected to find {} in the output but it wasn't included.", obj)
+            }
         }
     }
 }

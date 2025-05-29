@@ -107,25 +107,25 @@ impl<'a> OutputDescription<'a> {
             ))
     }
 
-    pub fn fields(&self, obj: &'a Object) -> Result<Vec<&'a Field>, OutputBuilderError> {
-        let mut fields = Vec::<&'a Field>::new();
-        for field in &obj.fields {
-            fields.push(field);
-        }
-        if let Some(inherit_name) = &obj.inherits {
-            let parent = self.objects.iter().find(|o| o.name == *inherit_name).ok_or(
-                OutputBuilderError::InheritenceReferenceNotIncluded(
-                    obj.name.clone(),
-                    inherit_name.clone(),
-                ),
-            );
-            if obj.reuse_all {
-                let mut parent_fields = self.fields(parent?)?;
-                parent_fields.retain(|x| !obj.reuse_exclude.contains(&x.name));
-                fields.append(&mut parent_fields);
-            }
-        }
-        return Ok(fields);
+    pub fn object_by_name(&self, obj_name: &str) -> Result<&'a Object, OutputBuilderError> {
+        self.objects
+            .iter()
+            .find(|obj| obj.name == obj_name)
+            .copied()
+            .ok_or(OutputBuilderError::ObjectNotIncluded(obj_name.to_string()))
+    }
+
+    pub fn field_by_name(
+        &self,
+        obj: &'a Object,
+        field_name: &str,
+    ) -> Result<&'a Field, OutputBuilderError> {
+        Ok(
+            obj.fields
+                .iter()
+                .find(|field| field.name == field_name)
+                .unwrap(),
+        )
     }
 
     pub fn field(

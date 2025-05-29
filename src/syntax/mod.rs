@@ -9,7 +9,7 @@ mod types;
 mod dependancies;
 
 pub use errors::*;
-pub use field::Field;
+pub use field::*;
 pub use language::Output;
 pub use object::{Object, ObjectType};
 pub use parser::FileContents;

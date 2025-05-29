@@ -1,65 +1,76 @@
 use super::{FieldCommand, FieldType, FileContents, Token};
 
-#[derive(Debug)]
-pub struct FieldReference {
-    pub object_name: String,
-    pub field_name: String,
+#[derive(Debug, Clone)]
+pub struct FieldLocation {
+    pub reference: FieldReferenceKind,
+    pub name: String, // Could be name
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
+pub enum FieldReferenceKind {
+    Local,
+    FieldType(String),
+    JoinData(String),
+}
+
+#[derive(Debug, Clone)]
 pub struct Field {
-    pub name: String,
-    pub field_type: FieldType,
+    pub name: String, // Could be name or aliased field name
+    pub location: FieldLocation,
+    pub field_type: Option<FieldType>,
     pub optional: bool,
     pub commands: Vec<FieldCommand>,
-    pub from: Option<FieldReference>,
-    pub reference: Option<FieldReference>,
 }
 impl Field {
-    pub fn from_join(join: String, field: String, alias: Option<String>) -> Field {
-        Field {
-            name: alias.unwrap_or(field.clone()),
-            field_type: FieldType::Unresolved,
-            optional: true,
-            from: Some(FieldReference {
-                object_name: join.clone(),
-                field_name: field.clone(),
-            }),
-            reference: None,
-            commands: Vec::new(),
-        }
+    /// Only safe for use in profile/output code.
+    pub fn field_type(&self) -> &FieldType {
+        return self.field_type.as_ref().unwrap();
     }
     pub fn from_contents(name: String, contents: &mut FileContents) -> Option<Field> {
-        let type_token = contents.next()?;
-        let mut reference: Option<FieldReference> = None;
-        let field_type: FieldType = match type_token {
-            Token::Literal(literal) => FieldType::from_string(literal),
+        let type_token = contents.take()?;
+        let field_type_loc: (Option<FieldType>, FieldLocation) = match type_token {
+            Token::Literal(literal) => (
+                Some(FieldType::from_string(&literal)),
+                FieldLocation {
+                    reference: FieldReferenceKind::Local,
+                    name: literal,
+                },
+            ),
+            Token::From => {
+                contents.skip(); // Skip (
+                let Some(Token::Literal(entity_name)) = contents.take() else {
+                    return None;
+                };
+                contents.skip(); // Skip .
+                let Some(Token::Literal(field_name)) = contents.take() else {
+                    return None;
+                };
+                contents.skip(); // Skip )
+                (
+                    None,
+                    FieldLocation {
+                        reference: FieldReferenceKind::JoinData(entity_name),
+                        name: field_name,
+                    },
+                )
+            }
             Token::Ref => {
-                let mut object_name = String::new();
-                let mut field_name = String::new();
-                while let Some(token) = contents.next() {
-                    match token {
-                        Token::OpenParen => {
-                            if let Some(Token::Literal(lit)) = contents.next() {
-                                object_name = lit.to_string();
-                            }
-                        }
-                        Token::Period => {
-                            if let Some(Token::Literal(lit)) = contents.next() {
-                                field_name = lit.to_string();
-                                break;
-                            }
-                        }
-                        _ => {
-                            return None;
-                        }
-                    }
-                }
-                reference = Some(FieldReference {
-                    object_name,
-                    field_name,
-                });
-                FieldType::Unresolved
+                contents.skip(); // Skip (
+                let Some(Token::Literal(entity_name)) = contents.take() else {
+                    return None;
+                };
+                contents.skip(); // Skip .
+                let Some(Token::Literal(field_name)) = contents.take() else {
+                    return None;
+                };
+                contents.skip(); // Skip )
+                (
+                    None,
+                    FieldLocation {
+                        reference: FieldReferenceKind::FieldType(entity_name),
+                        name: field_name,
+                    },
+                )
             }
             _ => {
                 return None;
@@ -93,11 +104,10 @@ impl Field {
 
         Some(Field {
             name,
-            field_type,
+            field_type: field_type_loc.0,
+            location: field_type_loc.1,
             optional,
             commands,
-            from: None,
-            reference,
         })
     }
 }

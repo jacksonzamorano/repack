@@ -9,7 +9,7 @@ pub enum FieldType {
     Boolean,
     DateTime,
     Custom(String),
-    Unresolved,
+    FutureType
 }
 impl Display for FieldType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -20,8 +20,8 @@ impl Display for FieldType {
             FieldType::Float64 => "float64".to_string(),
             FieldType::Boolean => "boolean".to_string(),
             FieldType::DateTime => "datetime".to_string(),
-            FieldType::Unresolved => "unresolved".to_string(),
-            FieldType::Custom(s) => s.clone()
+            FieldType::Custom(s) => s.clone(),
+            FieldType::FutureType => "FUTURE TYPE".to_string()
         };
         write!(f, "{}", res)
     }
@@ -39,15 +39,9 @@ impl FieldType {
             _ => FieldType::Custom(s.to_string())
         }
     }
-    pub fn unresolved(&self) -> bool {
-        match self {
-            FieldType::Unresolved => true,
-            _ => false
-        }
-    }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum FieldCommand {
     Default,
     Many,

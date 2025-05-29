@@ -28,12 +28,14 @@ fn main() {
             Ok(_) => {
                 if let Err(e) = description.flush() {
                     println!("[{}] Failed to build: {}", output.profile, e.description());
+                    exit(2);
                 } else {
                     println!("[{}] Built successfully!", output.profile);
                 }
             }
             Err(e) => {
                 println!("[{}] Failed to build: {}", output.profile, e.description());
+                exit(2);
             }
         };
     }

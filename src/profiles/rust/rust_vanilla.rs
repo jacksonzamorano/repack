@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::outputs::OutputBuilder;
+use crate::{outputs::OutputBuilder, syntax::FieldType};
 
 use super::type_to_rust;
 
@@ -16,12 +16,12 @@ impl OutputBuilder for RustBuilder {
         for object in description.objects() {
             output.push_str(&format!("pub struct {} {{\n", object.name));
             for field in &object.fields {
-                let rust_type = type_to_rust(&field.field_type).ok_or(
+                let rust_type = type_to_rust(field.field_type()).ok_or(
                     crate::outputs::OutputBuilderError::UnsupportedFieldType(
                         crate::outputs::OutputBuilderFieldError::new(object, field),
                     ),
                 )?;
-                if field.field_type == crate::syntax::FieldType::DateTime {
+                if *field.field_type() == FieldType::DateTime {
                     imports.insert("use chrono::NaiveDateTime;".to_string());
                 }
                 let optional = if field.optional { "Option<" } else { "" };

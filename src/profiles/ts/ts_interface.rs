@@ -1,4 +1,4 @@
-use crate::{outputs::{OutputBuilder, OutputBuilderError}, syntax::FieldCommand};
+use crate::{outputs::{OutputBuilder, OutputBuilderError}, syntax::{FieldCommand, FieldType}};
 
 use super::{make_index, type_to_ts};
 
@@ -11,7 +11,7 @@ impl OutputBuilder for TypescriptInterfaceBuilder {
             let mut output = String::new();
             output.push_str(&format!("export interface {} {{\n", object.name));
             for field in &object.fields {
-                let ts_type = type_to_ts(&field.field_type).ok_or(
+                let ts_type = type_to_ts(field.field_type()).ok_or(
                     OutputBuilderError::UnsupportedFieldType(crate::outputs::OutputBuilderFieldError::new(
                         object, field,
                     )),
@@ -26,7 +26,7 @@ impl OutputBuilder for TypescriptInterfaceBuilder {
                 } else {
                     ""
                 };
-                if let crate::syntax::FieldType::Custom(name) = &field.field_type {
+                if let FieldType::Custom(name) = field.field_type() {
                     if !imports.contains(name) {
                         imports.push(name.clone());
                     }

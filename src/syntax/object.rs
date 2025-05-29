@@ -1,6 +1,9 @@
+use std::collections::HashSet;
+
 use super::{
     Field, FieldCommand, FieldType, FieldValidationError, FieldValidationErrorType, FileContents,
     ObjectValidationError, ObjectValidationErrorType, ParseResult, Token, ValidationError,
+    field::FieldReferenceKind,
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -90,35 +93,15 @@ impl Object {
                         reuse_exclude.push(lit.to_string());
                     }
                 }
-                Token::Plus => {
-                    let Some(Token::Literal(val)) = contents.take() else {
-                        continue;
-                    };
-                    let Some(Token::Period) = contents.next() else {
-                        continue;
-                    };
-                    let Some(Token::Literal(field)) = contents.take() else {
-                        continue;
-                    };
-                    let mut alias = None;
-                    if let Some(Token::As) = contents.next() {
-                        if let Some(Token::Literal(lit)) = contents.take() {
-                            alias = Some(lit.to_string());
-                        }
-                    }
-                    let field = Field::from_join(val, field, alias);
-                    fields.push(field);
-                }
                 Token::Ampersand => {
                     let Some(Token::Literal(foreign_object)) = contents.take() else {
                         continue;
                     };
-                    let Some(Token::Ampersand) = contents.take() else {
-                        continue;
-                    };
-                    let Some(Token::Literal(join_name)) = contents.take() else {
-                        continue;
-                    };
+                    let mut name = foreign_object.clone();
+                    if let Some(Token::Literal(alias)) = contents.peek() {
+                        name = alias.to_string();
+                        contents.skip()
+                    }
                     let Some(Token::Where) = contents.take() else {
                         continue;
                     };
@@ -133,7 +116,7 @@ impl Object {
                     };
                     joins.push(ObjectJoin {
                         object_name: foreign_object,
-                        join_name: join_name,
+                        join_name: name,
                         local_field: local_field,
                         foreign_field: foreign_field,
                     });
@@ -171,7 +154,11 @@ impl Object {
         let mut errors = Vec::new();
         if self.object_type == ObjectType::Record {
             for field in &self.fields {
-                if let FieldType::Custom(_) = &field.field_type {
+                let Some(field_type) = &field.field_type else {
+                    errors.push(self.field_error(FieldValidationErrorType::TypeNotResolved, field));
+                    continue;
+                };
+                if let FieldType::Custom(_) = field_type {
                     errors
                         .push(self.field_error(FieldValidationErrorType::CustomNotAllowed, field));
                 }
@@ -205,11 +192,15 @@ impl Object {
             }
         }
         for field in &self.fields {
-            match &field.field_type {
+            let Some(field_type) = &field.field_type else {
+                errors.push(self.field_error(FieldValidationErrorType::TypeNotResolved, field));
+                continue;
+            };
+            match field_type {
                 FieldType::Custom(object_name) => {
                     if !result.objects.iter().any(|o| o.name == *object_name) {
                         errors.push(
-                            self.field_error(FieldValidationErrorType::CustomTypeNotFound, field),
+                            self.field_error(FieldValidationErrorType::CustomNotAllowed, field),
                         );
                     }
                 }
@@ -224,19 +215,33 @@ impl Object {
     }
 
     pub fn depends_on(&self) -> Vec<String> {
-        let mut dependencies = Vec::new();
+        let mut dependencies = HashSet::new();
         for field in &self.fields {
-            if let Some(reference) = &field.reference {
-                if !dependencies.contains(&reference.object_name) {
-                    dependencies.push(reference.object_name.clone());
+            match &field.location.reference {
+                FieldReferenceKind::FieldType(foreign_obj) => {
+                    dependencies.insert(foreign_obj.to_string());
+                }
+                FieldReferenceKind::JoinData(join_name) => {
+                    let Some(ref_field) = self.fields.iter().find(|field| field.name == *join_name)
+                    else {
+                        continue;
+                    };
+                    let FieldReferenceKind::FieldType(foreign_obj) = &ref_field.location.reference
+                    else {
+                        continue;
+                    };
+                    dependencies.insert(foreign_obj.to_string());
+                }
+                _ => {
+                    continue;
                 }
             }
         }
-        for join in &self.joins {
-            if !dependencies.contains(&join.object_name) {
-                dependencies.push(join.object_name.clone());
-            }
-        }
-        dependencies
+        // for join in &self.joins {
+        //     if !dependencies.contains(&join.object_name) {
+        //         dependencies.push(join.object_name.clone());
+        //     }
+        // }
+        dependencies.into_iter().collect()
     }
 }

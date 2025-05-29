@@ -8,6 +8,9 @@ pub enum FieldValidationErrorType {
     CustomTypeNotFound,
     ManyNotAllowed,
     PrimaryKeyOptional,
+    TypeNotResolved,
+    FromFieldNotFound,
+    FromFieldIsNotReference,
 }
 
 impl FieldValidationError {
@@ -30,6 +33,15 @@ impl FieldValidationError {
             }
             FieldValidationErrorType::CustomTypeNotFound => {
                 "Custom type not found.".to_string()
+            }
+            FieldValidationErrorType::FromFieldNotFound => {
+                "From field not found.".to_string()
+            }
+            FieldValidationErrorType::FromFieldIsNotReference => {
+                "From field found, but does not reference another record.".to_string()
+            }
+            FieldValidationErrorType::TypeNotResolved => {
+                "Type could not be resolved.".to_string()
             }
         };
 
