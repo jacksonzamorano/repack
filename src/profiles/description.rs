@@ -8,7 +8,7 @@ impl OutputBuilder for DescriptionBuilder {
         for object in description.objects() {
             description.append(DESCRIPTION_FILE, format!("{}\n", object.name));
             for field in &object.fields {
-                description.append(DESCRIPTION_FILE, format!("\t- {}: {}\n", field.name, field.field_type().to_string()));
+                description.append(DESCRIPTION_FILE, format!("\t- {}: {}\n", field.name, field.field_type()));
                 if field.optional {
                     description.append(DESCRIPTION_FILE, "\t\t- optional\n".to_string());
                 }

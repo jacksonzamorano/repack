@@ -37,24 +37,21 @@ impl OutputBuilder for PostgresBuilder {
                         object, field,
                     )),
                 )?;
-                match &field.location.reference {
-                    FieldReferenceKind::FieldType(table_ref) => {
-                        let ref_obj = description.object_by_name(table_ref)?;
-                        let ref_field = description.field_by_name(ref_obj, &field.location.name)?;
-                        let cascade = if field.commands.contains(&FieldCommand::Cascade) {
-                            " ON DELETE CASCADE"
-                        } else {
-                            ""
-                        };
-                        constraints.push_str(&format!(
-                            "\tFOREIGN KEY ({}) REFERENCES {}({}){},\n",
-                            field.name,
-                            ref_obj.table(),
-                            ref_field.name,
-                            cascade
-                        ));
-                    }
-                    _ => {}
+                if let FieldReferenceKind::FieldType(table_ref) = &field.location.reference {
+                    let ref_obj = description.object_by_name(table_ref)?;
+                    let ref_field = description.field_by_name(ref_obj, &field.location.name)?;
+                    let cascade = if field.commands.contains(&FieldCommand::Cascade) {
+                        " ON DELETE CASCADE"
+                    } else {
+                        ""
+                    };
+                    constraints.push_str(&format!(
+                        "\tFOREIGN KEY ({}) REFERENCES {}({}){},\n",
+                        field.name,
+                        ref_obj.table(),
+                        ref_field.name,
+                        cascade
+                    ));
                 }
                 sql.push_str(&format!("\t{} {}{},\n", field.name, typ, nullability));
             }

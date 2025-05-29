@@ -1,13 +1,7 @@
 use std::{collections::HashMap, env::current_dir, fs};
-
 use crate::syntax::{Field, Object, Output, ParseResult};
+use super::OutputBuilderError;
 
-use super::{OutputBuilderError, OutputBuilderFieldError};
-
-pub struct FieldResult<'a> {
-    pub field: &'a Field,
-    pub object: &'a Object,
-}
 pub struct OutputDescription<'a> {
     objects: Vec<&'a Object>,
     pub output: &'a Output,
@@ -92,21 +86,6 @@ impl<'a> OutputDescription<'a> {
         self.objects.clone()
     }
 
-    pub fn object(
-        &self,
-        obj: &Object,
-        field: &Field,
-        name: &str,
-    ) -> Result<&'a Object, OutputBuilderError> {
-        self.objects
-            .iter()
-            .find(|obj| obj.name == name)
-            .copied()
-            .ok_or(OutputBuilderError::FieldReferenceNotIncluded(
-                OutputBuilderFieldError::new(obj, field),
-            ))
-    }
-
     pub fn object_by_name(&self, obj_name: &str) -> Result<&'a Object, OutputBuilderError> {
         self.objects
             .iter()
@@ -126,37 +105,6 @@ impl<'a> OutputDescription<'a> {
                 .find(|field| field.name == field_name)
                 .unwrap(),
         )
-    }
-
-    pub fn field(
-        &self,
-        obj: &Object,
-        field: &Field,
-        name: &str,
-        field_name: &str,
-    ) -> Result<&'a Field, OutputBuilderError> {
-        self.object(obj, field, name).and_then(|obj| {
-            obj.fields.iter().find(|f| f.name == field_name).ok_or(
-                OutputBuilderError::FieldNotFound(OutputBuilderFieldError::new(obj, field)),
-            )
-        })
-    }
-
-    pub fn field_result(
-        &self,
-        obj: &Object,
-        field: &Field,
-        name: &str,
-        field_name: &str,
-    ) -> Result<FieldResult<'a>, OutputBuilderError> {
-        self.object(obj, field, name).and_then(|obj| {
-            Ok(FieldResult {
-                field: obj.fields.iter().find(|f| f.name == field_name).ok_or(
-                    OutputBuilderError::FieldNotFound(OutputBuilderFieldError::new(obj, field)),
-                )?,
-                object: obj,
-            })
-        })
     }
 
     pub fn bool(&self, key: &str, default: bool) -> bool {

@@ -24,7 +24,7 @@ pub struct Field {
 impl Field {
     /// Only safe for use in profile/output code.
     pub fn field_type(&self) -> &FieldType {
-        return self.field_type.as_ref().unwrap();
+        self.field_type.as_ref().unwrap()
     }
     pub fn from_contents(name: String, contents: &mut FileContents) -> Option<Field> {
         let type_token = contents.take()?;

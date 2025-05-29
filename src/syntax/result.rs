@@ -1,7 +1,7 @@
 use crate::syntax::FieldReferenceKind;
 
 use super::{
-    FieldValidationError, FileContents, Object, ObjectType, Output, Token, ValidationError,
+    FileContents, Object, ObjectType, Output, Token, ValidationError,
     dependancies::graph_valid, language,
 };
 use std::process::exit;
@@ -98,7 +98,7 @@ impl ParseResult {
                             .find(|field| {
                                 field.name == objects[object_idx].fields[field_idx].location.name
                             })
-                            .ok_or(ValidationError::JoinFieldUnresolvable(
+                            .ok_or(ValidationError::RefFieldUnresolvable(
                                 objects[object_idx].name.to_string(),
                                 objects[object_idx].fields[field_idx].name.to_string(),
                             ))?;
@@ -109,7 +109,7 @@ impl ParseResult {
                         let referenced_entity = objects
                             .iter()
                             .find(|obj| obj.name == *joining_entity)
-                            .ok_or(ValidationError::JoinFieldUnresolvable(
+                            .ok_or(ValidationError::RefFieldUnresolvable(
                                 objects[object_idx].name.to_string(),
                                 objects[object_idx].fields[field_idx].name.to_string(),
                             ))?;
@@ -119,7 +119,7 @@ impl ParseResult {
                             .find(|field| {
                                 field.name == objects[object_idx].fields[field_idx].location.name
                             })
-                            .ok_or(ValidationError::JoinFieldUnresolvable(
+                            .ok_or(ValidationError::RefFieldUnresolvable(
                                 objects[object_idx].name.to_string(),
                                 objects[object_idx].fields[field_idx].name.to_string(),
                             ))?;

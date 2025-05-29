@@ -2,26 +2,15 @@ use crate::syntax::{Field, Object};
 
 #[derive(Debug)]
 pub enum FieldValidationErrorType {
-    InvalidRefObject = 1,
-    InvalidRefField,
-    CustomNotAllowed,
-    CustomTypeNotFound,
+    CustomNotAllowed = 1,
     ManyNotAllowed,
     PrimaryKeyOptional,
     TypeNotResolved,
-    FromFieldNotFound,
-    FromFieldIsNotReference,
 }
 
 impl FieldValidationError {
     pub fn message(self) -> String {
         let err = match self.error_type {
-            FieldValidationErrorType::InvalidRefField => {
-                "Reference field doesn't exist in the object.".to_string()
-            }
-            FieldValidationErrorType::InvalidRefObject => {
-                "Reference object doesn't exist.".to_string()
-            }
             FieldValidationErrorType::CustomNotAllowed => {
                 "Custom types are not allowed in this context.".to_string()
             }
@@ -30,15 +19,6 @@ impl FieldValidationError {
             }
             FieldValidationErrorType::ManyNotAllowed => {
                 "Many-to-many relationships are not allowed in this context.".to_string()
-            }
-            FieldValidationErrorType::CustomTypeNotFound => {
-                "Custom type not found.".to_string()
-            }
-            FieldValidationErrorType::FromFieldNotFound => {
-                "From field not found.".to_string()
-            }
-            FieldValidationErrorType::FromFieldIsNotReference => {
-                "From field found, but does not reference another record.".to_string()
             }
             FieldValidationErrorType::TypeNotResolved => {
                 "Type could not be resolved.".to_string()

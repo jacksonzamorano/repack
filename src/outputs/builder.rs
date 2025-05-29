@@ -20,9 +20,6 @@ impl OutputBuilderFieldError {
 pub enum OutputBuilderError {
     CannotOpenFile,
     UnsupportedFieldType(OutputBuilderFieldError),
-    InheritenceReferenceNotIncluded(String, String),
-    FieldReferenceNotIncluded(OutputBuilderFieldError),
-    FieldNotFound(OutputBuilderFieldError),
     ObjectNotIncluded(String),
 }
 
@@ -32,15 +29,6 @@ impl OutputBuilderError {
             OutputBuilderError::CannotOpenFile => "Cannot open file.".to_string(),
             OutputBuilderError::UnsupportedFieldType(err) => {
                 format!("{}.{} requests type {} but this output doesn't support it.", err.object_name, err.field_name, err.field_type)
-            },
-            OutputBuilderError::InheritenceReferenceNotIncluded(object_name, parent_name) => {
-                format!("{} inherits from {} but {} isn't included in this output.", object_name, parent_name, parent_name)
-            },
-            OutputBuilderError::FieldReferenceNotIncluded(err) => {
-                format!("{}.{} requests type {} but this output doesn't include it.", err.object_name, err.field_name, err.field_type)
-            },
-            OutputBuilderError::FieldNotFound(err) => {
-                format!("{}.{} requests type {} but the field couldn't be found.", err.object_name, err.field_name, err.field_type)
             },
             OutputBuilderError::ObjectNotIncluded(obj) => {
                 format!("Expected to find {} in the output but it wasn't included.", obj)

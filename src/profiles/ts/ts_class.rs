@@ -11,7 +11,7 @@ impl OutputBuilder for TypescriptClassBuilder {
             let mut output = String::new();
             output.push_str(&format!("export class {} {{\n", object.name));
             for field in &object.fields {
-                let ts_type = type_to_ts(&field.field_type()).ok_or(
+                let ts_type = type_to_ts(field.field_type()).ok_or(
                     OutputBuilderError::UnsupportedFieldType(crate::outputs::OutputBuilderFieldError::new(
                         object, field,
                     )),

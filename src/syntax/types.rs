@@ -36,6 +36,7 @@ impl FieldType {
             "float64" => FieldType::Float64,
             "boolean" => FieldType::Boolean,
             "datetime" => FieldType::DateTime,
+            "___" => FieldType::FutureType,
             _ => FieldType::Custom(s.to_string())
         }
     }

@@ -13,14 +13,6 @@ pub enum ObjectType {
 }
 
 #[derive(Debug)]
-pub struct ObjectJoin {
-    pub object_name: String,
-    pub join_name: String,
-    pub local_field: String,
-    pub foreign_field: String,
-}
-
-#[derive(Debug)]
 pub struct Object {
     pub object_type: ObjectType,
     pub name: String,
@@ -30,7 +22,6 @@ pub struct Object {
     pub table_name: Option<String>,
     pub reuse_all: bool,
     pub reuse_exclude: Vec<String>,
-    pub joins: Vec<ObjectJoin>,
 }
 impl Object {
     pub fn read_from_contents(typ: ObjectType, contents: &mut FileContents) -> Object {
@@ -47,7 +38,6 @@ impl Object {
         let mut table_name = None;
         let mut reuse_all = false;
         let mut reuse_exclude = Vec::new();
-        let mut joins: Vec<ObjectJoin> = Vec::new();
 
         'header: while let Some(token) = contents.next() {
             match token {
@@ -93,34 +83,6 @@ impl Object {
                         reuse_exclude.push(lit.to_string());
                     }
                 }
-                Token::Ampersand => {
-                    let Some(Token::Literal(foreign_object)) = contents.take() else {
-                        continue;
-                    };
-                    let mut name = foreign_object.clone();
-                    if let Some(Token::Literal(alias)) = contents.peek() {
-                        name = alias.to_string();
-                        contents.skip()
-                    }
-                    let Some(Token::Where) = contents.take() else {
-                        continue;
-                    };
-                    let Some(Token::Literal(local_field)) = contents.take() else {
-                        continue;
-                    };
-                    let Some(Token::Equals) = contents.take() else {
-                        continue;
-                    };
-                    let Some(Token::Literal(foreign_field)) = contents.take() else {
-                        continue;
-                    };
-                    joins.push(ObjectJoin {
-                        object_name: foreign_object,
-                        join_name: name,
-                        local_field: local_field,
-                        foreign_field: foreign_field,
-                    });
-                }
                 _ => {}
             }
         }
@@ -134,7 +96,6 @@ impl Object {
             reuse_all,
             reuse_exclude,
             categories,
-            joins,
         }
     }
 
@@ -196,15 +157,12 @@ impl Object {
                 errors.push(self.field_error(FieldValidationErrorType::TypeNotResolved, field));
                 continue;
             };
-            match field_type {
-                FieldType::Custom(object_name) => {
-                    if !result.objects.iter().any(|o| o.name == *object_name) {
-                        errors.push(
-                            self.field_error(FieldValidationErrorType::CustomNotAllowed, field),
-                        );
-                    }
+            if let FieldType::Custom(object_name) = field_type {
+                if !result.objects.iter().any(|o| o.name == *object_name) {
+                    errors.push(
+                        self.field_error(FieldValidationErrorType::CustomNotAllowed, field),
+                    );
                 }
-                _ => {}
             }
         }
         if errors.is_empty() {
