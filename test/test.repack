@@ -1,6 +1,6 @@
 import "test-import.repack"
 
-output description @test {
+output description @test/description {
 	print_commands true
 }
 
