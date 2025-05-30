@@ -116,6 +116,24 @@ impl<'a> OutputDescription<'a> {
         Ok(())
     }
 
+    pub fn clean(&mut self) -> Result<(), RepackError> {
+        let mut root_path = current_dir()
+            .map_err(|_| RepackError::from_lang(RepackErrorKind::CannotWriteFile, &self.output))?;
+        if let Some(path) = &self.output.location {
+            root_path.push(path);
+        }
+        for (name, _) in &self.buffers {
+            let mut file_path = root_path.clone();
+            file_path.push(name);
+            _ = fs::remove_file(file_path);
+        }
+        let mut entries = fs::read_dir(&root_path).unwrap();
+        if entries.next().is_none() {
+            _ = fs::remove_dir_all(&root_path);
+        }
+        return Ok(());
+    }
+
     pub fn objects(&self) -> Vec<&'a Object> {
         self.objects.clone()
     }

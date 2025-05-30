@@ -1,0 +1,6 @@
+# repack #
+Repack is a robust codegen tool for writing your models once.
+
+Usage:
+repack file.repack
+repack file.repack --clean
