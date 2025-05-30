@@ -1,4 +1,4 @@
-export interface UserPublic {
+export interface UserWithOrg {
 	id: number;
 	name: string;
 	email: string;
@@ -6,5 +6,5 @@ export interface UserPublic {
 	last_login: Date;
 	total_cost: number;
 	org_id: number;
-	personal_org_id: number;
+	org_name: string;
 }

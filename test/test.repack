@@ -4,7 +4,7 @@ output description @test {
 	print_commands true
 }
 
-output postgres @test/postgres #models;
+output postgres @test/postgres #models #views;
 output typescript_class @test/ts_classes #data {
 	make_index true
 }
@@ -13,13 +13,6 @@ output typescript_interface @test/ts_interfaces #data {
 }
 output typescript_drizzle @test/ts_drizzle #models;
 output rust @test/rust_vanilla #data #private;
-
-
-record UserPublicNoOrg: UserPublic #data {
-	*
-	- org_name
-	- org_id
-}
 
 record User @users #private #models {
 	id int32 #pk #generated #unique
@@ -41,10 +34,12 @@ record Organization @orgs #models #data {
 
 record UserPublic: User #data {
 	*
-	org_name from(org_id.name)
-	- personal_org_id
+	- password
 }
 
-struct OrgModel #data {
-	user UserPublic
+record AllUserList: UserPublic #views {
+	*
+	org_name from(org_id.name)
+	- personal_org_id
+	- password
 }

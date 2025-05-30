@@ -170,10 +170,11 @@ impl Object {
             };
             if let FieldType::Custom(object_name) = field_type {
                 if !result.objects.iter().any(|o| o.name == *object_name) {
-                    errors.push(RepackError::from_field(
-                        RepackErrorKind::CustomTypeNotAllowed,
+                    errors.push(RepackError::from_field_with_msg(
+                        RepackErrorKind::CustomTypeNotDefined,
                         self,
                         field,
+                        object_name.to_string(),
                     ));
                 }
             }

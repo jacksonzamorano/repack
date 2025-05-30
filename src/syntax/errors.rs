@@ -20,7 +20,9 @@ pub enum RepackErrorKind {
     ManyNotAllowed,
     PrimaryKeyOptional,
     CustomTypeNotAllowed,
+    CustomTypeNotDefined,
     TypeNotResolved,
+    ExpectedReference,
 }
 impl RepackErrorKind {
     pub fn as_string(&self) -> &'static str {
@@ -35,8 +37,8 @@ impl RepackErrorKind {
                 "This definition creates a circular dependancy with:"
             }
             Self::UnknownLanguage => "Repack doesn't recognize this language. Make sure you are running the latest version.",
-            Self::RefFieldUnresolvable => "Could not resolve the 'ref' reference.",
-            Self::JoinFieldUnresolvable => "Could not resolve the 'from' reference.",
+            Self::RefFieldUnresolvable => "Could not resolve the 'ref' reference:",
+            Self::JoinFieldUnresolvable => "Could not resolve the 'from' reference:",
             Self::ParentObjectDoesNotExist => "Parent object couldn't be found:",
             Self::TableNameNotAllowed => "Table name isn't allowed in this context.",
             Self::NoTableName => "Table name is required in this context.",
@@ -48,6 +50,10 @@ impl RepackErrorKind {
             Self::CustomTypeNotAllowed => {
                 "Custom types are not available in this context."
             }
+            Self::CustomTypeNotDefined => "The custom type cannot be resolved:",
+            Self::ExpectedReference => {
+                "Expected a reference but got a local or join field."
+            },
             Self::TypeNotResolved => "This type couldn't be resolved.",
         }
     }

@@ -1,5 +1,6 @@
 BEGIN;
 
+DROP VIEW IF EXISTS AllUserList;
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS orgs;
 CREATE TABLE orgs (
@@ -20,5 +21,5 @@ CREATE TABLE users (
 	FOREIGN KEY (org_id) REFERENCES orgs(id),
 	FOREIGN KEY (personal_org_id) REFERENCES orgs(id)
 );
-
+CREATE VIEW AllUserList AS SELECT users.id as id, users.name as name, users.email as email, users.login_count as login_count, users.last_login as last_login, users.total_cost as total_cost, users.org_id as org_id, j_org_id.name as org_name FROM users INNER JOIN orgs j_org_id ON j_org_id.id = users.org_id;
 COMMIT;

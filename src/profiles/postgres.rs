@@ -1,3 +1,8 @@
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::format,
+};
+
 use crate::{
     outputs::{OutputBuilder, OutputDescription},
     syntax::{
@@ -31,78 +36,138 @@ impl OutputBuilder for PostgresBuilder {
                     object,
                 ));
             }
-            sql.push_str("DROP TABLE IF EXISTS ");
-            sql.push_str(object.table());
+            if object.inherits.is_none() {
+                sql.push_str("DROP TABLE IF EXISTS ");
+                sql.push_str(object.table());
+            } else {
+                sql.push_str("DROP VIEW IF EXISTS ");
+                sql.push_str(&object.name);
+            }
             sql.push_str(";\n");
         }
 
         for object in description.objects() {
             if object.object_type != ObjectType::Record {
-                return Err(RepackError::from_lang_with_obj(
-                    RepackErrorKind::UnsupportedObjectType,
-                    &description.output,
-                    object,
-                ));
-            }
-            if object.inherits.is_some() {
                 return Err(RepackError::from_lang(
                     RepackErrorKind::CannotInherit,
                     &description.output,
                 ));
             }
-            let mut constraints = String::new();
-            sql.push_str(&format!("CREATE TABLE {} (\n", object.table()));
-            for field in &object.fields {
-                let nullability = if field.optional { "" } else { " NOT NULL" };
-                let typ =
-                    type_to_psql(field.field_type()).ok_or(RepackError::from_lang_with_msg(
-                        RepackErrorKind::UnsupportedFieldType,
-                        &description.output,
-                        field.field_type().to_string(),
-                    ))?;
-                if let FieldReferenceKind::FieldType(table_ref) = &field.location.reference {
-                    let ref_obj = description.object_by_name(table_ref)?;
-                    let ref_field = description.field_by_name(ref_obj, &field.location.name)?;
-                    let cascade = if field.commands.contains(&FieldCommand::Cascade) {
-                        " ON DELETE CASCADE"
-                    } else {
-                        ""
-                    };
-                    constraints.push_str(&format!(
-                        "\tFOREIGN KEY ({}) REFERENCES {}({}){},\n",
+            if object.inherits.is_none() {
+                // Root table
+                let mut constraints = String::new();
+                sql.push_str(&format!("CREATE TABLE {} (\n", object.table()));
+                for field in &object.fields {
+                    let nullability = if field.optional { "" } else { " NOT NULL" };
+                    let typ =
+                        type_to_psql(field.field_type()).ok_or(RepackError::from_lang_with_msg(
+                            RepackErrorKind::UnsupportedFieldType,
+                            &description.output,
+                            field.field_type().to_string(),
+                        ))?;
+                    if let FieldReferenceKind::FieldType(table_ref) = &field.location.reference {
+                        let ref_obj = description.object_by_name(table_ref)?;
+                        let ref_field = description.field_by_name(ref_obj, &field.location.name)?;
+                        let cascade = if field.commands.contains(&FieldCommand::Cascade) {
+                            " ON DELETE CASCADE"
+                        } else {
+                            ""
+                        };
+                        constraints.push_str(&format!(
+                            "\tFOREIGN KEY ({}) REFERENCES {}({}){},\n",
+                            field.name,
+                            ref_obj.table(),
+                            ref_field.name,
+                            cascade
+                        ));
+                    }
+                    let mut constraints: Vec<String> = Vec::new();
+                    for c in &field.commands {
+                        match c {
+                            FieldCommand::Generated => {
+                                constraints.push("GENERATED ALWAYS AS IDENTITY".to_string());
+                            }
+                            FieldCommand::Unique => {
+                                constraints.push("UNIQUE".to_string());
+                            }
+                            FieldCommand::PrimaryKey => {
+                                constraints.push("PRIMARY KEY".to_string());
+                            }
+                            _ => {}
+                        }
+                    }
+                    sql.push_str(&format!(
+                        "\t{} {}{} {},\n",
                         field.name,
-                        ref_obj.table(),
-                        ref_field.name,
-                        cascade
+                        typ,
+                        nullability,
+                        constraints.join(" ")
                     ));
                 }
-                let mut constraints: Vec<String> = Vec::new();
-                for c in &field.commands {
-                    match c {
-                        FieldCommand::Generated => {
-                            constraints.push("GENERATED ALWAYS AS IDENTITY".to_string());
+                sql.push_str(&constraints);
+                sql.pop(); // Remove last comma
+                sql.pop(); // Remove last newline
+                sql.push_str("\n);\n");
+            } else {
+                // Make view
+                let mut fields = Vec::<String>::new();
+                let mut joins = HashMap::<String, String>::new();
+                for field in &object.fields {
+                    match &field.location.reference {
+                        FieldReferenceKind::Local | FieldReferenceKind::FieldType(_) => {
+                            fields.push(format!(
+                                "{}.{} as {}",
+                                object.table(),
+                                field.name,
+                                field.name
+                            ));
                         }
-                        FieldCommand::Unique => {
-                            constraints.push("UNIQUE".to_string());
+                        FieldReferenceKind::JoinData(local_join_key) => {
+                            let join_name = format!("j_{}", local_join_key);
+                            if !joins.contains_key(&join_name) {
+                                let local_join = object
+                                    .fields
+                                    .iter()
+                                    .find(|x| x.name == *local_join_key)
+                                    .unwrap();
+                                let foreign_object_name = match &local_join.location.reference {
+                                    FieldReferenceKind::FieldType(foreign_table) => foreign_table,
+                                    _ => {
+                                        return Err(RepackError::from_lang_with_obj(
+                                            RepackErrorKind::ExpectedReference,
+                                            description.output,
+                                            &object,
+                                        ));
+                                    }
+                                };
+                                let foreign_object =
+                                    description.object_by_name(foreign_object_name)?;
+                                let join = format!(
+                                    "INNER JOIN {} {} ON {}.{} = {}.{}",
+                                    foreign_object.table(),
+                                    join_name,
+                                    join_name,
+                                    local_join.location.name,
+                                    object.table(),
+                                    local_join.name
+                                );
+                                fields.push(format!(
+                                    "{}.{} as {}",
+                                    join_name, field.location.name, field.name
+                                ));
+                                joins.insert(join_name, join);
+                            }
                         }
-                        FieldCommand::PrimaryKey => {
-                            constraints.push("PRIMARY KEY".to_string());
-                        }
-                        _ => {}
                     }
                 }
                 sql.push_str(&format!(
-                    "\t{} {}{} {},\n",
-                    field.name,
-                    typ,
-                    nullability,
-                    constraints.join(" ")
+                    "CREATE VIEW {} AS SELECT {} FROM {} {};",
+                    object.name,
+                    fields.join(", "),
+                    object.table(),
+                    joins.into_values().collect::<Vec<String>>().join(" ")
                 ));
             }
-            sql.push_str(&constraints);
-            sql.pop(); // Remove last comma
-            sql.pop(); // Remove last newline
-            sql.push_str("\n);\n");
         }
         sql.push_str("\nCOMMIT;\n");
         description.append("model.sql", sql);

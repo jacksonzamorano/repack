@@ -7,10 +7,6 @@ Organization
 	- email: string
 ---
 
-OrgModel
-	- user: UserPublic
----
-
 UserWithOrganization
 	- user: UserPublic
 	- organization: Organization
@@ -38,24 +34,24 @@ UserPublic
 		- Unique
 	- name: string
 	- email: string
-	- password: string
 	- login_count: int64
 	- last_login: datetime
 	- total_cost: float64
 	- org_id: int32
-	- org_name: string
+	- personal_org_id: int32
 ---
 
-UserPublicNoOrg
+AllUserList
 	- id: int32
 		- Primary Key
 		- Generated
 		- Unique
 	- name: string
 	- email: string
-	- password: string
 	- login_count: int64
 	- last_login: datetime
 	- total_cost: float64
+	- org_id: int32
+	- org_name: string
 ---
 

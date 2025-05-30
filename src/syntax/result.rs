@@ -110,25 +110,28 @@ impl ParseResult {
                             .fields
                             .iter()
                             .find(|field| field.name == *joining_field)
-                            .ok_or(RepackError::from_field(
+                            .ok_or(RepackError::from_field_with_msg(
                                 RepackErrorKind::JoinFieldUnresolvable,
                                 &objects[object_idx],
                                 &objects[object_idx].fields[field_idx],
+                                joining_field.to_string(),
                             ))?;
                         let referenced_entity = match &referenced_field.location.reference {
                             FieldReferenceKind::FieldType(entity_name) => objects
                                 .iter()
                                 .find(|obj| obj.name == *entity_name)
-                                .ok_or(RepackError::from_field(
+                                .ok_or(RepackError::from_field_with_msg(
                                     RepackErrorKind::JoinFieldUnresolvable,
                                     &objects[object_idx],
                                     &objects[object_idx].fields[field_idx],
+                                    joining_field.to_string(),
                                 ))?,
                             _ => {
-                                return Err(RepackError::from_field(
+                                return Err(RepackError::from_field_with_msg(
                                     RepackErrorKind::JoinFieldUnresolvable,
                                     &objects[object_idx],
                                     &objects[object_idx].fields[field_idx],
+                                    joining_field.to_string(),
                                 ));
                             }
                         };
@@ -138,10 +141,11 @@ impl ParseResult {
                             .find(|field| {
                                 field.name == objects[object_idx].fields[field_idx].location.name
                             })
-                            .ok_or(RepackError::from_field(
+                            .ok_or(RepackError::from_field_with_msg(
                                 RepackErrorKind::RefFieldUnresolvable,
                                 &objects[object_idx],
                                 &objects[object_idx].fields[field_idx],
+                                joining_field.to_string(),
                             ))?;
                         objects[object_idx].fields[field_idx].field_type =
                             referenced_foreign_field.field_type.clone();
@@ -150,10 +154,11 @@ impl ParseResult {
                         let referenced_entity = objects
                             .iter()
                             .find(|obj| obj.name == *joining_entity)
-                            .ok_or(RepackError::from_field(
+                            .ok_or(RepackError::from_field_with_msg(
                                 RepackErrorKind::RefFieldUnresolvable,
                                 &objects[object_idx],
                                 &objects[object_idx].fields[field_idx],
+                                joining_entity.to_string(),
                             ))?;
                         let referenced_foreign_field = referenced_entity
                             .fields
@@ -161,10 +166,11 @@ impl ParseResult {
                             .find(|field| {
                                 field.name == objects[object_idx].fields[field_idx].location.name
                             })
-                            .ok_or(RepackError::from_field(
+                            .ok_or(RepackError::from_field_with_msg(
                                 RepackErrorKind::RefFieldUnresolvable,
                                 &objects[object_idx],
                                 &objects[object_idx].fields[field_idx],
+                                joining_entity.to_string(),
                             ))?;
                         objects[object_idx].fields[field_idx].field_type =
                             referenced_foreign_field.field_type.clone();

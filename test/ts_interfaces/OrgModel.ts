@@ -1,4 +1,4 @@
-import type { UserPublic } from './UserPublic';
+import type { UserWithOrg } from './UserWithOrg';
 export interface OrgModel {
-	user: UserPublic;
+	user: UserWithOrg;
 }
