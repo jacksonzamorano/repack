@@ -7,11 +7,11 @@ Organization
 ---
 
 OrgModel
-	- user: User
+	- user: UserPublic
 ---
 
 UserWithOrganization
-	- user: User
+	- user: UserPublic
 	- organization: Organization
 ---
 

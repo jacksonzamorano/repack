@@ -5,22 +5,22 @@ output description @test {
 }
 
 output postgres @test/postgres #models;
-output typescript_class @test/ts_classes #frontend #orm {
+output typescript_class @test/ts_classes #data {
 	make_index true
 }
-output typescript_interface @test/ts_interfaces #frontend {
+output typescript_interface @test/ts_interfaces #data {
 	make_index true
 }
-output rust @test/rust_vanilla #frontend;
+output rust @test/rust_vanilla #data #private;
 
 
-record UserPublicNoOrg: UserPublic #orm {
+record UserPublicNoOrg: UserPublic #data {
 	*
 	- org_name
 	- org_id
 }
 
-record User @users #models #frontend {
+record User @users #private #models {
 	id int32 #pk #increment
 	name string
 	email string
@@ -29,18 +29,18 @@ record User @users #models #frontend {
 	personal_org_id ref(Organization.id)
 }
 
-record Organization @orgs #models {
+record Organization @orgs #models #data {
 	id int32 #pk #increment
 	name string
 	email string
 }
 
-record UserPublic: User #orm {
+record UserPublic: User #data {
 	*
 	org_name from(org_id.name)
 	- personal_org_id
 }
 
-struct OrgModel #frontend {
-	user User
+struct OrgModel #data {
+	user UserPublic
 }

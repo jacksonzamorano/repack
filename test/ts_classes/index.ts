@@ -1,4 +1,5 @@
+export { Organization } from './Organization';
 export { OrgModel } from './OrgModel';
-export { User } from './User';
+export { UserWithOrganization } from './UserWithOrganization';
 export { UserPublic } from './UserPublic';
 export { UserPublicNoOrg } from './UserPublicNoOrg';

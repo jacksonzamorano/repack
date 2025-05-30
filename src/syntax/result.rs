@@ -45,6 +45,8 @@ impl ParseResult {
             }
         }
 
+        // Rearrange all objects in dependancy order
+        // for simple resolution.
         let mut i = 0;
         while i < objects.len() {
             let mut found_issue = false;

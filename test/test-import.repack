@@ -1,4 +1,4 @@
-struct UserWithOrganization #models {
-	user User
+struct UserWithOrganization #data {
+	user UserPublic
 	organization Organization
 }

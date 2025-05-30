@@ -1,4 +1,4 @@
-import { User } from './User';
+import { UserPublic } from './UserPublic';
 export class OrgModel {
-	user: User;
+	user: UserPublic;
 }

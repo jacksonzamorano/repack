@@ -54,15 +54,6 @@ impl<'a> OutputDescription<'a> {
         let included_types: Vec<String> = objs.iter().map(|x| x.name.to_string()).collect();
 
         for o in &objs {
-            if let Some(inherit) = &o.inherits {
-                if !included_types.contains(&inherit) {
-                    return Err(RepackError::from_obj_with_msg(
-                        RepackErrorKind::ObjectNotIncluded,
-                        o,
-                        inherit.to_string(),
-                    ));
-                }
-            }
             for f in &o.fields {
                 match f.field_type() {
                     crate::syntax::FieldType::Custom(typ) => {
