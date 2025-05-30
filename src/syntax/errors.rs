@@ -23,6 +23,7 @@ pub enum RepackErrorKind {
     CustomTypeNotDefined,
     TypeNotResolved,
     ExpectedReference,
+    ExpectedArgument,
 }
 impl RepackErrorKind {
     pub fn as_string(&self) -> &'static str {
@@ -32,6 +33,9 @@ impl RepackErrorKind {
             Self::UnsupportedFieldType => "This builder doesn't support",
             Self::ObjectNotIncluded => {
                 "The following object was required but not a part of this output:"
+            }
+            Self::ExpectedArgument => {
+                "This function expects more arguments, totalling"
             }
             Self::CircularDependancy => {
                 "This definition creates a circular dependancy with:"
@@ -149,6 +153,16 @@ impl RepackError {
             obj_name: Some(obj.name.to_string()),
             field_name: None,
             error_details: None,
+        }
+    }
+
+    pub fn from_lang_with_obj_field_msg(error: RepackErrorKind, lang: &Output, obj: &Object, field: &Field, msg: String) -> RepackError {
+        RepackError {
+            error,
+            lang_name: Some(lang.profile.clone()),
+            obj_name: Some(obj.name.to_string()),
+            field_name: Some(field.name.to_string()),
+            error_details: Some(msg),
         }
     }
 

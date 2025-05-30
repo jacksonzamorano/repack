@@ -1,9 +1,9 @@
-use std::collections::{hash_map::Entry, HashMap};
+use std::collections::{HashMap, hash_map::Entry};
 
 use crate::{
     outputs::{OutputBuilder, OutputDescription},
     syntax::{
-        FieldCommand, FieldReferenceKind, FieldType, ObjectType, RepackError, RepackErrorKind,
+        FieldCommand, FieldReferenceKind, FieldType, FunctionNamespace, ObjectType, RepackError, RepackErrorKind, FUNCTION_DEFAULT_VALUE
     },
 };
 
@@ -93,6 +93,12 @@ impl OutputBuilder for PostgresBuilder {
                             _ => {}
                         }
                     }
+                    for f in &field.functions_in_namespace(FunctionNamespace::Database) {
+                        if f.name.as_str() == FUNCTION_DEFAULT_VALUE {
+                            let arg = f.arg(description.output, object, field, 0)?;
+                            constraints.push(format!("DEFAULT {}", arg));
+                        }
+                    }
                     sql.push_str(&format!(
                         "\t{} {}{} {},\n",
                         field.name,
@@ -113,7 +119,7 @@ impl OutputBuilder for PostgresBuilder {
                     match &field.location.reference {
                         FieldReferenceKind::Local | FieldReferenceKind::FieldType(_) => {
                             fields.push(format!(
-                                "{}.{} as {}",
+                                "\t{}.{} as {}",
                                 object.table(),
                                 field.name,
                                 field.name
@@ -149,7 +155,7 @@ impl OutputBuilder for PostgresBuilder {
                                     local_join.name
                                 );
                                 fields.push(format!(
-                                    "{}.{} as {}",
+                                    "\t{}.{} as {}",
                                     join_name, field.location.name, field.name
                                 ));
                                 e.insert(join);
@@ -158,11 +164,11 @@ impl OutputBuilder for PostgresBuilder {
                     }
                 }
                 sql.push_str(&format!(
-                    "CREATE VIEW {} AS SELECT {} FROM {} {};",
+                    "CREATE VIEW {} AS SELECT\n{}\nFROM {}\n{};\n",
                     object.name,
-                    fields.join(", "),
+                    fields.join(",\n"),
                     object.table(),
-                    joins.into_values().collect::<Vec<String>>().join(" ")
+                    joins.into_values().collect::<Vec<String>>().join("\n")
                 ));
             }
         }

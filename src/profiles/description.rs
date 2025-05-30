@@ -20,6 +20,15 @@ impl OutputBuilder for DescriptionBuilder {
                         );
                     }
                 }
+                if description.bool("print_functions", true) {
+                    for function in &field.functions {
+                        let args = function.args.iter().map(|x| format!("\t\t\t- '{}'", x)).collect::<Vec<_>>().join("\n");
+
+                        description.append(DESCRIPTION_FILE,
+                            format!("\t\t- Function: '{}'\n{}\n", function.name, args)
+                        );
+                    }
+                }
             }
             description.append(DESCRIPTION_FILE, "---\n\n".to_string());
         }

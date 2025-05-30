@@ -1,4 +1,4 @@
-use super::{FieldCommand, FieldType, FileContents, Token};
+use super::{FieldCommand, FieldFunction, FieldType, FileContents, FunctionNamespace, Token};
 
 #[derive(Debug, Clone)]
 pub struct FieldLocation {
@@ -21,12 +21,18 @@ pub struct Field {
     pub field_type: Option<FieldType>,
     pub optional: bool,
     pub commands: Vec<FieldCommand>,
+    pub functions: Vec<FieldFunction>,
 }
 impl Field {
     /// Only safe for use in profile/output code.
     pub fn field_type(&self) -> &FieldType {
         self.field_type.as_ref().unwrap()
     }
+
+    pub fn functions_in_namespace(&self, ns: FunctionNamespace) -> Vec<&FieldFunction> {
+        self.functions.iter().filter(|x| x.namespace == ns).collect()
+    }
+
     pub fn from_contents(name: String, contents: &mut FileContents) -> Option<Field> {
         let type_token = contents.take()?;
         let field_type_loc: (Option<FieldType>, FieldLocation) = match type_token {
@@ -86,9 +92,15 @@ impl Field {
             _ => false,
         };
         let mut commands = Vec::new();
+        let mut functions = Vec::new();
 
-        while let Some(token) = contents.next() {
+        while let Some(token) = contents.take() {
             match token {
+                Token::Literal(name) => {
+                    if let Some(func) = FieldFunction::from_contents(name, contents) {
+                        functions.push(func);
+                    }
+                }
                 Token::Pound => {
                     if let Some(Token::Literal(cmd)) = contents.next() {
                         if let Some(command) = FieldCommand::from_string(cmd) {
@@ -109,6 +121,7 @@ impl Field {
             location: field_type_loc.1,
             optional,
             commands,
+            functions,
         })
     }
 }

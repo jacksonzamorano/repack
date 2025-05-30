@@ -19,11 +19,12 @@ record User @users #private #models {
 	name string
 	email string
 	password string
-	login_count int64
-	last_login datetime
-	total_cost float64
+	login_count int64 db:default("0")
+	last_login datetime?
+	total_cost float64 db:default("0")
 	org_id ref(Organization.id)
 	personal_org_id ref(Organization.id)
+	created_date datetime db_default("NOW()")
 }
 
 record Organization @orgs #models #data {
@@ -41,6 +42,7 @@ record Todo @todos #models #data {
 	assigned_user_id ref(User.id)?
 	list_id ref(List.id)?
 	org_id ref(Organization.id)
+	created_date datetime db:default("NOW()")
 }
 
 record List @lists #models #data {

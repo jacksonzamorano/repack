@@ -1,15 +1,19 @@
+mod dependancies;
 mod errors;
 mod field;
+mod function;
+mod function_names;
 mod language;
 mod object;
 mod parser;
 mod result;
 mod tokens;
 mod types;
-mod dependancies;
 
 pub use errors::*;
 pub use field::*;
+pub use function::*;
+pub use function_names::*;
 pub use language::Output;
 pub use object::{Object, ObjectType};
 pub use parser::FileContents;
