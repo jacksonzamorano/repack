@@ -1,6 +1,4 @@
-use super::{
-    FileContents, LanguageValidationError, LanguageValidationErrorType, Token, ValidationError,
-};
+use super::{FileContents, RepackError, RepackErrorKind, Token};
 use crate::profiles::OutputProfile;
 use std::collections::HashMap;
 
@@ -85,14 +83,13 @@ impl Output {
         })
     }
 
-    fn make_error(&self, error_type: LanguageValidationErrorType) -> ValidationError {
-        ValidationError::Language(LanguageValidationError::new(error_type, self))
-    }
-
-    pub fn errors(&self) -> Vec<ValidationError> {
+    pub fn errors(&self) -> Vec<RepackError> {
         let mut errors = Vec::new();
         if OutputProfile::from_keyword(&self.profile).is_none() {
-            errors.push(self.make_error(LanguageValidationErrorType::UnknownLanguage));
+            errors.push(RepackError::from_lang(
+                RepackErrorKind::UnknownLanguage,
+                self,
+            ));
         }
         errors
     }

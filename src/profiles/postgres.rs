@@ -1,6 +1,6 @@
 use crate::{
-    outputs::{OutputBuilder, OutputBuilderError, OutputBuilderFieldError, OutputDescription},
-    syntax::{FieldCommand, FieldReferenceKind, FieldType},
+    outputs::{OutputBuilder, OutputDescription},
+    syntax::{FieldCommand, FieldReferenceKind, FieldType, RepackError, RepackErrorKind},
 };
 
 fn type_to_psql(field_type: &FieldType) -> Option<String> {
@@ -18,7 +18,7 @@ fn type_to_psql(field_type: &FieldType) -> Option<String> {
 pub struct PostgresBuilder;
 
 impl OutputBuilder for PostgresBuilder {
-    fn build(&self, description: &mut OutputDescription) -> Result<(), OutputBuilderError> {
+    fn build(&self, description: &mut OutputDescription) -> Result<(), RepackError> {
         let mut sql = String::new();
         sql.push_str("BEGIN;\n\n");
         for object in description.objects().iter().rev() {
@@ -28,15 +28,22 @@ impl OutputBuilder for PostgresBuilder {
         }
 
         for object in description.objects() {
+            if object.inherits.is_some() {
+                return Err(RepackError::from_lang(
+                    RepackErrorKind::CannotInherit,
+                    &description.output,
+                ));
+            }
             let mut constraints = String::new();
             sql.push_str(&format!("CREATE TABLE {} (\n", object.table()));
             for field in &object.fields {
                 let nullability = if field.optional { "" } else { " NOT NULL" };
-                let typ = type_to_psql(field.field_type()).ok_or(
-                    OutputBuilderError::UnsupportedFieldType(OutputBuilderFieldError::new(
-                        object, field,
-                    )),
-                )?;
+                let typ =
+                    type_to_psql(field.field_type()).ok_or(RepackError::from_lang_with_msg(
+                        RepackErrorKind::UnsupportedFieldType,
+                        &description.output,
+                        field.field_type().to_string(),
+                    ))?;
                 if let FieldReferenceKind::FieldType(table_ref) = &field.location.reference {
                     let ref_obj = description.object_by_name(table_ref)?;
                     let ref_field = description.field_by_name(ref_obj, &field.location.name)?;

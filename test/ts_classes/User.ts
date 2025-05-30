@@ -4,5 +4,5 @@ export class User {
 	email: string;
 	password: string;
 	org_id: number;
-	personal_org: number;
+	personal_org_id: number;
 }

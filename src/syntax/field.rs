@@ -6,11 +6,12 @@ pub struct FieldLocation {
     pub name: String, // Could be name
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord)]
+#[repr(i32)]
 pub enum FieldReferenceKind {
-    Local,
-    FieldType(String),
-    JoinData(String),
+    Local = 1,
+    FieldType(String) = 2,
+    JoinData(String) = 3,
 }
 
 #[derive(Debug, Clone)]

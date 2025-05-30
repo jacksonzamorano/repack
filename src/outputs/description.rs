@@ -1,6 +1,5 @@
+use crate::syntax::{Field, Object, Output, ParseResult, RepackError, RepackErrorKind};
 use std::{collections::HashMap, env::current_dir, fs};
-use crate::syntax::{Field, Object, Output, ParseResult};
-use super::OutputBuilderError;
 
 pub struct OutputDescription<'a> {
     objects: Vec<&'a Object>,
@@ -9,7 +8,7 @@ pub struct OutputDescription<'a> {
 }
 
 impl<'a> OutputDescription<'a> {
-    pub fn new(result: &'a ParseResult, output: &'a Output) -> Self {
+    pub fn new(result: &'a ParseResult, output: &'a Output) -> Result<Self, RepackError> {
         let mut objs = result
             .objects
             .iter()
@@ -51,11 +50,41 @@ impl<'a> OutputDescription<'a> {
                 i += 1;
             }
         }
-        Self {
+
+        let included_types: Vec<String> = objs.iter().map(|x| x.name.to_string()).collect();
+
+        for o in &objs {
+            if let Some(inherit) = &o.inherits {
+                if !included_types.contains(&inherit) {
+                    return Err(RepackError::from_obj_with_msg(
+                        RepackErrorKind::ObjectNotIncluded,
+                        o,
+                        inherit.to_string(),
+                    ));
+                }
+            }
+            for f in &o.fields {
+                match f.field_type() {
+                    crate::syntax::FieldType::Custom(typ) => {
+                        if !included_types.contains(&typ) {
+                            return Err(RepackError::from_field_with_msg(
+                                RepackErrorKind::ObjectNotIncluded,
+                                o,
+                                f,
+                                typ.to_string(),
+                            ));
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        Ok(Self {
             objects: objs,
             output,
             buffers: HashMap::new(),
-        }
+        })
     }
 
     pub fn append(&mut self, name: &str, contents: String) {
@@ -66,8 +95,9 @@ impl<'a> OutputDescription<'a> {
         }
     }
 
-    pub fn flush(&mut self) -> Result<(), OutputBuilderError> {
-        let mut root_path = current_dir().map_err(|_| OutputBuilderError::CannotOpenFile)?;
+    pub fn flush(&mut self) -> Result<(), RepackError> {
+        let mut root_path = current_dir()
+            .map_err(|_| RepackError::from_lang(RepackErrorKind::CannotWriteFile, &self.output))?;
         if let Some(path) = &self.output.location {
             root_path.push(path);
         }
@@ -75,9 +105,13 @@ impl<'a> OutputDescription<'a> {
             let mut file_path = root_path.clone();
             file_path.push(name);
             if let Some(parent) = file_path.parent() {
-                fs::create_dir_all(parent).map_err(|_| OutputBuilderError::CannotOpenFile)?;
+                fs::create_dir_all(parent).map_err(|_| {
+                    RepackError::from_lang(RepackErrorKind::CannotWriteFile, &self.output)
+                })?;
             }
-            fs::write(&file_path, contents).map_err(|_| OutputBuilderError::CannotOpenFile)?;
+            fs::write(&file_path, contents).map_err(|_| {
+                RepackError::from_lang(RepackErrorKind::CannotWriteFile, &self.output)
+            })?;
         }
         Ok(())
     }
@@ -86,25 +120,28 @@ impl<'a> OutputDescription<'a> {
         self.objects.clone()
     }
 
-    pub fn object_by_name(&self, obj_name: &str) -> Result<&'a Object, OutputBuilderError> {
+    pub fn object_by_name(&self, obj_name: &str) -> Result<&'a Object, RepackError> {
         self.objects
             .iter()
             .find(|obj| obj.name == obj_name)
             .copied()
-            .ok_or(OutputBuilderError::ObjectNotIncluded(obj_name.to_string()))
+            .ok_or(RepackError::from_lang_with_msg(
+                RepackErrorKind::ObjectNotIncluded,
+                self.output,
+                obj_name.to_string(),
+            ))
     }
 
     pub fn field_by_name(
         &self,
         obj: &'a Object,
         field_name: &str,
-    ) -> Result<&'a Field, OutputBuilderError> {
-        Ok(
-            obj.fields
-                .iter()
-                .find(|field| field.name == field_name)
-                .unwrap(),
-        )
+    ) -> Result<&'a Field, RepackError> {
+        Ok(obj
+            .fields
+            .iter()
+            .find(|field| field.name == field_name)
+            .unwrap())
     }
 
     pub fn bool(&self, key: &str, default: bool) -> bool {

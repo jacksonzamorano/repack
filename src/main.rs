@@ -21,22 +21,20 @@ fn main() {
     parse_result.validate(true);
 
     for output in &parse_result.languages {
-        let mut description = OutputDescription::new(&parse_result, output);
-        let profile = OutputProfile::from_keyword(&output.profile).unwrap();
-        let builder = profile.builder();
-        match builder.build(&mut description) {
+        match OutputDescription::new(&parse_result, output)
+            .and_then(|mut desc| {
+                let profile = OutputProfile::from_keyword(&output.profile).unwrap();
+                let builder = profile.builder();
+                builder.build(&mut desc).map(|_| desc)
+            })
+            .and_then(|mut desc| desc.flush())
+        {
             Ok(_) => {
-                if let Err(e) = description.flush() {
-                    println!("[{}] Failed to build: {}", output.profile, e.description());
-                    exit(2);
-                } else {
-                    println!("[{}] Built successfully!", output.profile);
-                }
+                println!("[{}] Built successfully!", output.profile);
             }
             Err(e) => {
-                println!("[{}] Failed to build: {}", output.profile, e.description());
-                exit(2);
+                println!("[{}] Failed to build: {}", output.profile, e.into_string());
             }
-        };
+        }
     }
 }

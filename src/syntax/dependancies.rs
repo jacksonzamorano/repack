@@ -1,8 +1,8 @@
 use std::collections::VecDeque;
 
-use super::{Object, ValidationError};
+use super::{Object, RepackError, RepackErrorKind};
 
-pub fn graph_valid(objects: &[Object]) -> Result<(), ValidationError> {
+pub fn graph_valid(objects: &[Object]) -> Result<(), RepackError> {
     let mut graph: VecDeque<Vec<String>> = VecDeque::new();
     for obj in objects.iter() {
         graph.push_back(vec![obj.name.clone()]);
@@ -12,14 +12,15 @@ pub fn graph_valid(objects: &[Object]) -> Result<(), ValidationError> {
             .iter()
             .find(|obj| *obj.name == *eval.last().unwrap())
             .unwrap();
-        if eval_object
+        if let Some(error) = eval_object
             .depends_on()
             .iter()
-            .any(|dep| eval.contains(dep))
+            .find(|dep| eval.contains(dep))
         {
-            return Err(ValidationError::CircularDependancy(
-                eval_object.name.clone(),
-                eval.first().unwrap().clone(),
+            return Err(RepackError::from_obj_with_msg(
+                RepackErrorKind::CircularDependancy,
+                eval_object,
+                error.to_string(),
             ));
         } else {
             for dep in eval_object.depends_on() {

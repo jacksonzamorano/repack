@@ -1,8 +1,7 @@
 use std::collections::HashSet;
 
 use super::{
-    Field, FieldCommand, FieldType, FieldValidationError, FieldValidationErrorType, FileContents,
-    ObjectValidationError, ObjectValidationErrorType, ParseResult, Token, ValidationError,
+    Field, FieldCommand, FieldType, FileContents, ParseResult, RepackError, RepackErrorKind, Token,
     field::FieldReferenceKind,
 };
 
@@ -103,65 +102,79 @@ impl Object {
         self.table_name.as_ref().unwrap()
     }
 
-    fn field_error(&self, error: FieldValidationErrorType, field: &Field) -> ValidationError {
-        ValidationError::Field(FieldValidationError::new(error, self, field))
-    }
-
-    fn object_error(&self, error: ObjectValidationErrorType) -> ValidationError {
-        ValidationError::Object(ObjectValidationError::new(error, self))
-    }
-
-    pub fn errors(&self, result: &ParseResult) -> Option<Vec<ValidationError>> {
+    pub fn errors(&self, result: &ParseResult) -> Option<Vec<RepackError>> {
         let mut errors = Vec::new();
         if self.object_type == ObjectType::Record {
             for field in &self.fields {
                 let Some(field_type) = &field.field_type else {
-                    errors.push(self.field_error(FieldValidationErrorType::TypeNotResolved, field));
+                    errors.push(RepackError::from_field(
+                        RepackErrorKind::TypeNotResolved,
+                        self,
+                        field,
+                    ));
                     continue;
                 };
                 if let FieldType::Custom(_) = field_type {
-                    errors
-                        .push(self.field_error(FieldValidationErrorType::CustomNotAllowed, field));
+                    errors.push(RepackError::from_field(
+                        RepackErrorKind::CustomTypeNotAllowed,
+                        self,
+                        field,
+                    ));
                 }
                 if field.optional && field.commands.contains(&FieldCommand::PrimaryKey) {
-                    errors.push(
-                        self.field_error(FieldValidationErrorType::PrimaryKeyOptional, field),
-                    );
+                    errors.push(RepackError::from_field(
+                        RepackErrorKind::PrimaryKeyOptional,
+                        self,
+                        field,
+                    ));
                 }
                 if field.commands.contains(&FieldCommand::Many) {
-                    errors.push(self.field_error(FieldValidationErrorType::ManyNotAllowed, field));
+                    errors.push(RepackError::from_field(
+                        RepackErrorKind::ManyNotAllowed,
+                        self,
+                        field,
+                    ));
                 }
             }
             if self.table_name.is_none() {
-                errors.push(self.object_error(ObjectValidationErrorType::TableNameRequired));
+                errors.push(RepackError::from_obj(RepackErrorKind::NoTableName, self));
             }
             if self.fields.is_empty() {
-                errors.push(self.object_error(ObjectValidationErrorType::NoFields));
+                errors.push(RepackError::from_obj(RepackErrorKind::NoFields, self));
             }
         } else if self.object_type == ObjectType::Struct {
             if self.inherits.is_some() {
-                errors.push(self.object_error(ObjectValidationErrorType::CannotInherit));
+                errors.push(RepackError::from_obj(RepackErrorKind::CannotInherit, self));
             }
             if self.reuse_all {
-                errors.push(self.object_error(ObjectValidationErrorType::CannotReuse));
+                errors.push(RepackError::from_obj(RepackErrorKind::CannotReuse, self));
             }
             if !self.reuse_exclude.is_empty() {
-                errors.push(self.object_error(ObjectValidationErrorType::CannotReuse));
+                errors.push(RepackError::from_obj(RepackErrorKind::CannotReuse, self));
             }
             if self.table_name.is_some() {
-                errors.push(self.object_error(ObjectValidationErrorType::TableNameNotAllowed));
+                errors.push(RepackError::from_obj(
+                    RepackErrorKind::TableNameNotAllowed,
+                    self,
+                ));
             }
         }
         for field in &self.fields {
             let Some(field_type) = &field.field_type else {
-                errors.push(self.field_error(FieldValidationErrorType::TypeNotResolved, field));
+                errors.push(RepackError::from_field(
+                    RepackErrorKind::TypeNotResolved,
+                    self,
+                    field,
+                ));
                 continue;
             };
             if let FieldType::Custom(object_name) = field_type {
                 if !result.objects.iter().any(|o| o.name == *object_name) {
-                    errors.push(
-                        self.field_error(FieldValidationErrorType::CustomNotAllowed, field),
-                    );
+                    errors.push(RepackError::from_field(
+                        RepackErrorKind::CustomTypeNotAllowed,
+                        self,
+                        field,
+                    ));
                 }
             }
         }
@@ -174,6 +187,9 @@ impl Object {
 
     pub fn depends_on(&self) -> Vec<String> {
         let mut dependencies = HashSet::new();
+        if let Some(inherit) = &self.inherits {
+            dependencies.insert(inherit.to_string());
+        }
         for field in &self.fields {
             match &field.location.reference {
                 FieldReferenceKind::FieldType(foreign_obj) => {

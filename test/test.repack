@@ -3,21 +3,28 @@ output description @test {
 }
 
 output postgres @test/postgres #models;
-output typescript_class @test/ts_classes {
+output typescript_class @test/ts_classes #frontend #orm {
 	make_index true
 }
-output typescript_interface @test/ts_interfaces {
+output typescript_interface @test/ts_interfaces #frontend {
 	make_index true
 }
-output rust @test/rust_vanilla;
+output rust @test/rust_vanilla #frontend;
 
-record User @users #models {
+
+record UserPublicNoOrg: UserPublic #orm {
+	*
+	- org_name
+	- org_id
+}
+
+record User @users #models #frontend {
 	id int32 #pk #increment
 	name string
 	email string
 	password string
 	org_id ref(Organization.id)
-	personal_org ref(Organization.id)
+	personal_org_id ref(Organization.id)
 }
 
 record Organization @orgs #models {
@@ -29,5 +36,9 @@ record Organization @orgs #models {
 record UserPublic: User #orm {
 	*
 	org_name from(org_id.name)
+	- personal_org_id
 }
 
+struct OrgModel #frontend {
+	user User
+}

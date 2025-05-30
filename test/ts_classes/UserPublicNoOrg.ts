@@ -1,8 +1,6 @@
-export class UserPublic {
+export class UserPublicNoOrg {
 	id: number;
 	name: string;
 	email: string;
 	password: string;
-	org_id: number;
-	org_name: string;
 }

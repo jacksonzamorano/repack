@@ -13,9 +13,9 @@ CREATE TABLE users (
 	email TEXT NOT NULL,
 	password TEXT NOT NULL,
 	org_id INT4 NOT NULL,
-	personal_org INT4 NOT NULL,
+	personal_org_id INT4 NOT NULL,
 	FOREIGN KEY (org_id) REFERENCES orgs(id),
-	FOREIGN KEY (personal_org) REFERENCES orgs(id)
+	FOREIGN KEY (personal_org_id) REFERENCES orgs(id)
 );
 
 COMMIT;

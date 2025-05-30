@@ -1,10 +1,10 @@
-use crate::outputs::{OutputBuilder, OutputBuilderError, OutputDescription};
+use crate::{outputs::{OutputBuilder, OutputDescription}, syntax::RepackError};
 
 const DESCRIPTION_FILE: &str = "description.txt";
 pub struct DescriptionBuilder;
 
 impl OutputBuilder for DescriptionBuilder {
-    fn build(&self, description: &mut OutputDescription) -> Result<(), OutputBuilderError> {
+    fn build(&self, description: &mut OutputDescription) -> Result<(), RepackError> {
         for object in description.objects() {
             description.append(DESCRIPTION_FILE, format!("{}\n", object.name));
             for field in &object.fields {
