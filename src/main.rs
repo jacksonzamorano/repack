@@ -1,4 +1,4 @@
-use std::process::exit;
+use std::{io::Write, process::exit};
 
 use outputs::OutputDescription;
 use profiles::OutputProfile;
@@ -16,7 +16,8 @@ enum Behavior {
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 2 {
-        eprintln!("Usage: {} <input_file>", args[0]);
+        let msg = include_bytes!("usage.txt");
+        _ = std::io::stdout().write_all(msg);
         exit(1);
     }
 
@@ -63,7 +64,7 @@ fn main() {
                     .and_then(|mut desc| desc.clean())
                 {
                     Ok(_) => {
-                        println!("[{}] Built successfully!", output.profile);
+                        println!("[{}] Cleaned successfully!", output.profile);
                     }
                     Err(e) => {
                         println!("[{}] Failed to build: {}", output.profile, e.into_string());

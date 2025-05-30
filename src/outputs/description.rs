@@ -127,9 +127,10 @@ impl<'a> OutputDescription<'a> {
             file_path.push(name);
             _ = fs::remove_file(file_path);
         }
-        let mut entries = fs::read_dir(&root_path).unwrap();
-        if entries.next().is_none() {
-            _ = fs::remove_dir_all(&root_path);
+        if let Ok(mut entries) = fs::read_dir(&root_path) {
+            if entries.next().is_none() {
+                _ = fs::remove_dir_all(&root_path);
+            }
         }
         return Ok(());
     }
