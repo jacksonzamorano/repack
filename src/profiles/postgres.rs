@@ -76,7 +76,28 @@ impl OutputBuilder for PostgresBuilder {
                         cascade
                     ));
                 }
-                sql.push_str(&format!("\t{} {}{},\n", field.name, typ, nullability));
+                let mut constraints: Vec<String> = Vec::new();
+                for c in &field.commands {
+                    match c {
+                        FieldCommand::Generated => {
+                            constraints.push("GENERATED ALWAYS AS IDENTITY".to_string());
+                        }
+                        FieldCommand::Unique => {
+                            constraints.push("UNIQUE".to_string());
+                        }
+                        FieldCommand::PrimaryKey => {
+                            constraints.push("PRIMARY KEY".to_string());
+                        }
+                        _ => {}
+                    }
+                }
+                sql.push_str(&format!(
+                    "\t{} {}{} {},\n",
+                    field.name,
+                    typ,
+                    nullability,
+                    constraints.join(" ")
+                ));
             }
             sql.push_str(&constraints);
             sql.pop(); // Remove last comma

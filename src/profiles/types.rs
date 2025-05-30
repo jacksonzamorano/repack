@@ -1,6 +1,6 @@
 use crate::outputs::OutputBuilder;
 
-use super::{DescriptionBuilder, PostgresBuilder, RustBuilder, TypescriptClassBuilder, TypescriptInterfaceBuilder};
+use super::{DescriptionBuilder, PostgresBuilder, RustBuilder, TypescriptClassBuilder, TypescriptInterfaceBuilder, TypescriptDrizzleBuilder};
 
 #[derive(Debug)]
 pub enum OutputProfile {
@@ -8,19 +8,21 @@ pub enum OutputProfile {
     PostgresInit,
     TypescriptClass,
     TypescriptInterface,
+    TypescriptDrizzle,
     Rust
 }
 
 impl OutputProfile {
     pub fn from_keyword(keyword: &str) -> Option<Self> {
-        match keyword {
-            "description" => Some(OutputProfile::Description),
-            "postgres" => Some(OutputProfile::PostgresInit),
-            "typescript_class" => Some(OutputProfile::TypescriptClass),
-            "typescript_interface" => Some(OutputProfile::TypescriptInterface),
-            "rust" => Some(OutputProfile::Rust),
-            _ => None,
-        }
+        Some(match keyword {
+            "description" => OutputProfile::Description,
+            "postgres" => OutputProfile::PostgresInit,
+            "typescript_class" => OutputProfile::TypescriptClass,
+            "typescript_interface" => OutputProfile::TypescriptInterface,
+            "typescript_drizzle" => OutputProfile::TypescriptDrizzle,
+            "rust" => OutputProfile::Rust,
+            _ => return None,
+        })
     }
     pub fn builder(&self) -> Box<dyn OutputBuilder> {
         match self {
@@ -28,6 +30,7 @@ impl OutputProfile {
             OutputProfile::PostgresInit => Box::new(PostgresBuilder {}),
             OutputProfile::TypescriptClass => Box::new(TypescriptClassBuilder {}),
             OutputProfile::TypescriptInterface => Box::new(TypescriptInterfaceBuilder {}),
+            Self::TypescriptDrizzle => Box::new(TypescriptDrizzleBuilder {}),
             OutputProfile::Rust => Box::new(RustBuilder {}),
         }
     }

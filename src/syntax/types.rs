@@ -9,7 +9,7 @@ pub enum FieldType {
     Boolean,
     DateTime,
     Custom(String),
-    FutureType
+    FutureType,
 }
 impl Display for FieldType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -21,11 +21,10 @@ impl Display for FieldType {
             FieldType::Boolean => "boolean".to_string(),
             FieldType::DateTime => "datetime".to_string(),
             FieldType::Custom(s) => s.clone(),
-            FieldType::FutureType => "FUTURE TYPE".to_string()
+            FieldType::FutureType => "FUTURE TYPE".to_string(),
         };
         write!(f, "{}", res)
     }
-
 }
 impl FieldType {
     pub fn from_string(s: &str) -> FieldType {
@@ -37,7 +36,7 @@ impl FieldType {
             "boolean" => FieldType::Boolean,
             "datetime" => FieldType::DateTime,
             "___" => FieldType::FutureType,
-            _ => FieldType::Custom(s.to_string())
+            _ => FieldType::Custom(s.to_string()),
         }
     }
 }
@@ -49,8 +48,10 @@ pub enum FieldCommand {
     PrimaryKey,
     Increment,
     Cascade,
+    Generated,
+    Unique,
 }
-impl  FieldCommand {
+impl FieldCommand {
     pub fn string(&self) -> String {
         match self {
             FieldCommand::Default => "Default Value".to_string(),
@@ -58,6 +59,8 @@ impl  FieldCommand {
             FieldCommand::PrimaryKey => "Primary Key".to_string(),
             FieldCommand::Increment => "Auto Increment".to_string(),
             FieldCommand::Cascade => "Cascade".to_string(),
+            FieldCommand::Generated => "Generated".to_string(),
+            FieldCommand::Unique => "Unique".to_string(),
         }
     }
 }
@@ -69,7 +72,9 @@ impl FieldCommand {
             "pk" => Some(FieldCommand::PrimaryKey),
             "increment" => Some(FieldCommand::Increment),
             "cascade" => Some(FieldCommand::Cascade),
-            _ => None
+            "generated" => Some(FieldCommand::Generated),
+            "unique" => Some(FieldCommand::Unique),
+            _ => None,
         }
     }
 }

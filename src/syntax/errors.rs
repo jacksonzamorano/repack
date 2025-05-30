@@ -34,7 +34,7 @@ impl RepackErrorKind {
             Self::CircularDependancy => {
                 "This definition creates a circular dependancy with:"
             }
-            Self::UnknownLanguage => "This language isn't available.",
+            Self::UnknownLanguage => "Repack doesn't recognize this language. Make sure you are running the latest version.",
             Self::RefFieldUnresolvable => "Could not resolve the 'ref' reference.",
             Self::JoinFieldUnresolvable => "Could not resolve the 'from' reference.",
             Self::ParentObjectDoesNotExist => "Parent object couldn't be found:",

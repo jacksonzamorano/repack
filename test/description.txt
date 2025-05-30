@@ -1,7 +1,8 @@
 Organization
 	- id: int32
 		- Primary Key
-		- Auto Increment
+		- Generated
+		- Unique
 	- name: string
 	- email: string
 ---
@@ -18,10 +19,14 @@ UserWithOrganization
 User
 	- id: int32
 		- Primary Key
-		- Auto Increment
+		- Generated
+		- Unique
 	- name: string
 	- email: string
 	- password: string
+	- login_count: int64
+	- last_login: datetime
+	- total_cost: float64
 	- org_id: int32
 	- personal_org_id: int32
 ---
@@ -29,10 +34,14 @@ User
 UserPublic
 	- id: int32
 		- Primary Key
-		- Auto Increment
+		- Generated
+		- Unique
 	- name: string
 	- email: string
 	- password: string
+	- login_count: int64
+	- last_login: datetime
+	- total_cost: float64
 	- org_id: int32
 	- org_name: string
 ---
@@ -40,9 +49,13 @@ UserPublic
 UserPublicNoOrg
 	- id: int32
 		- Primary Key
-		- Auto Increment
+		- Generated
+		- Unique
 	- name: string
 	- email: string
 	- password: string
+	- login_count: int64
+	- last_login: datetime
+	- total_cost: float64
 ---
 

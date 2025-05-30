@@ -11,6 +11,7 @@ output typescript_class @test/ts_classes #data {
 output typescript_interface @test/ts_interfaces #data {
 	make_index true
 }
+output typescript_drizzle @test/ts_drizzle #models;
 output rust @test/rust_vanilla #data #private;
 
 
@@ -21,16 +22,19 @@ record UserPublicNoOrg: UserPublic #data {
 }
 
 record User @users #private #models {
-	id int32 #pk #increment
+	id int32 #pk #generated #unique
 	name string
 	email string
 	password string
+	login_count int64
+	last_login datetime
+	total_cost float64
 	org_id ref(Organization.id)
 	personal_org_id ref(Organization.id)
 }
 
 record Organization @orgs #models #data {
-	id int32 #pk #increment
+	id int32 #pk #generated #unique
 	name string
 	email string
 }
