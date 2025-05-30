@@ -1,6 +1,8 @@
 use crate::{
     outputs::{OutputBuilder, OutputDescription},
-    syntax::{FieldCommand, FieldReferenceKind, FieldType, RepackError, RepackErrorKind},
+    syntax::{
+        FieldCommand, FieldReferenceKind, FieldType, ObjectType, RepackError, RepackErrorKind,
+    },
 };
 
 fn type_to_psql(field_type: &FieldType) -> Option<String> {
@@ -22,12 +24,26 @@ impl OutputBuilder for PostgresBuilder {
         let mut sql = String::new();
         sql.push_str("BEGIN;\n\n");
         for object in description.objects().iter().rev() {
+            if object.object_type != ObjectType::Record {
+                return Err(RepackError::from_lang_with_obj(
+                    RepackErrorKind::UnsupportedObjectType,
+                    &description.output,
+                    object,
+                ));
+            }
             sql.push_str("DROP TABLE IF EXISTS ");
             sql.push_str(object.table());
             sql.push_str(";\n");
         }
 
         for object in description.objects() {
+            if object.object_type != ObjectType::Record {
+                return Err(RepackError::from_lang_with_obj(
+                    RepackErrorKind::UnsupportedObjectType,
+                    &description.output,
+                    object,
+                ));
+            }
             if object.inherits.is_some() {
                 return Err(RepackError::from_lang(
                     RepackErrorKind::CannotInherit,

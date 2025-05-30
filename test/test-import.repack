@@ -1,0 +1,4 @@
+struct UserWithOrganization #models {
+	user User
+	organization Organization
+}

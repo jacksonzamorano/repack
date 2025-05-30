@@ -29,6 +29,7 @@ pub enum Token {
     From,
     As,
     Where,
+    Import,
 }
 impl Token {
     pub fn from_byte(byte: u8) -> Option<Token> {
@@ -65,6 +66,7 @@ impl Token {
             "ref"  => Token::Ref,
             "as" => Token::As,
             "where" => Token::Where,
+            "import" => Token::Import,
 
             _ => Token::Literal(string.trim().to_string()),
         }

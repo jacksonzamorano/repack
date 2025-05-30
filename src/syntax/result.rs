@@ -36,6 +36,11 @@ impl ParseResult {
                         languages.push(language);
                     }
                 }
+                Token::Import => {
+                    if let Some(Token::Literal(path)) = contents.take() {
+                        contents.add_relative(&path);
+                    }
+                }
                 _ => {}
             }
         }

@@ -10,6 +10,11 @@ OrgModel
 	- user: User
 ---
 
+UserWithOrganization
+	- user: User
+	- organization: Organization
+---
+
 User
 	- id: int32
 		- Primary Key

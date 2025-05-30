@@ -28,8 +28,7 @@ fn main() {
     }
 
     let input_file = &args[1];
-    let mut contents = FileContents::new();
-    contents.read(input_file);
+    let contents = FileContents::new(&input_file);
     let parse_result = ParseResult::from_contents(contents).unwrap();
     parse_result.validate(true);
 
@@ -48,7 +47,11 @@ fn main() {
                         println!("[{}] Built successfully!", output.profile);
                     }
                     Err(e) => {
-                        println!("[{}] Failed to build: {}", output.profile, e.into_string());
+                        println!(
+                            "[{}] Failed to build:\n\t{}",
+                            output.profile,
+                            e.into_string()
+                        );
                     }
                 }
             }
@@ -67,7 +70,11 @@ fn main() {
                         println!("[{}] Cleaned successfully!", output.profile);
                     }
                     Err(e) => {
-                        println!("[{}] Failed to build: {}", output.profile, e.into_string());
+                        println!(
+                            "[{}] Failed to build:\n\t{}",
+                            output.profile,
+                            e.into_string()
+                        );
                     }
                 }
             }
