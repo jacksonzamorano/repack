@@ -32,6 +32,25 @@ record Organization @orgs #models #data {
 	email string
 }
 
+record Todo @todos #models #data {
+	id int32 #pk #generated #unique
+	done boolean
+	title string
+	description string
+	creator_user_id ref(User.id)
+	assigned_user_id ref(User.id)?
+	list_id ref(List.id)?
+	org_id ref(Organization.id)
+}
+
+record List @lists #models #data {
+	id int32 #pk #generated #unique
+	title string
+	description string
+	creator_user_id ref(User.id)
+	org_id ref(Organization.id)
+}
+
 record UserPublic: User #data {
 	*
 	- password

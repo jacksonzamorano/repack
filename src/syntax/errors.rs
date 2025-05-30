@@ -71,7 +71,7 @@ impl RepackError {
             (_, _, _) => String::new(),
         };
 
-        let details = self.error_details.unwrap_or(String::new());
+        let details = self.error_details.unwrap_or_default();
 
         format!("[E{:04}]{} {} {}", self.error as u32, loc, msg, details)
     }

@@ -1,7 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet},
-    fmt::format,
-};
+use std::collections::{hash_map::Entry, HashMap};
 
 use crate::{
     outputs::{OutputBuilder, OutputDescription},
@@ -32,7 +29,7 @@ impl OutputBuilder for PostgresBuilder {
             if object.object_type != ObjectType::Record {
                 return Err(RepackError::from_lang_with_obj(
                     RepackErrorKind::UnsupportedObjectType,
-                    &description.output,
+                    description.output,
                     object,
                 ));
             }
@@ -50,7 +47,7 @@ impl OutputBuilder for PostgresBuilder {
             if object.object_type != ObjectType::Record {
                 return Err(RepackError::from_lang(
                     RepackErrorKind::CannotInherit,
-                    &description.output,
+                    description.output,
                 ));
             }
             if object.inherits.is_none() {
@@ -62,7 +59,7 @@ impl OutputBuilder for PostgresBuilder {
                     let typ =
                         type_to_psql(field.field_type()).ok_or(RepackError::from_lang_with_msg(
                             RepackErrorKind::UnsupportedFieldType,
-                            &description.output,
+                            description.output,
                             field.field_type().to_string(),
                         ))?;
                     if let FieldReferenceKind::FieldType(table_ref) = &field.location.reference {
@@ -124,7 +121,7 @@ impl OutputBuilder for PostgresBuilder {
                         }
                         FieldReferenceKind::JoinData(local_join_key) => {
                             let join_name = format!("j_{}", local_join_key);
-                            if !joins.contains_key(&join_name) {
+                            if let Entry::Vacant(e) = joins.entry(join_name.clone()) {
                                 let local_join = object
                                     .fields
                                     .iter()
@@ -136,7 +133,7 @@ impl OutputBuilder for PostgresBuilder {
                                         return Err(RepackError::from_lang_with_obj(
                                             RepackErrorKind::ExpectedReference,
                                             description.output,
-                                            &object,
+                                            object,
                                         ));
                                     }
                                 };
@@ -155,7 +152,7 @@ impl OutputBuilder for PostgresBuilder {
                                     "{}.{} as {}",
                                     join_name, field.location.name, field.name
                                 ));
-                                joins.insert(join_name, join);
+                                e.insert(join);
                             }
                         }
                     }

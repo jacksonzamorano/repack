@@ -55,18 +55,15 @@ impl<'a> OutputDescription<'a> {
 
         for o in &objs {
             for f in &o.fields {
-                match f.field_type() {
-                    crate::syntax::FieldType::Custom(typ) => {
-                        if !included_types.contains(&typ) {
-                            return Err(RepackError::from_field_with_msg(
-                                RepackErrorKind::ObjectNotIncluded,
-                                o,
-                                f,
-                                typ.to_string(),
-                            ));
-                        }
+                if let crate::syntax::FieldType::Custom(typ) = f.field_type() {
+                    if !included_types.contains(typ) {
+                        return Err(RepackError::from_field_with_msg(
+                            RepackErrorKind::ObjectNotIncluded,
+                            o,
+                            f,
+                            typ.to_string(),
+                        ));
                     }
-                    _ => {}
                 }
             }
         }
@@ -88,7 +85,7 @@ impl<'a> OutputDescription<'a> {
 
     pub fn flush(&mut self) -> Result<(), RepackError> {
         let mut root_path = current_dir()
-            .map_err(|_| RepackError::from_lang(RepackErrorKind::CannotWriteFile, &self.output))?;
+            .map_err(|_| RepackError::from_lang(RepackErrorKind::CannotWriteFile, self.output))?;
         if let Some(path) = &self.output.location {
             root_path.push(path);
         }
@@ -97,11 +94,11 @@ impl<'a> OutputDescription<'a> {
             file_path.push(name);
             if let Some(parent) = file_path.parent() {
                 fs::create_dir_all(parent).map_err(|_| {
-                    RepackError::from_lang(RepackErrorKind::CannotWriteFile, &self.output)
+                    RepackError::from_lang(RepackErrorKind::CannotWriteFile, self.output)
                 })?;
             }
             fs::write(&file_path, contents).map_err(|_| {
-                RepackError::from_lang(RepackErrorKind::CannotWriteFile, &self.output)
+                RepackError::from_lang(RepackErrorKind::CannotWriteFile, self.output)
             })?;
         }
         Ok(())
@@ -109,11 +106,11 @@ impl<'a> OutputDescription<'a> {
 
     pub fn clean(&mut self) -> Result<(), RepackError> {
         let mut root_path = current_dir()
-            .map_err(|_| RepackError::from_lang(RepackErrorKind::CannotWriteFile, &self.output))?;
+            .map_err(|_| RepackError::from_lang(RepackErrorKind::CannotWriteFile, self.output))?;
         if let Some(path) = &self.output.location {
             root_path.push(path);
         }
-        for (name, _) in &self.buffers {
+        for name in self.buffers.keys() {
             let mut file_path = root_path.clone();
             file_path.push(name);
             _ = fs::remove_file(file_path);
@@ -123,7 +120,7 @@ impl<'a> OutputDescription<'a> {
                 _ = fs::remove_dir_all(&root_path);
             }
         }
-        return Ok(());
+        Ok(())
     }
 
     pub fn objects(&self) -> Vec<&'a Object> {

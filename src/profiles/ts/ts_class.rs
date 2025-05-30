@@ -20,7 +20,7 @@ impl OutputBuilder for TypescriptClassBuilder {
                 let ts_type =
                     type_to_ts(field.field_type()).ok_or(RepackError::from_lang_with_msg(
                         RepackErrorKind::UnsupportedFieldType,
-                        &description.output,
+                        description.output,
                         field.field_type().to_string(),
                     ))?;
                 let optional = if field.optional { "?" } else { "" };

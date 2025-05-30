@@ -28,7 +28,7 @@ fn main() {
     }
 
     let input_file = &args[1];
-    let contents = FileContents::new(&input_file);
+    let contents = FileContents::new(input_file);
     let parse_result = match ParseResult::from_contents(contents) {
         Ok(res) => res,
         Err(e) => {

@@ -14,12 +14,13 @@ fn drizzle_type(typ: &FieldType) -> Option<(&'static str, &'static str)> {
         FieldType::Float64 => ("doublePrecision", "doublePrecision()"),
         FieldType::DateTime => ("timestamp", "timestamp({ withTimezone: true })"),
         FieldType::String => ("varchar", "varchar()"),
+        FieldType::Boolean => ("boolean", "boolean()"),
         _ => return None,
     })
 }
 
-const F_NAME: &'static str = "schema.ts";
-const PRIMARY_KEY: &'static str = "primaryKey";
+const F_NAME: &str = "schema.ts";
+const PRIMARY_KEY: &str = "primaryKey";
 
 impl OutputBuilder for TypescriptDrizzleBuilder {
     fn build(
@@ -65,13 +66,10 @@ impl OutputBuilder for TypescriptDrizzleBuilder {
                         _ => {}
                     }
                 }
-                match &f.location.reference {
-                    FieldReferenceKind::FieldType(table_ref) => {
-                        let ref_obj = description.object_by_name(table_ref)?;
-                        let ref_field = description.field_by_name(ref_obj, &f.location.name)?;
-                        modifiers.push(format!("references(() => {}.{})", ref_obj.name, ref_field.name));
-                    }
-                    _ => {}
+                if let FieldReferenceKind::FieldType(table_ref) = &f.location.reference {
+                    let ref_obj = description.object_by_name(table_ref)?;
+                    let ref_field = description.field_by_name(ref_obj, &f.location.name)?;
+                    modifiers.push(format!("references(() => {}.{})", ref_obj.name, ref_field.name));
                 }
 
                 let modifier_prefix = if modifiers.is_empty() { "" } else { "." };
@@ -104,6 +102,6 @@ impl OutputBuilder for TypescriptDrizzleBuilder {
         );
 
         description.append(F_NAME, tables.join("\n\n"));
-        return Ok(());
+        Ok(())
     }
 }

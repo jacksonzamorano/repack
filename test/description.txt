@@ -27,6 +27,17 @@ User
 	- personal_org_id: int32
 ---
 
+List
+	- id: int32
+		- Primary Key
+		- Generated
+		- Unique
+	- title: string
+	- description: string
+	- creator_user_id: int32
+	- org_id: int32
+---
+
 UserPublic
 	- id: int32
 		- Primary Key
@@ -53,5 +64,21 @@ AllUserList
 	- total_cost: float64
 	- org_id: int32
 	- org_name: string
+---
+
+Todo
+	- id: int32
+		- Primary Key
+		- Generated
+		- Unique
+	- done: boolean
+	- title: string
+	- description: string
+	- creator_user_id: int32
+	- assigned_user_id: int32
+		- optional
+	- list_id: int32
+		- optional
+	- org_id: int32
 ---
 
