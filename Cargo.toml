@@ -1,5 +1,6 @@
 [package]
 name = "repack"
+description = "Powerful model codegen."
 version = "0.1.0"
 edition = "2024"
 license = "GNU GPLv3"

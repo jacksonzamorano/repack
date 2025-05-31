@@ -1,5 +1,7 @@
 # Repack: Code Generation Tool
 
+*Repack is not an ORM. Repack can generate code for your ORM but cannot connect to a database on it's own.*
+
 *Documentation is currently AI-generated, use at your own risk.*
 
 **Overview:**
