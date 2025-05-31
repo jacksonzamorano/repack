@@ -36,7 +36,7 @@ fn main() {
             exit(1);
         }
     };
-    parse_result.validate(true);
+    parse_result.validate();
 
     match behavior {
         Behavior::Build => {

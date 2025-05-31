@@ -216,7 +216,7 @@ impl ParseResult {
         Ok(ParseResult { objects, languages })
     }
 
-    pub fn validate(&self, should_exit: bool) {
+    pub fn validate(&self) {
         let mut has_errors = false;
         for object in &self.objects {
             if let Some(errors) = object.errors(self) {
@@ -241,9 +241,6 @@ impl ParseResult {
         }
         if has_errors {
             println!("Compilation failed.");
-            if should_exit {
-                exit(-1);
-            }
         }
     }
 }

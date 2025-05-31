@@ -88,10 +88,10 @@ impl Field {
         };
 
         let is_many = match contents.peek() {
-            Some(Token::OpenBrace) => {
+            Some(Token::OpenBracket) => {
                 contents.skip();
                 match contents.peek() {
-                    Some(Token::CloseBrace) => {
+                    Some(Token::CloseBracket) => {
                         contents.skip();
                         true
                     }

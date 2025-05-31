@@ -67,3 +67,8 @@ record AllUserList: UserPublic #views {
 	- personal_org_id
 	- password
 }
+
+struct OrganizationDirectory #data {
+	organization Organization
+	users UserPublic[]
+}
