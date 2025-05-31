@@ -24,6 +24,7 @@ pub enum RepackErrorKind {
     ExpectedReference,
     ExpectedArgument,
     SnippetNotFound,
+    DuplicateFieldNames,
 }
 impl RepackErrorKind {
     pub fn as_string(&self) -> &'static str {
@@ -58,7 +59,8 @@ impl RepackErrorKind {
                 "Expected a reference but got a local or join field."
             },
             Self::TypeNotResolved => "This type couldn't be resolved.",
-            Self::SnippetNotFound => "Expected to use snippet, but it couldn't be found:"
+            Self::SnippetNotFound => "Expected to use snippet, but it couldn't be found:",
+            Self::DuplicateFieldNames => "A field already exists with this name.",
         }
     }
 }
@@ -153,6 +155,16 @@ impl RepackError {
             obj_name: Some(obj.name.to_string()),
             field_name: None,
             error_details: None,
+        }
+    }
+
+    pub fn from_lang_with_obj_msg(error: RepackErrorKind, lang: &Output, obj: &Object, msg: String) -> RepackError {
+        RepackError {
+            error,
+            lang_name: Some(lang.profile.clone()),
+            obj_name: Some(obj.name.to_string()),
+            field_name: None,
+            error_details: Some(msg),
         }
     }
 

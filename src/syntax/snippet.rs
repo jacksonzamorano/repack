@@ -1,9 +1,10 @@
-use super::{Field, FileContents, Token};
+use super::{Field, FileContents, ObjectFunction, Token};
 
 #[derive(Debug)]
 pub struct Snippet {
     pub name: String,
     pub fields: Vec<Field>,
+    pub functions: Vec<ObjectFunction>,
 }
 
 impl Snippet {
@@ -16,6 +17,7 @@ impl Snippet {
         };
         let name = name_ref.to_string();
         let mut fields = Vec::new();
+        let mut functions = Vec::new();
 
         while let Some(next) = contents.take() {
             if next == Token::OpenBrace {
@@ -23,20 +25,28 @@ impl Snippet {
             }
         }
 
-        'cmd: while let Some(token) = contents.next() {
+        'cmd: while let Some(token) = contents.take() {
             match token {
                 Token::CloseBrace => {
                     break 'cmd;
                 }
                 Token::Literal(lit) => {
-                    if let Some(field) = Field::from_contents(lit.to_string(), contents) {
-                        fields.push(field);
+                    if let Some(next) = contents.peek() {
+                        if *next == Token::Colon {
+                            if let Some(func) =
+                                ObjectFunction::from_contents(lit.to_string(), contents)
+                            {
+                                functions.push(func);
+                            }
+                        } else if let Some(field) = Field::from_contents(lit.to_string(), contents) {
+                            fields.push(field);
+                        }
                     }
                 }
                 _ => {}
             }
         }
 
-        Snippet { name, fields }
+        Snippet { name, fields, functions }
     }
 }

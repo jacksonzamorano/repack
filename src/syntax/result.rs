@@ -1,10 +1,10 @@
+
 use crate::syntax::FieldReferenceKind;
 
 use super::{
-    FileContents, Object, ObjectType, Output, RepackError, RepackErrorKind, Snippet, Token,
-    dependancies::graph_valid, language,
+    FieldType, FileContents, Object, ObjectType, Output, RepackError, RepackErrorKind, Snippet,
+    Token, dependancies::graph_valid, language,
 };
-use std::process::exit;
 
 #[derive(Debug)]
 pub struct ParseResult {
@@ -13,7 +13,9 @@ pub struct ParseResult {
 }
 
 impl ParseResult {
-    pub fn from_contents(mut contents: FileContents) -> Result<ParseResult, RepackError> {
+    pub fn from_contents(mut contents: FileContents) -> Result<ParseResult, Vec<RepackError>> {
+        let mut errors = Vec::<RepackError>::new();
+
         let mut objects = Vec::new();
         let mut snippets = Vec::new();
         let mut languages = Vec::new();
@@ -58,18 +60,23 @@ impl ParseResult {
             let mut snip_idx = 0;
             while snip_idx < objects[object_snip_idx].use_snippets.iter().len() {
                 let snip_name = &objects[object_snip_idx].use_snippets[snip_idx];
-                let snippet = snippets.iter().find(|snip| snip.name == *snip_name).ok_or(
-                    RepackError::from_obj_with_msg(
-                        RepackErrorKind::SnippetNotFound,
-                        &objects[object_snip_idx],
-                        snip_name.to_string(),
-                    ),
-                )?;
+                let snippet = snippets
+                    .iter()
+                    .find(|snip| snip.name == *snip_name)
+                    .ok_or_else(|| {
+                        vec![RepackError::from_obj_with_msg(
+                            RepackErrorKind::SnippetNotFound,
+                            &objects[object_snip_idx],
+                            snip_name.to_string(),
+                        )]
+                    })?;
                 let snippet_fields = snippet.fields.clone();
                 for s in snippet_fields.into_iter() {
                     objects[object_snip_idx].fields.insert(snip_offset, s);
                     snip_offset += 1;
                 }
+                let mut snippet_fns = snippet.functions.clone();
+                objects[object_snip_idx].functions.append(&mut snippet_fns);
                 snip_idx += 1;
             }
             object_snip_idx += 1;
@@ -108,11 +115,13 @@ impl ParseResult {
                 let Some(parent_obj_idx) =
                     objects.iter().position(|obj| obj.name == *parent_obj_name)
                 else {
-                    return Err(RepackError::from_obj_with_msg(
+                    errors.push(RepackError::from_obj_with_msg(
                         RepackErrorKind::ParentObjectDoesNotExist,
                         &objects[object_idx],
                         parent_obj_name.to_string(),
                     ));
+                    object_idx += 1;
+                    continue;
                 };
 
                 if objects[object_idx].reuse_all {
@@ -130,117 +139,137 @@ impl ParseResult {
             }
 
             while field_idx < objects[object_idx].fields.len() {
-                if objects[object_idx].fields[field_idx].field_type.is_some() {
-                    field_idx += 1;
-                    continue;
-                }
-
-                match &objects[object_idx].fields[field_idx].location.reference {
-                    FieldReferenceKind::JoinData(joining_field) => {
-                        let referenced_field = &objects[object_idx]
-                            .fields
-                            .iter()
-                            .find(|field| field.name == *joining_field)
-                            .ok_or(RepackError::from_field_with_msg(
-                                RepackErrorKind::JoinFieldUnresolvable,
-                                &objects[object_idx],
-                                &objects[object_idx].fields[field_idx],
-                                joining_field.to_string(),
-                            ))?;
-                        let referenced_entity = match &referenced_field.location.reference {
-                            FieldReferenceKind::FieldType(entity_name) => objects
+                if objects[object_idx].fields[field_idx].field_type.is_none() {
+                    match &objects[object_idx].fields[field_idx].location.reference {
+                        FieldReferenceKind::JoinData(joining_field) => {
+                            let Some(referenced_field) = &objects[object_idx]
+                                .fields
                                 .iter()
-                                .find(|obj| obj.name == *entity_name)
-                                .ok_or(RepackError::from_field_with_msg(
-                                    RepackErrorKind::JoinFieldUnresolvable,
-                                    &objects[object_idx],
-                                    &objects[object_idx].fields[field_idx],
-                                    joining_field.to_string(),
-                                ))?,
-                            _ => {
-                                return Err(RepackError::from_field_with_msg(
+                                .find(|field| field.name == *joining_field)
+                            else {
+                                errors.push(RepackError::from_field_with_msg(
                                     RepackErrorKind::JoinFieldUnresolvable,
                                     &objects[object_idx],
                                     &objects[object_idx].fields[field_idx],
                                     joining_field.to_string(),
                                 ));
-                            }
-                        };
-                        let referenced_foreign_field = referenced_entity
-                            .fields
-                            .iter()
-                            .find(|field| {
-                                field.name == objects[object_idx].fields[field_idx].location.name
-                            })
-                            .ok_or(RepackError::from_field_with_msg(
-                                RepackErrorKind::JoinFieldUnresolvable,
-                                &objects[object_idx],
-                                &objects[object_idx].fields[field_idx],
-                                joining_field.to_string(),
-                            ))?;
-                        objects[object_idx].fields[field_idx].field_type =
-                            referenced_foreign_field.field_type.clone();
+                                field_idx += 1;
+                                continue;
+                            };
+                            let referenced_entity = match &referenced_field.location.reference {
+                                FieldReferenceKind::FieldType(entity_name) => {
+                                    let Some(res) =
+                                        objects.iter().find(|obj| obj.name == *entity_name)
+                                    else {
+                                        errors.push(RepackError::from_field_with_msg(
+                                            RepackErrorKind::JoinFieldUnresolvable,
+                                            &objects[object_idx],
+                                            &objects[object_idx].fields[field_idx],
+                                            joining_field.to_string(),
+                                        ));
+                                        field_idx += 1;
+                                        continue;
+                                    };
+                                    res
+                                }
+                                _ => {
+                                    errors.push(RepackError::from_field_with_msg(
+                                        RepackErrorKind::JoinFieldUnresolvable,
+                                        &objects[object_idx],
+                                        &objects[object_idx].fields[field_idx],
+                                        joining_field.to_string(),
+                                    ));
+                                    field_idx += 1;
+                                    continue;
+                                }
+                            };
+                            let Some(referenced_foreign_field) =
+                                referenced_entity.fields.iter().find(|field| {
+                                    field.name
+                                        == objects[object_idx].fields[field_idx].location.name
+                                })
+                            else {
+                                errors.push(RepackError::from_field_with_msg(
+                                    RepackErrorKind::JoinFieldUnresolvable,
+                                    &objects[object_idx],
+                                    &objects[object_idx].fields[field_idx],
+                                    joining_field.to_string(),
+                                ));
+                                field_idx += 1;
+                                continue;
+                            };
+                            objects[object_idx].fields[field_idx].field_type =
+                                referenced_foreign_field.field_type.clone();
+                        }
+                        FieldReferenceKind::FieldType(joining_entity) => {
+                            let Some(referenced_entity) =
+                                objects.iter().find(|obj| obj.name == *joining_entity)
+                            else {
+                                errors.push(RepackError::from_field_with_msg(
+                                    RepackErrorKind::RefFieldUnresolvable,
+                                    &objects[object_idx],
+                                    &objects[object_idx].fields[field_idx],
+                                    joining_entity.to_string(),
+                                ));
+                                field_idx += 1;
+                                continue;
+                            };
+                            let Some(referenced_foreign_field) =
+                                referenced_entity.fields.iter().find(|field| {
+                                    field.name
+                                        == objects[object_idx].fields[field_idx].location.name
+                                })
+                            else {
+                                errors.push(RepackError::from_field_with_msg(
+                                    RepackErrorKind::RefFieldUnresolvable,
+                                    &objects[object_idx],
+                                    &objects[object_idx].fields[field_idx],
+                                    joining_entity.to_string(),
+                                ));
+                                field_idx += 1;
+                                continue;
+                            };
+                            objects[object_idx].fields[field_idx].field_type =
+                                referenced_foreign_field.field_type.clone();
+                        }
+                        _ => {}
                     }
-                    FieldReferenceKind::FieldType(joining_entity) => {
-                        let referenced_entity = objects
-                            .iter()
-                            .find(|obj| obj.name == *joining_entity)
-                            .ok_or(RepackError::from_field_with_msg(
-                                RepackErrorKind::RefFieldUnresolvable,
-                                &objects[object_idx],
-                                &objects[object_idx].fields[field_idx],
-                                joining_entity.to_string(),
-                            ))?;
-                        let referenced_foreign_field = referenced_entity
-                            .fields
-                            .iter()
-                            .find(|field| {
-                                field.name == objects[object_idx].fields[field_idx].location.name
-                            })
-                            .ok_or(RepackError::from_field_with_msg(
-                                RepackErrorKind::RefFieldUnresolvable,
-                                &objects[object_idx],
-                                &objects[object_idx].fields[field_idx],
-                                joining_entity.to_string(),
-                            ))?;
-                        objects[object_idx].fields[field_idx].field_type =
-                            referenced_foreign_field.field_type.clone();
+                }
+
+                // Ensure custom types are resolved
+                if let Some(FieldType::Custom(object_name)) =
+                    &objects[object_idx].fields[field_idx].field_type
+                {
+                    if !objects.iter().any(|o| o.name == *object_name) {
+                        errors.push(RepackError::from_field_with_msg(
+                            RepackErrorKind::CustomTypeNotDefined,
+                            &objects[object_idx],
+                            &objects[object_idx].fields[field_idx],
+                            object_name.to_string(),
+                        ));
                     }
-                    _ => {}
                 }
                 field_idx += 1;
             }
             object_idx += 1;
         }
 
-        Ok(ParseResult { objects, languages })
-    }
-
-    pub fn validate(&self) {
-        let mut has_errors = false;
-        for object in &self.objects {
-            if let Some(errors) = object.errors(self) {
-                has_errors = true;
-                for error in errors {
-                    println!("{}", error.into_string());
-                }
+        for object in &objects {
+            if let Some(mut errs) = object.errors() {
+                errors.append(&mut errs);
             }
         }
-        for language in &self.languages {
-            let errors = language.errors();
-            if !errors.is_empty() {
-                has_errors = true;
-                for error in errors {
-                    println!("{}", error.into_string());
-                }
-            }
+        for language in &languages {
+            let mut errs = language.errors();
+            errors.append(&mut errs);
         }
-        if let Err(e) = graph_valid(&self.objects) {
-            has_errors = true;
-            println!("[ERROR] {}", e.into_string());
+        if let Err(e) = graph_valid(&objects) {
+            errors.push(e)
         }
-        if has_errors {
-            println!("Compilation failed.");
+        if !errors.is_empty() {
+            Err(errors)
+        } else {
+            Ok(ParseResult { objects, languages })
         }
     }
 }

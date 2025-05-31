@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use crate::{
     outputs::OutputBuilder,
     syntax::{
-        FieldReferenceKind, FieldType, FunctionName, FunctionNamespace, ObjectType, RepackError,
+        FieldReferenceKind, FieldType, FieldFunctionName, FunctionNamespace, ObjectType, RepackError,
     },
 };
 
@@ -59,10 +59,10 @@ impl OutputBuilder for TypescriptDrizzleBuilder {
                 };
                 for function in &f.functions_in_namespace(FunctionNamespace::Database) {
                     match function.name {
-                        FunctionName::PrimaryKey => {
+                        FieldFunctionName::PrimaryKey => {
                             modifiers.push(format!("{}()", PRIMARY_KEY));
                         }
-                        FunctionName::Identity => {
+                        FieldFunctionName::Identity => {
                             modifiers.push("generatedAlwaysAsIdentity()".to_string())
                         }
                         _ => {}

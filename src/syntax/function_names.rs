@@ -13,18 +13,32 @@ impl FunctionNamespace {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum FunctionName {
+pub enum ObjectFunctionName {
+    Index,
+    Custom(String),
+}
+
+impl ObjectFunctionName {
+    pub fn from_string(val: &str) -> ObjectFunctionName {
+        match val {
+            "index" => Self::Index,
+            _ => Self::Custom(val.to_string()),
+        }
+    }
+}
+#[derive(Debug, Clone, PartialEq)]
+pub enum FieldFunctionName {
     Default,
     Generated,
     Identity,
     PrimaryKey,
     Unique,
     Cascade,
-    Custom(String)
+    Custom(String),
 }
 
-impl FunctionName {
-    pub fn from_string(val: &str) -> FunctionName {
+impl FieldFunctionName {
+    pub fn from_string(val: &str) -> FieldFunctionName {
         match val {
             "default" => Self::Default,
             "generated" => Self::Generated,
@@ -32,7 +46,7 @@ impl FunctionName {
             "primary_key" => Self::PrimaryKey,
             "unique" => Self::Unique,
             "cascade" => Self::Cascade,
-            _ => Self::Custom(val.to_string())
+            _ => Self::Custom(val.to_string()),
         }
     }
 }

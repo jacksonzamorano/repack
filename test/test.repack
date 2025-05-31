@@ -6,6 +6,7 @@ snippet base {
 }
 snippet org_linked {
 	org_id ref(Organization.id)
+	db:index("org_id")
 }
 
 output description @test/description;
@@ -53,7 +54,6 @@ record List @lists #models #data {
 	title string
 	description string
 	creator_user_id ref(User.id)
-	org_id ref(Organization.id)
 }
 
 record UserPublic: User #data {

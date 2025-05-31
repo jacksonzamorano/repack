@@ -3,8 +3,8 @@ use std::collections::{HashMap, hash_map::Entry};
 use crate::{
     outputs::{OutputBuilder, OutputDescription},
     syntax::{
-        FieldReferenceKind, FieldType, FunctionName, FunctionNamespace, ObjectType, RepackError,
-        RepackErrorKind,
+        FieldFunctionName, FieldReferenceKind, FieldType, FunctionNamespace, ObjectFunctionName,
+        ObjectType, RepackError, RepackErrorKind,
     },
 };
 
@@ -52,8 +52,10 @@ impl OutputBuilder for PostgresBuilder {
                 ));
             }
             if object.inherits.is_none() {
-                // Root table
-                let mut constraints = String::new();
+                // Root object = table
+                let mut fields = Vec::<String>::new();
+                let mut constraints = Vec::<String>::new();
+                let mut indicies = Vec::<String>::new();
                 sql.push_str(&format!("CREATE TABLE {} (\n", object.table()));
                 for field in &object.fields {
                     let nullability = if field.optional { "" } else { " NOT NULL" };
@@ -69,55 +71,72 @@ impl OutputBuilder for PostgresBuilder {
                         let cascade = if field
                             .functions_in_namespace(FunctionNamespace::Database)
                             .iter()
-                            .any(|x| x.name == FunctionName::Cascade)
+                            .any(|x| x.name == FieldFunctionName::Cascade)
                         {
                             " ON DELETE CASCADE"
                         } else {
                             ""
                         };
-                        constraints.push_str(&format!(
-                            "\tFOREIGN KEY ({}) REFERENCES {}({}){},\n",
+                        constraints.push(format!(
+                            "\tFOREIGN KEY ({}) REFERENCES {}({}){}",
                             field.name,
                             ref_obj.table(),
                             ref_field.name,
                             cascade
                         ));
                     }
-                    let mut constraints: Vec<String> = Vec::new();
+                    let mut modifiers: Vec<String> = Vec::new();
                     for f in &field.functions_in_namespace(FunctionNamespace::Database) {
                         match f.name {
-                            FunctionName::Default => {
+                            FieldFunctionName::Default => {
                                 let arg = f.arg(description.output, object, field, 0)?;
-                                constraints.push(format!("DEFAULT {}", arg));
+                                modifiers.push(format!("DEFAULT {}", arg));
                             }
-                            FunctionName::Identity => {
-                                constraints.push("GENERATED ALWAYS AS IDENTITY".to_string());
+                            FieldFunctionName::Identity => {
+                                modifiers.push("GENERATED ALWAYS AS IDENTITY".to_string());
                             }
-                            FunctionName::Generated => {
+                            FieldFunctionName::Generated => {
                                 let arg = f.arg(description.output, object, field, 0)?;
-                                constraints.push(format!("GENERATED ALWAYS AS ({})", arg));
+                                modifiers.push(format!("GENERATED ALWAYS AS ({})", arg));
                             }
-                            FunctionName::Unique => {
-                                constraints.push("UNIQUE".to_string());
+                            FieldFunctionName::Unique => {
+                                modifiers.push("UNIQUE".to_string());
                             }
-                            FunctionName::PrimaryKey => {
-                                constraints.push("PRIMARY KEY".to_string());
+                            FieldFunctionName::PrimaryKey => {
+                                modifiers.push("PRIMARY KEY".to_string());
                             }
                             _ => {}
                         }
                     }
-                    sql.push_str(&format!(
-                        "\t{} {}{} {},\n",
+                    fields.push(format!(
+                        "\t{} {}{}{}{}",
                         field.name,
                         typ,
                         nullability,
-                        constraints.join(" ")
+                        if !modifiers.is_empty() { " " } else { "" },
+                        modifiers.join(" ")
                     ));
                 }
-                sql.push_str(&constraints);
-                sql.pop(); // Remove last comma
-                sql.pop(); // Remove last newline
-                sql.push_str("\n);\n");
+                for o in &object.functions_in_namespace(FunctionNamespace::Database) {
+                    if o.name == ObjectFunctionName::Index {
+                        let column_name = o.arg(description.output, object, 0)?;
+                        indicies.push(format!(
+                            "CREATE INDEX idx_{} ON {} ({});",
+                            column_name,
+                            object.table(),
+                            column_name
+                        ));
+                    }
+                }
+                sql.push_str(&fields.join(",\n"));
+                if !constraints.is_empty() {
+                    sql.push_str(",\n");
+                    sql.push_str(&constraints.join(",\n"));
+                }
+                sql.push('\n');
+                sql.push_str(");\n");
+                sql.push_str(&indicies.join("\n"));
+                sql.push_str("\n\n");
             } else {
                 // Make view
                 let mut fields = Vec::<String>::new();

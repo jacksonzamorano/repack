@@ -21,6 +21,9 @@ fn main() {
         exit(1);
     }
 
+    let msg = include_bytes!("welcome.txt");
+    _ = std::io::stdout().write_all(msg);
+
     let mut behavior = Behavior::Build;
 
     if args.contains(&"--clean".to_string()) {
@@ -32,11 +35,12 @@ fn main() {
     let parse_result = match ParseResult::from_contents(contents) {
         Ok(res) => res,
         Err(e) => {
-            println!("{}", e.into_string());
+            for err in e {
+                println!("{}", err.into_string());
+            }
             exit(1);
         }
     };
-    parse_result.validate();
 
     match behavior {
         Behavior::Build => {
@@ -61,6 +65,8 @@ fn main() {
                     }
                 }
             }
+            let msg = include_bytes!("done.txt");
+            _ = std::io::stdout().write_all(msg);
         }
         Behavior::Clean => {
             for output in &parse_result.languages {

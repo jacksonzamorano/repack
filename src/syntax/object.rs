@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
 use super::{
-    Field, FieldType, FileContents, ParseResult, RepackError, RepackErrorKind, Token,
-    field::FieldReferenceKind,
+    Field, FieldType, FileContents, FunctionNamespace, ObjectFunction, RepackError,
+    RepackErrorKind, Token, field::FieldReferenceKind,
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -22,6 +22,7 @@ pub struct Object {
     pub reuse_all: bool,
     pub reuse_exclude: Vec<String>,
     pub use_snippets: Vec<String>,
+    pub functions: Vec<ObjectFunction>,
 }
 impl Object {
     pub fn read_from_contents(typ: ObjectType, contents: &mut FileContents) -> Object {
@@ -39,6 +40,7 @@ impl Object {
         let mut reuse_all = false;
         let mut reuse_exclude = Vec::new();
         let mut use_snippets = Vec::new();
+        let mut functions = Vec::new();
 
         'header: while let Some(token) = contents.next() {
             match token {
@@ -66,14 +68,23 @@ impl Object {
             }
         }
 
-        'cmd: while let Some(token) = contents.next() {
+        'cmd: while let Some(token) = contents.take() {
             match token {
                 Token::CloseBrace => {
                     break 'cmd;
                 }
                 Token::Literal(lit) => {
-                    if let Some(field) = Field::from_contents(lit.to_string(), contents) {
-                        fields.push(field);
+                    if let Some(next) = contents.peek() {
+                        if *next == Token::Colon {
+                            if let Some(func) =
+                                ObjectFunction::from_contents(lit.to_string(), contents)
+                            {
+                                functions.push(func);
+                            }
+                        } else if let Some(field) = Field::from_contents(lit.to_string(), contents)
+                        {
+                            fields.push(field);
+                        }
                     }
                 }
                 Token::Star => {
@@ -103,6 +114,7 @@ impl Object {
             reuse_exclude,
             categories,
             use_snippets,
+            functions,
         }
     }
 
@@ -110,7 +122,14 @@ impl Object {
         self.table_name.as_ref().unwrap()
     }
 
-    pub fn errors(&self, result: &ParseResult) -> Option<Vec<RepackError>> {
+    pub fn functions_in_namespace(&self, ns: FunctionNamespace) -> Vec<&ObjectFunction> {
+        self.functions
+            .iter()
+            .filter(|of| of.namespace == ns)
+            .collect()
+    }
+
+    pub fn errors(&self) -> Option<Vec<RepackError>> {
         let mut errors = Vec::new();
         if self.object_type == ObjectType::Record {
             for field in &self.fields {
@@ -160,8 +179,18 @@ impl Object {
                 ));
             }
         }
+        let mut field_names = HashSet::new();
         for field in &self.fields {
-            let Some(field_type) = &field.field_type else {
+            if field_names.contains(&field.name) {
+                errors.push(RepackError::from_field(
+                    RepackErrorKind::DuplicateFieldNames,
+                    self,
+                    field,
+                ));
+            } else {
+                field_names.insert(field.name.clone());
+            }
+            if field.field_type.is_none() {
                 errors.push(RepackError::from_field(
                     RepackErrorKind::TypeNotResolved,
                     self,
@@ -169,16 +198,6 @@ impl Object {
                 ));
                 continue;
             };
-            if let FieldType::Custom(object_name) = field_type {
-                if !result.objects.iter().any(|o| o.name == *object_name) {
-                    errors.push(RepackError::from_field_with_msg(
-                        RepackErrorKind::CustomTypeNotDefined,
-                        self,
-                        field,
-                        object_name.to_string(),
-                    ));
-                }
-            }
         }
         if errors.is_empty() {
             None
@@ -213,11 +232,6 @@ impl Object {
                 }
             }
         }
-        // for join in &self.joins {
-        //     if !dependencies.contains(&join.object_name) {
-        //         dependencies.push(join.object_name.clone());
-        //     }
-        // }
         dependencies.into_iter().collect()
     }
 }
