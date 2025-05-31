@@ -1,7 +1,7 @@
 use crate::syntax::FieldReferenceKind;
 
 use super::{
-    FileContents, Object, ObjectType, Output, RepackError, RepackErrorKind, Token,
+    FileContents, Object, ObjectType, Output, RepackError, RepackErrorKind, Snippet, Token,
     dependancies::graph_valid, language,
 };
 use std::process::exit;
@@ -15,6 +15,7 @@ pub struct ParseResult {
 impl ParseResult {
     pub fn from_contents(mut contents: FileContents) -> Result<ParseResult, RepackError> {
         let mut objects = Vec::new();
+        let mut snippets = Vec::new();
         let mut languages = Vec::new();
 
         while let Some(token) = contents.next() {
@@ -31,6 +32,9 @@ impl ParseResult {
                         &mut contents,
                     ));
                 }
+                Token::SnippetType => {
+                    snippets.push(Snippet::read_from_contents(&mut contents));
+                }
                 Token::OutputType => {
                     if let Some(language) = language::Output::from_contents(&mut contents) {
                         languages.push(language);
@@ -43,6 +47,32 @@ impl ParseResult {
                 }
                 _ => {}
             }
+        }
+
+        // Expand all snippets.
+        // This is important to do before dependancy checks
+        // because snippets could introduce deps.
+        let mut object_snip_idx = 0;
+        while object_snip_idx < objects.len() {
+            let mut snip_offset = 0;
+            let mut snip_idx = 0;
+            while snip_idx < objects[object_snip_idx].use_snippets.iter().len() {
+                let snip_name = &objects[object_snip_idx].use_snippets[snip_idx];
+                let snippet = snippets.iter().find(|snip| snip.name == *snip_name).ok_or(
+                    RepackError::from_obj_with_msg(
+                        RepackErrorKind::SnippetNotFound,
+                        &objects[object_snip_idx],
+                        snip_name.to_string(),
+                    ),
+                )?;
+                let snippet_fields = snippet.fields.clone();
+                for s in snippet_fields.into_iter() {
+                    objects[object_snip_idx].fields.insert(snip_offset, s);
+                    snip_offset += 1;
+                }
+                snip_idx += 1;
+            }
+            object_snip_idx += 1;
         }
 
         // Rearrange all objects in dependancy order
@@ -69,6 +99,7 @@ impl ParseResult {
             }
         }
 
+        // Resolve references and do some error checking.
         let mut object_idx: usize = 0;
         while object_idx < objects.len() {
             let mut field_idx: usize = 0;

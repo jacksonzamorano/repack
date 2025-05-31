@@ -9,7 +9,9 @@ mod parser;
 mod result;
 mod tokens;
 mod types;
+mod snippet;
 
+pub use snippet::*;
 pub use errors::*;
 pub use field::*;
 pub use function::*;

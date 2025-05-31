@@ -25,6 +25,7 @@ pub enum Token {
     OutputType,
     RecordType,
     StructType,
+    SnippetType,
     Ref,
     From,
     As,
@@ -67,6 +68,7 @@ impl Token {
             "as" => Token::As,
             "where" => Token::Where,
             "import" => Token::Import,
+            "snippet" => Token::SnippetType,
 
             _ => Token::Literal(string.trim().to_string()),
         }

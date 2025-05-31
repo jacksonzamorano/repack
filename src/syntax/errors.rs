@@ -23,6 +23,7 @@ pub enum RepackErrorKind {
     TypeNotResolved,
     ExpectedReference,
     ExpectedArgument,
+    SnippetNotFound,
 }
 impl RepackErrorKind {
     pub fn as_string(&self) -> &'static str {
@@ -57,6 +58,7 @@ impl RepackErrorKind {
                 "Expected a reference but got a local or join field."
             },
             Self::TypeNotResolved => "This type couldn't be resolved.",
+            Self::SnippetNotFound => "Expected to use snippet, but it couldn't be found:"
         }
     }
 }

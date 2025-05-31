@@ -21,6 +21,7 @@ pub struct Object {
     pub table_name: Option<String>,
     pub reuse_all: bool,
     pub reuse_exclude: Vec<String>,
+    pub use_snippets: Vec<String>,
 }
 impl Object {
     pub fn read_from_contents(typ: ObjectType, contents: &mut FileContents) -> Object {
@@ -37,6 +38,7 @@ impl Object {
         let mut table_name = None;
         let mut reuse_all = false;
         let mut reuse_exclude = Vec::new();
+        let mut use_snippets = Vec::new();
 
         'header: while let Some(token) = contents.next() {
             match token {
@@ -82,6 +84,11 @@ impl Object {
                         reuse_exclude.push(lit.to_string());
                     }
                 }
+                Token::Exclamation => {
+                    if let Some(Token::Literal(snippet_name)) = contents.take() {
+                        use_snippets.push(snippet_name);
+                    }
+                }
                 _ => {}
             }
         }
@@ -95,6 +102,7 @@ impl Object {
             reuse_all,
             reuse_exclude,
             categories,
+            use_snippets,
         }
     }
 
