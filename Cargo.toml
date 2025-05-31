@@ -1,4 +1,7 @@
 [package]
-name = "repack-rust"
+name = "repack"
 version = "0.1.0"
 edition = "2024"
+license = "GNU GPLv3"
+repository = "https://github.com/jacksonzamorano/repack"
+homepage = "https://github.com/jacksonzamorano/repack"
