@@ -1,6 +1,6 @@
 use crate::{
     outputs::OutputBuilder,
-    syntax::{FieldCommand, RepackError, RepackErrorKind},
+    syntax::{RepackError, RepackErrorKind},
 };
 
 use super::{make_index, type_to_ts};
@@ -24,11 +24,7 @@ impl OutputBuilder for TypescriptClassBuilder {
                         field.field_type().to_string(),
                     ))?;
                 let optional = if field.optional { "?" } else { "" };
-                let arr = if field.commands.contains(&FieldCommand::Many) {
-                    "[]"
-                } else {
-                    ""
-                };
+                let arr = if field.array { "[]" } else { "" };
                 if let crate::syntax::FieldType::Custom(name) = &field.field_type() {
                     if !imports.contains(name) {
                         imports.push(name.clone());

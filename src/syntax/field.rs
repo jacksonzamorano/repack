@@ -1,4 +1,4 @@
-use super::{FieldCommand, FieldFunction, FieldType, FileContents, FunctionNamespace, Token};
+use super::{FieldFunction, FieldType, FileContents, FunctionNamespace, Token};
 
 #[derive(Debug, Clone)]
 pub struct FieldLocation {
@@ -20,7 +20,7 @@ pub struct Field {
     pub location: FieldLocation,
     pub field_type: Option<FieldType>,
     pub optional: bool,
-    pub commands: Vec<FieldCommand>,
+    pub array: bool,
     pub functions: Vec<FieldFunction>,
 }
 impl Field {
@@ -30,7 +30,10 @@ impl Field {
     }
 
     pub fn functions_in_namespace(&self, ns: FunctionNamespace) -> Vec<&FieldFunction> {
-        self.functions.iter().filter(|x| x.namespace == ns).collect()
+        self.functions
+            .iter()
+            .filter(|x| x.namespace == ns)
+            .collect()
     }
 
     pub fn from_contents(name: String, contents: &mut FileContents) -> Option<Field> {
@@ -84,6 +87,20 @@ impl Field {
             }
         };
 
+        let is_many = match contents.peek() {
+            Some(Token::OpenBrace) => {
+                contents.skip();
+                match contents.peek() {
+                    Some(Token::CloseBrace) => {
+                        contents.skip();
+                        true
+                    }
+                    _ => false,
+                }
+            }
+            _ => false,
+        };
+
         let optional = match contents.peek() {
             Some(Token::Question) => {
                 contents.next();
@@ -91,7 +108,6 @@ impl Field {
             }
             _ => false,
         };
-        let mut commands = Vec::new();
         let mut functions = Vec::new();
 
         while let Some(token) = contents.take() {
@@ -99,13 +115,6 @@ impl Field {
                 Token::Literal(name) => {
                     if let Some(func) = FieldFunction::from_contents(name, contents) {
                         functions.push(func);
-                    }
-                }
-                Token::Pound => {
-                    if let Some(Token::Literal(cmd)) = contents.next() {
-                        if let Some(command) = FieldCommand::from_string(cmd) {
-                            commands.push(command);
-                        }
                     }
                 }
                 Token::NewLine => {
@@ -120,7 +129,7 @@ impl Field {
             field_type: field_type_loc.0,
             location: field_type_loc.1,
             optional,
-            commands,
+            array: is_many,
             functions,
         })
     }

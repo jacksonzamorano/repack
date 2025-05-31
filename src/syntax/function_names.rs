@@ -12,13 +12,14 @@ impl FunctionNamespace {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum FunctionName {
     Default,
     Generated,
     Identity,
     PrimaryKey,
     Unique,
+    Cascade,
     Custom(String)
 }
 
@@ -30,6 +31,7 @@ impl FunctionName {
             "identity" => Self::Identity,
             "primary_key" => Self::PrimaryKey,
             "unique" => Self::Unique,
+            "cascade" => Self::Cascade,
             _ => Self::Custom(val.to_string())
         }
     }

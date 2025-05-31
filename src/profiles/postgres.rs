@@ -3,8 +3,8 @@ use std::collections::{HashMap, hash_map::Entry};
 use crate::{
     outputs::{OutputBuilder, OutputDescription},
     syntax::{
-        FieldCommand, FieldReferenceKind, FieldType, FunctionName,
-        FunctionNamespace, ObjectType, RepackError, RepackErrorKind,
+        FieldReferenceKind, FieldType, FunctionName, FunctionNamespace, ObjectType, RepackError,
+        RepackErrorKind,
     },
 };
 
@@ -66,7 +66,11 @@ impl OutputBuilder for PostgresBuilder {
                     if let FieldReferenceKind::FieldType(table_ref) = &field.location.reference {
                         let ref_obj = description.object_by_name(table_ref)?;
                         let ref_field = description.field_by_name(ref_obj, &field.location.name)?;
-                        let cascade = if field.commands.contains(&FieldCommand::Cascade) {
+                        let cascade = if field
+                            .functions_in_namespace(FunctionNamespace::Database)
+                            .iter()
+                            .any(|x| x.name == FunctionName::Cascade)
+                        {
                             " ON DELETE CASCADE"
                         } else {
                             ""

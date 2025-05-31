@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use super::{
-    Field, FieldCommand, FieldType, FileContents, ParseResult, RepackError, RepackErrorKind, Token,
+    Field, FieldType, FileContents, ParseResult, RepackError, RepackErrorKind, Token,
     field::FieldReferenceKind,
 };
 
@@ -121,14 +121,7 @@ impl Object {
                         field,
                     ));
                 }
-                if field.optional && field.commands.contains(&FieldCommand::PrimaryKey) {
-                    errors.push(RepackError::from_field(
-                        RepackErrorKind::PrimaryKeyOptional,
-                        self,
-                        field,
-                    ));
-                }
-                if field.commands.contains(&FieldCommand::Many) {
+                if field.array {
                     errors.push(RepackError::from_field(
                         RepackErrorKind::ManyNotAllowed,
                         self,

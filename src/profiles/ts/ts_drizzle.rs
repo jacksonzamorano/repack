@@ -2,7 +2,9 @@ use std::collections::HashSet;
 
 use crate::{
     outputs::OutputBuilder,
-    syntax::{FieldCommand, FieldReferenceKind, FieldType, ObjectType, RepackError},
+    syntax::{
+        FieldReferenceKind, FieldType, FunctionName, FunctionNamespace, ObjectType, RepackError,
+    },
 };
 
 pub struct TypescriptDrizzleBuilder;
@@ -55,12 +57,12 @@ impl OutputBuilder for TypescriptDrizzleBuilder {
                 if !f.optional {
                     modifiers.push("notNull()".to_string());
                 };
-                for command in &f.commands {
-                    match command {
-                        FieldCommand::PrimaryKey => {
+                for function in &f.functions_in_namespace(FunctionNamespace::Database) {
+                    match function.name {
+                        FunctionName::PrimaryKey => {
                             modifiers.push(format!("{}()", PRIMARY_KEY));
                         }
-                        FieldCommand::Generated => {
+                        FunctionName::Identity => {
                             modifiers.push("generatedAlwaysAsIdentity()".to_string())
                         }
                         _ => {}
@@ -69,7 +71,10 @@ impl OutputBuilder for TypescriptDrizzleBuilder {
                 if let FieldReferenceKind::FieldType(table_ref) = &f.location.reference {
                     let ref_obj = description.object_by_name(table_ref)?;
                     let ref_field = description.field_by_name(ref_obj, &f.location.name)?;
-                    modifiers.push(format!("references(() => {}.{})", ref_obj.name, ref_field.name));
+                    modifiers.push(format!(
+                        "references(() => {}.{})",
+                        ref_obj.name, ref_field.name
+                    ));
                 }
 
                 let modifier_prefix = if modifiers.is_empty() { "" } else { "." };

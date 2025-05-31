@@ -1,4 +1,4 @@
-use crate::{outputs::OutputBuilder, syntax::{FieldCommand, FieldType, RepackError, RepackErrorKind}};
+use crate::{outputs::OutputBuilder, syntax::{FieldType, RepackError, RepackErrorKind}};
 
 use super::{make_index, type_to_ts};
 
@@ -23,7 +23,7 @@ impl OutputBuilder for TypescriptInterfaceBuilder {
                 } else {
                     ""
                 };
-                let arr = if field.commands.contains(&FieldCommand::Many) {
+                let arr = if field.array {
                     "[]"
                 } else {
                     ""

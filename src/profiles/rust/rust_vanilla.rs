@@ -29,13 +29,13 @@ impl OutputBuilder for RustBuilder {
                     imports.insert("use chrono::NaiveDateTime;".to_string());
                 }
                 let optional = if field.optional { "Option<" } else { "" };
-                let arr = if field.commands.contains(&crate::syntax::FieldCommand::Many) {
+                let arr = if field.array {
                     "Vec<"
                 } else {
                     ""
                 };
                 let optional_close = if field.optional { ">" } else { "" };
-                let arr_close = if field.commands.contains(&crate::syntax::FieldCommand::Many) {
+                let arr_close = if field.array {
                     ">"
                 } else {
                     ""
