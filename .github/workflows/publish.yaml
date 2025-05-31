@@ -1,0 +1,28 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - '*' 
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: moonrepo/setup-rust@v1
+
+      - name: Set Version
+        run: |
+          TAG_VERSION="${{ github.ref_name }}"
+          sed -i "s/^version = \".*\"/version = \"${TAG_VERSION}\"/" Cargo.toml
+
+      - name: Cargo Login
+        run: cargo login ${{ secrets.CARGO_AUTH_KEY }}
+
+      - name: Publish to crates.io
+        run: cargo publish --verbose --allow-dirty
