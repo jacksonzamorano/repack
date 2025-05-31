@@ -1,127 +1,84 @@
-# Repack: Code Generation Tool
+# REPACK
 
-*Repack is not an ORM. Repack can generate code for your ORM but cannot connect to a database on it's own.*
+`repack` is a tool to define data models and generate corresponding code in various languages and formats. You define your models in `.repack` files using a simple syntax.
 
-*Documentation is currently AI-generated AND OUT OF DATE, use at your own risk.*
+* Note: Repack is not an ORM. Repack is a codegen tool. *
 
-**Overview:**
+* Another note: documentation below is AI generated and has only been lightly reviewed. While this will change in the near future, to learn more now, check out the example files in test/test.repack *
 
-Repack is a command-line tool designed to streamline development by allowing you to define your data models once in a `.repack` file and then generate corresponding code in various languages and formats. This helps maintain consistency across different parts of your application (e.g., backend, frontend, database).
+## Key Concepts
 
-**Core Concepts:**
+*   **Snippets:** Reusable blocks of fields. Include them in records using `!snippet_name`.
+    Example: `base` snippet for `id` and `created_date`.
+*   **Records:** Define your data models (e.g., `User`, `Organization`). Similar to classes or tables.
+*   **Structs:** Define data structures not necessarily database models but useful for your application (e.g., `OrganizationDirectory`).
+*   **Outputs:** Specify desired output formats and locations. Currently supported outputs (more to come):
+    *   `description`: Text description of models.
+    *   `postgres`: SQL for PostgreSQL.
+    *   `typescript_class`: TypeScript classes.
+    *   `typescript_interface`: TypeScript interfaces.
+    *   `typescript_drizzle`: TypeScript code for Drizzle ORM.
+    *   `rust`: Rust structs.
+*   **Tags:** Categorize models using `#tag_name` (e.g., `#models`, `#data`, `#private`). Used by output generators.
+*   **Fields:** Define fields with types (e.g., `name string`, `id int32`).
+*   **Functions** Add functions like `db:primary_key`, `db:default("NOW()")`, `db:index("org_id")`.
+*   **References:** Define relationships using `ref(OtherRecord.field)`.
+*   **Joins** Define views and join data using `from(local_ref_field.field)`.
+*   **Inheritance/Composition:** Create record variations by including all fields (`*`) and adding/removing specific fields (`- field_name`).
+*   **Imports:** Import definitions from other `.repack` files using `import "filename.repack"`.
 
-*   **`.repack` Definition File:** This is the central file where you define your data structures (records and structs) and specify the desired outputs.
-*   **Records (`record`):** Represent data entities that typically map to database tables or persistent data structures. They can have table names, inherit from other records, and include fields with various types and constraints.
-*   **Structs (`struct`):** Represent data structures that are not necessarily tied to database persistence. They are simpler than records and cannot inherit or have table names.
-*   **Outputs (`output`):** Define the target languages/formats for code generation. Each output specifies a profile (e.g., `postgres`, `typescript_class`, `rust`), an output location (directory), and can be filtered by categories.
-*   **Fields:** Define the properties of your records and structs. Fields have a name, a type (e.g., `string`, `int32`, `ref(OtherRecord.id)`), and can have commands like `#pk` (primary key), `#increment`, etc.
-*   **Categories (`#category_name`):** Allow you to group records and structs. Outputs can then be configured to only include objects belonging to specific categories.
-*   **Inheritance (`:`):** Records can inherit fields from a parent record.
-*   **Field Reuse (`*`, `- field_name`):** When inheriting, you can include all fields from the parent using `*` and exclude specific fields using `- field_name`.
-*   **References (`ref(OtherRecord.id)`):** Define relationships between records, typically for foreign keys.
-*   **Computed Fields (`from(other_field.name)`):** Define fields whose values are derived from other fields, often in related records.
+## How to Create Your Own Models
 
-**Command-Line Usage:**
+1.  **Create a `.repack` file:** This is where you'll define your models.
+2.  **Define Snippets (Optional but Recommended):**
+    ```repack
+    snippet base {
+        id int32 db:primary_key db:identity db:unique
+        created_date datetime db:default("NOW()")
+    }
+    ```
+3.  **Define Records:**
+    ```repack
+    record User @users #private #models {
+        !base // Includes id and created_date
+        name string
+        email string
+        // ... other fields
+    }
 
-The primary way to use `repack` is through the command line:
+    record Post @posts #models {
+        !base
+        title string
+        content string
+        author_id ref(User.id) // Foreign key to User table
+        db:index("author_id")
+    }
+    ```
+4.  **Define Structs (Optional):**
+    ```repack
+    struct UserProfile #data {
+        user User
+        posts Post[]
+    }
+    ```
+5.  **Specify Outputs:**
+    ```repack
+    // Output all records tagged with #models to a PostgreSQL schema file
+    output postgres @./output/postgres_schema #models;
 
-```bash
-repack <input_file.repack> [options]
-```
+    // Output all records and structs tagged with #data as TypeScript interfaces
+    output typescript_interface @./output/ts_interfaces #data {
+        make_index true // Option to create an index.ts file
+    }
 
-*   **`<input_file.repack>` (Required):** The path to your `.repack` definition file.
-*   **Options:**
-    *   `--clean`: This option will remove the previously generated files for the specified outputs before generating new ones.
+    // Output Rust structs for items tagged #data
+    output rust @./output/rust_structs #data;
+    ```
+6.  **Run the `repack` CLI:**
+    ```bash
+    repack your_definitions.repack
+    ```
+    This will process your definitions and generate files in the specified output directories.
 
-**Key Tasks and Functionality:**
 
-1.  **Parsing `.repack` Files:**
-    *   The tool reads the `.repack` file, tokenizes its content, and parses it into an internal representation of objects (records and structs) and output configurations.
-    *   It handles various syntax elements like object types (`record`, `struct`), output definitions (`output`), field definitions (name, type, commands), inheritance, categories, table names (`@table_name`), and output-specific options.
-
-2.  **Dependency Resolution and Validation:**
-    *   **Object Dependencies:** It analyzes dependencies between objects (e.g., due to inheritance or field references) and reorders them to ensure that dependencies are processed before the objects that depend on them.
-    *   **Circular Dependency Check:** Validates that there are no circular dependencies between object definitions, which would lead to an unresolvable generation order.
-    *   **Type Resolution:** Resolves field types, including references to fields in other objects (`ref` and `from` clauses).
-    *   **Error Handling:** Performs extensive validation and reports errors if the `.repack` file contains invalid syntax, unresolved references, or unsupported configurations. Errors include specific codes and messages indicating the location (object and field) of the issue.
-
-3.  **Code Generation:**
-    *   For each `output` defined in the `.repack` file, the tool:
-        *   Filters the parsed objects based on the categories specified in the `output` definition.
-        *   Selects the appropriate output profile (e.g., `postgres`, `typescript_class`, `rust_vanilla`).
-        *   Uses a corresponding "builder" for that profile to generate the code.
-        *   Writes the generated code to the specified output location.
-    *   **Supported Output Profiles (based on the provided code):**
-        *   **`description`:** Generates a text file (`description.txt`) summarizing the defined objects and their fields.
-            *   Options: `print_commands` (boolean, defaults to `true`) - whether to include field commands in the description.
-        *   **`postgres`:** Generates SQL statements (`model.sql`) to create database tables for `record` definitions.
-            *   Handles primary keys, nullability, and foreign key constraints (including `ON DELETE CASCADE` if specified with `#cascade`).
-            *   Does not support inheritance for Postgres output.
-        *   **`typescript_class`:** Generates TypeScript class definitions (`.ts` files) for objects.
-            *   Creates individual files for each object and an optional `index.ts` file to export all generated classes.
-            *   Handles field types, optionality (`?`), and arrays (`[]` for `#many` command).
-            *   Generates import statements for custom types (other generated classes).
-            *   Options: `make_index` (boolean, defaults to `false`) - whether to create an `index.ts` file.
-        *   **`typescript_interface`:** Generates TypeScript interface definitions (`.ts` files).
-            *   Similar to `typescript_class` but generates interfaces instead of classes.
-            *   Uses `import type` for dependencies.
-            *   Options: `make_index` (boolean, defaults to `false`).
-        *   **`rust` (specifically `rust_vanilla`):** Generates Rust struct definitions (`model.rs`).
-            *   Handles field types, `Option<>` for optional fields, and `Vec<>` for fields with the `#many` command.
-            *   Automatically adds `use chrono::NaiveDateTime;` if `DateTime` fields are used.
-
-4.  **File System Operations:**
-    *   Creates output directories if they don't exist.
-    *   Writes generated files to the appropriate locations.
-    *   Handles cleaning of output directories when the `--clean` flag is used (removes files generated by previous runs for the relevant output profiles).
-
-**Example `.repack` File Structure (from `test.repack`):**
-
-```repack
-// Define outputs
-output description @test { // Output human-readable description to 'test' directory
-	print_commands true
-}
-
-output postgres @test/postgres #models; // Output PostgreSQL schema to 'test/postgres' for objects in '#models' category
-output typescript_class @test/ts_classes #frontend #orm { // Output TS classes to 'test/ts_classes' for '#frontend' or '#orm'
-	make_index true
-}
-output typescript_interface @test/ts_interfaces #frontend { // Output TS interfaces to 'test/ts_interfaces' for '#frontend'
-	make_index true
-}
-output rust @test/rust_vanilla #frontend; // Output Rust structs to 'test/rust_vanilla' for '#frontend'
-
-// Define records (typically map to database tables)
-record User @users #models #frontend { // 'User' record, in 'users' table, part of '#models' and '#frontend' categories
-	id int32 #pk #increment       // Integer ID, primary key, auto-incrementing
-	name string
-	email string
-	password string
-	org_id ref(Organization.id)   // Foreign key to Organization.id
-	personal_org_id ref(Organization.id)
-}
-
-record Organization @orgs #models { // 'Organization' record, in 'orgs' table, part of '#models' category
-	id int32 #pk #increment
-	name string
-	email string
-}
-
-record UserPublic: User #orm { // 'UserPublic' inherits from 'User', part of '#orm' category
-	*                             // Include all fields from User
-	org_name from(org_id.name)    // Add 'org_name' field, derived from the 'name' of the related Organization
-	- personal_org_id             // Exclude 'personal_org_id' from User
-}
-
-record UserPublicNoOrg: UserPublic #orm { // 'UserPublicNoOrg' inherits from 'UserPublic'
-	*
-	- org_name                    // Exclude 'org_name'
-	- org_id                      // Exclude 'org_id'
-}
-
-// Define structs (general data structures)
-struct OrgModel #frontend { // 'OrgModel' struct, part of '#frontend' category
-	user User                   // Field 'user' of type 'User' (references the User record)
-}
-
+By combining these features, you can create a rich and well-structured definition of your data model that can then be translated into various code artifacts, saving time and ensuring consistency.
