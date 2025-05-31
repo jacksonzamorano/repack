@@ -12,23 +12,14 @@ impl OutputBuilder for DescriptionBuilder {
                 if field.optional {
                     description.append(DESCRIPTION_FILE, "\t\t- optional\n".to_string());
                 }
-                if description.bool("print_commands", true) {
-                    for commands in &field.commands {
-                        description.append(
-                            DESCRIPTION_FILE,
-                            format!("\t\t- {}\n", commands.string()),
-                        );
-                    }
-                }
-                if description.bool("print_functions", true) {
-                    for function in &field.functions {
-                        let args = function.args.iter().map(|x| format!("\t\t\t- '{}'", x)).collect::<Vec<_>>().join("\n");
-
-                        description.append(DESCRIPTION_FILE,
-                            format!("\t\t- Function: '{}'\n{}\n", function.name, args)
-                        );
-                    }
-                }
+                // if description.bool("print_functions", true) {
+                //     for function in &field.functions {
+                //         let args = function.args.iter().map(|x| format!("\t\t\t- '{}'", x)).collect::<Vec<_>>().join("\n");
+                //         description.append(DESCRIPTION_FILE,
+                //             format!("\t\t- Function: '{}'\n{}\n", function.name, args)
+                //         );
+                //     }
+                // }
             }
             description.append(DESCRIPTION_FILE, "---\n\n".to_string());
         }

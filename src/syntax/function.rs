@@ -1,11 +1,11 @@
 use super::{
-    Field, FileContents, FunctionNamespace, Object, Output, RepackError, RepackErrorKind, Token,
+    Field, FileContents, FunctionName, FunctionNamespace, Object, Output, RepackError, RepackErrorKind, Token
 };
 
 #[derive(Debug, Clone)]
 pub struct FieldFunction {
     pub namespace: FunctionNamespace,
-    pub name: String,
+    pub name: FunctionName,
     pub args: Vec<String>,
 }
 impl FieldFunction {
@@ -34,29 +34,32 @@ impl FieldFunction {
             return None;
         };
         let mut args = Vec::<String>::new();
-        contents.take(); // skip (
-        let mut buf = String::new();
-        loop {
-            let Some(tok) = contents.take() else { break };
-            match tok {
-                Token::Comma => {
-                    args.push(buf);
-                    buf = String::new();
-                }
-                Token::CloseParen => {
-                    args.push(buf);
-                    break;
-                }
-                Token::Literal(text) => {
-                    buf.push_str(&text);
-                }
-                _ => {}
-            };
+        if *contents.peek()? == Token::OpenParen {
+            contents.skip();
+            // has args
+            let mut buf = String::new();
+            loop {
+                let Some(tok) = contents.take() else { break };
+                match tok {
+                    Token::Comma => {
+                        args.push(buf);
+                        buf = String::new();
+                    }
+                    Token::CloseParen => {
+                        args.push(buf);
+                        break;
+                    }
+                    Token::Literal(text) => {
+                        buf.push_str(&text);
+                    }
+                    _ => {}
+                };
+            }
         }
 
         Some(FieldFunction {
             namespace: FunctionNamespace::from_string(&namespace),
-            name,
+            name: FunctionName::from_string(&name),
             args,
         })
     }

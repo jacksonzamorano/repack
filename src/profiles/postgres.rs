@@ -3,7 +3,8 @@ use std::collections::{HashMap, hash_map::Entry};
 use crate::{
     outputs::{OutputBuilder, OutputDescription},
     syntax::{
-        FieldCommand, FieldReferenceKind, FieldType, FunctionNamespace, ObjectType, RepackError, RepackErrorKind, FUNCTION_DEFAULT_VALUE
+        FieldCommand, FieldReferenceKind, FieldType, FunctionName,
+        FunctionNamespace, ObjectType, RepackError, RepackErrorKind,
     },
 };
 
@@ -79,24 +80,26 @@ impl OutputBuilder for PostgresBuilder {
                         ));
                     }
                     let mut constraints: Vec<String> = Vec::new();
-                    for c in &field.commands {
-                        match c {
-                            FieldCommand::Generated => {
+                    for f in &field.functions_in_namespace(FunctionNamespace::Database) {
+                        match f.name {
+                            FunctionName::Default => {
+                                let arg = f.arg(description.output, object, field, 0)?;
+                                constraints.push(format!("DEFAULT {}", arg));
+                            }
+                            FunctionName::Identity => {
                                 constraints.push("GENERATED ALWAYS AS IDENTITY".to_string());
                             }
-                            FieldCommand::Unique => {
+                            FunctionName::Generated => {
+                                let arg = f.arg(description.output, object, field, 0)?;
+                                constraints.push(format!("GENERATED ALWAYS AS ({})", arg));
+                            }
+                            FunctionName::Unique => {
                                 constraints.push("UNIQUE".to_string());
                             }
-                            FieldCommand::PrimaryKey => {
+                            FunctionName::PrimaryKey => {
                                 constraints.push("PRIMARY KEY".to_string());
                             }
                             _ => {}
-                        }
-                    }
-                    for f in &field.functions_in_namespace(FunctionNamespace::Database) {
-                        if f.name.as_str() == FUNCTION_DEFAULT_VALUE {
-                            let arg = f.arg(description.output, object, field, 0)?;
-                            constraints.push(format!("DEFAULT {}", arg));
                         }
                     }
                     sql.push_str(&format!(

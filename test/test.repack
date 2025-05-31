@@ -15,7 +15,7 @@ output typescript_drizzle @test/ts_drizzle #models;
 output rust @test/rust_vanilla #data #private;
 
 record User @users #private #models {
-	id int32 #pk #generated #unique
+	id int32 db:primary_key db:identity db:unique
 	name string
 	email string
 	password string
@@ -34,7 +34,7 @@ record Organization @orgs #models #data {
 }
 
 record Todo @todos #models #data {
-	id int32 #pk #generated #unique
+	id int32 db:primary_key db:identity db:unique
 	done boolean
 	title string
 	description string
@@ -46,7 +46,7 @@ record Todo @todos #models #data {
 }
 
 record List @lists #models #data {
-	id int32 #pk #generated #unique
+	id int32 db:primary_key db:identity db:unique
 	title string
 	description string
 	creator_user_id ref(User.id)
