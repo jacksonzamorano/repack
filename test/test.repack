@@ -28,7 +28,7 @@ record User @users #private #models {
 }
 
 record Organization @orgs #models #data {
-	id int32 #pk #generated #unique
+	id int32 db:primary_key db:identity db:unique
 	name string
 	email string
 }

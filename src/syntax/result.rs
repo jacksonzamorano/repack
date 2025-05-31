@@ -142,7 +142,7 @@ impl ParseResult {
                                 field.name == objects[object_idx].fields[field_idx].location.name
                             })
                             .ok_or(RepackError::from_field_with_msg(
-                                RepackErrorKind::RefFieldUnresolvable,
+                                RepackErrorKind::JoinFieldUnresolvable,
                                 &objects[object_idx],
                                 &objects[object_idx].fields[field_idx],
                                 joining_field.to_string(),
