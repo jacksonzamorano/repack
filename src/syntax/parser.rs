@@ -32,15 +32,22 @@ impl FileContents {
         let mut contents = vec![];
         _ = file.read_to_end(&mut contents);
 
+        let mut iter = contents.into_iter().peekable();
+
         let mut buf: String = String::new();
-        let mut in_quote: bool = false;
-        for byte in contents {
+        let mut in_comment = false;
+        let mut in_quote = false;
+        loop {
+            let Some(byte) = iter.next() else {
+                break;
+            };
             if byte == b'"' {
                 if in_quote {
                     self.contents.push(Token::Literal(buf));
                     buf = String::new();
                 } else if !buf.is_empty() {
-                    self.contents.push(Token::from_string(&buf));
+                    let token = Token::from_string(&buf);
+                    self.contents.push(token);
                 }
                 in_quote = !in_quote;
                 continue;
@@ -48,23 +55,35 @@ impl FileContents {
             if in_quote {
                 buf.push(byte as char);
             } else {
-                match Token::from_byte(byte) {
-                    Some(token) => {
-                        if !buf.is_empty() {
-                            self.contents.push(Token::from_string(&buf));
-                            buf.clear();
-                        }
-                        self.contents.push(token);
-                    }
-                    None => {
-                        if !byte.is_ascii_whitespace() {
-                            buf.push(byte as char);
-                        } else if !buf.is_empty() {
-                            // Handle the buffer content
-                            self.contents.push(Token::from_string(&buf));
-                            buf.clear();
+                if byte == b'/' {
+                    if let Some(next_byte) = iter.peek() {
+                        if *next_byte == b'/' {
+                            in_comment = true;
+                            continue;
                         }
                     }
+                }
+                if !in_comment {
+                    match Token::from_byte(byte) {
+                        Some(token) => {
+                            if !buf.is_empty() {
+                                self.contents.push(Token::from_string(&buf));
+                                buf.clear();
+                            }
+                            self.contents.push(token);
+                        }
+                        None => {
+                            if !byte.is_ascii_whitespace() {
+                                buf.push(byte as char);
+                            } else if !buf.is_empty() {
+                                // Handle the buffer content
+                                self.contents.push(Token::from_string(&buf));
+                                buf.clear();
+                            }
+                        }
+                    }
+                } else if byte.is_ascii_whitespace() {
+                    in_comment = false;
                 }
             }
         }

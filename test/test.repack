@@ -1,9 +1,14 @@
 import "test-import.repack"
 
+// Provide a base, with ID and created date.
+// All DB models will inherit.
 snippet base {
 	id int32 db:primary_key db:identity db:unique
 	created_date datetime db:default("NOW()")
 }
+
+// Provide a reference to Organization
+// and an index for all related objects
 snippet org_linked {
 	org_id ref(Organization.id)
 	db:index("org_id")
@@ -46,6 +51,7 @@ record Todo @todos #models #data {
 	creator_user_id ref(User.id)
 	assigned_user_id ref(User.id)?
 	list_id ref(List.id)?
+	db:index("done", "org_id")
 }
 
 record List @lists #models #data {
@@ -54,6 +60,13 @@ record List @lists #models #data {
 	title string
 	description string
 	creator_user_id ref(User.id)
+}
+
+record Product @products #models #data {
+	!base
+	monthly_price int32
+	yearly_price int32
+	db:check("monthly_price < yearly_price")
 }
 
 record UserPublic: User #data {
@@ -71,4 +84,9 @@ record AllUserList: UserPublic #views {
 struct OrganizationDirectory #data {
 	organization Organization
 	users UserPublic[]
+}
+
+record TempIdList @id_list #models {
+	id int32 db:pk
+	db:temporary
 }

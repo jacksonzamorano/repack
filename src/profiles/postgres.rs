@@ -56,7 +56,6 @@ impl OutputBuilder for PostgresBuilder {
                 let mut fields = Vec::<String>::new();
                 let mut constraints = Vec::<String>::new();
                 let mut indicies = Vec::<String>::new();
-                sql.push_str(&format!("CREATE TABLE {} (\n", object.table()));
                 for field in &object.fields {
                     let nullability = if field.optional { "" } else { " NOT NULL" };
                     let typ =
@@ -99,6 +98,10 @@ impl OutputBuilder for PostgresBuilder {
                                 let arg = f.arg(description.output, object, field, 0)?;
                                 modifiers.push(format!("GENERATED ALWAYS AS ({})", arg));
                             }
+                            FieldFunctionName::GeneratedStored => {
+                                let arg = f.arg(description.output, object, field, 0)?;
+                                modifiers.push(format!("GENERATED ALWAYS AS ({}) STORED", arg));
+                            }
                             FieldFunctionName::Unique => {
                                 modifiers.push("UNIQUE".to_string());
                             }
@@ -117,17 +120,31 @@ impl OutputBuilder for PostgresBuilder {
                         modifiers.join(" ")
                     ));
                 }
+
+                let mut temp = "";
                 for o in &object.functions_in_namespace(FunctionNamespace::Database) {
-                    if o.name == ObjectFunctionName::Index {
-                        let column_name = o.arg(description.output, object, 0)?;
-                        indicies.push(format!(
-                            "CREATE INDEX idx_{} ON {} ({});",
-                            column_name,
-                            object.table(),
-                            column_name
-                        ));
+                    match o.name {
+                        ObjectFunctionName::Index => {
+                            let fields = o.args_min_count(description.output, object, 1)?;
+                            let index_name = fields.join("_");
+                            indicies.push(format!(
+                                "CREATE INDEX {}_idx_{} ON {} ({});",
+                                object.table(),
+                                index_name,
+                                object.table(),
+                                fields.join(", ")
+                            ));
+                        }
+                        ObjectFunctionName::Temporary => temp = "TEMP ",
+                        ObjectFunctionName::Check => {
+                            let arg = o.arg(description.output, object, 0)?;
+                            constraints.push(format!("\tCHECK ({})", arg));
+                        }
+                        _ => {}
                     }
                 }
+
+                sql.push_str(&format!("CREATE {}TABLE {} (\n", temp, object.table()));
                 sql.push_str(&fields.join(",\n"));
                 if !constraints.is_empty() {
                     sql.push_str(",\n");

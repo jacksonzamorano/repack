@@ -50,7 +50,7 @@ impl RepackErrorKind {
             Self::CannotReuse => "Reuse is not available in this context.",
             Self::CannotInherit => "Inherit is not available in this context.",
             Self::NoFields => "No fields were found in this object.",
-            Self::ManyNotAllowed => "Command 'many' is not valid in this context.",
+            Self::ManyNotAllowed => "Arrays aren't allowed in this context.",
             Self::CustomTypeNotAllowed => {
                 "Custom types are not available in this context."
             }

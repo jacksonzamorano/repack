@@ -15,6 +15,8 @@ impl FunctionNamespace {
 #[derive(Debug, Clone, PartialEq)]
 pub enum ObjectFunctionName {
     Index,
+    Temporary,
+    Check,
     Custom(String),
 }
 
@@ -22,6 +24,8 @@ impl ObjectFunctionName {
     pub fn from_string(val: &str) -> ObjectFunctionName {
         match val {
             "index" => Self::Index,
+            "temporary" => Self::Temporary,
+            "check" => Self::Check,
             _ => Self::Custom(val.to_string()),
         }
     }
@@ -30,6 +34,7 @@ impl ObjectFunctionName {
 pub enum FieldFunctionName {
     Default,
     Generated,
+    GeneratedStored,
     Identity,
     PrimaryKey,
     Unique,
@@ -42,6 +47,7 @@ impl FieldFunctionName {
         match val {
             "default" => Self::Default,
             "generated" => Self::Generated,
+            "generated_stored" => Self::GeneratedStored,
             "identity" => Self::Identity,
             "primary_key" => Self::PrimaryKey,
             "unique" => Self::Unique,
