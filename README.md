@@ -2,7 +2,7 @@
 
 *Repack is not an ORM. Repack can generate code for your ORM but cannot connect to a database on it's own.*
 
-*Documentation is currently AI-generated, use at your own risk.*
+*Documentation is currently AI-generated AND OUT OF DATE, use at your own risk.*
 
 **Overview:**
 
