@@ -12,6 +12,9 @@ mod snippet;
 mod tokens;
 mod types;
 
+#[cfg(test)]
+mod tests;
+
 pub use errors::*;
 pub use field::*;
 pub use field_function::*;
