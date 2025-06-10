@@ -3,8 +3,8 @@ use std::collections::{HashMap, hash_map::Entry};
 use crate::{
     outputs::{OutputBuilder, OutputDescription},
     syntax::{
-        FieldFunctionName, FieldReferenceKind, FieldType, FunctionNamespace, ObjectFunctionName,
-        ObjectType, RepackError, RepackErrorKind,
+        CustomFieldType, FieldFunctionName, FieldReferenceKind, FieldType, FunctionNamespace,
+        ObjectFunctionName, ObjectType, RepackError, RepackErrorKind,
     },
 };
 
@@ -17,6 +17,7 @@ fn type_to_psql(field_type: &FieldType) -> Option<String> {
         FieldType::Float64 => Some("FLOAT8".to_string()),
         FieldType::DateTime => Some("TIMESTAMPTZ".to_string()),
         FieldType::Uuid => Some("UUID".to_string()),
+        FieldType::Custom(name, CustomFieldType::Enum) => Some(name.to_string()),
         _ => None,
     }
 }
@@ -27,6 +28,7 @@ impl OutputBuilder for PostgresBuilder {
     fn build(&self, description: &mut OutputDescription) -> Result<(), RepackError> {
         let mut sql = String::new();
         sql.push_str("BEGIN;\n\n");
+
         for object in description.objects().iter().rev() {
             if object.object_type != ObjectType::Record {
                 return Err(RepackError::from_lang_with_obj(
@@ -43,6 +45,22 @@ impl OutputBuilder for PostgresBuilder {
                 sql.push_str(&object.name);
             }
             sql.push_str(";\n");
+        }
+
+        for enm in description.enums() {
+            sql.push_str(&format!("DROP TYPE {};\n", enm.name));
+        }
+
+        for enm in description.enums() {
+            sql.push_str(&format!(
+                "CREATE TYPE {} AS ENUM ({});\n",
+                enm.name,
+                enm.options
+                    .iter()
+                    .map(|x| format!("'{}'", x))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
         }
 
         for object in description.objects() {

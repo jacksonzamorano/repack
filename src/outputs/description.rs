@@ -1,8 +1,9 @@
-use crate::syntax::{Field, Object, Output, ParseResult, RepackError, RepackErrorKind};
+use crate::syntax::{Enum, Field, Object, Output, ParseResult, RepackError, RepackErrorKind};
 use std::{collections::HashMap, env::current_dir, fs};
 
 pub struct OutputDescription<'a> {
     objects: Vec<&'a Object>,
+    enums: Vec<&'a Enum>,
     pub output: &'a Output,
     pub buffers: HashMap<String, String>,
 }
@@ -11,6 +12,25 @@ impl<'a> OutputDescription<'a> {
     pub fn new(result: &'a ParseResult, output: &'a Output) -> Result<Self, RepackError> {
         let mut objs = result
             .objects
+            .iter()
+            .filter(|obj| {
+                // If the output has categories, filter the objects.
+                if !output.categories.is_empty()
+                    && !obj
+                        .categories
+                        .iter()
+                        .any(|cat| output.categories.contains(cat))
+                {
+                    return false;
+                }
+                if output.exclude.contains(&obj.name) {
+                    return false;
+                }
+                true
+            })
+            .collect::<Vec<_>>();
+        let enums = result
+            .enums
             .iter()
             .filter(|obj| {
                 // If the output has categories, filter the objects.
@@ -51,11 +71,12 @@ impl<'a> OutputDescription<'a> {
             }
         }
 
-        let included_types: Vec<String> = objs.iter().map(|x| x.name.to_string()).collect();
+        let mut included_types: Vec<String> = objs.iter().map(|x| x.name.to_string()).collect();
+        included_types.append(&mut enums.iter().map(|x| x.name.to_string()).collect());
 
         for o in &objs {
             for f in &o.fields {
-                if let crate::syntax::FieldType::Custom(typ) = f.field_type() {
+                if let crate::syntax::FieldType::Custom(typ, _) = f.field_type() {
                     if !included_types.contains(typ) {
                         return Err(RepackError::from_field_with_msg(
                             RepackErrorKind::ObjectNotIncluded,
@@ -70,6 +91,7 @@ impl<'a> OutputDescription<'a> {
 
         Ok(Self {
             objects: objs,
+            enums,
             output,
             buffers: HashMap::new(),
         })
@@ -125,6 +147,10 @@ impl<'a> OutputDescription<'a> {
 
     pub fn objects(&self) -> Vec<&'a Object> {
         self.objects.clone()
+    }
+
+    pub fn enums(&self) -> Vec<&'a Enum> {
+        self.enums.clone()
     }
 
     pub fn object_by_name(&self, obj_name: &str) -> Result<&'a Object, RepackError> {

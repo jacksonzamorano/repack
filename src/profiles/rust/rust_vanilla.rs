@@ -43,7 +43,7 @@ impl OutputBuilder for RustBuilder {
                     ""
                 };
                 output.push_str(&format!(
-                    "\t{}: {}{}{}{}{},\n",
+                    "\tpub {}: {}{}{}{}{},\n",
                     field.name, optional, arr, rust_type, optional_close, arr_close
                 ));
             }

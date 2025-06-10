@@ -13,7 +13,7 @@ pub fn type_to_ts(field_type: &crate::syntax::FieldType) -> Option<String> {
         FieldType::Float64 => Some("number".to_string()),
         FieldType::DateTime => Some("Date".to_string()),
         FieldType::Uuid => Some("string".to_string()),
-        FieldType::Custom(name) => Some(name.to_string()),
+        FieldType::Custom(name, _) => Some(name.to_string()),
         _ => None,
     }
 }

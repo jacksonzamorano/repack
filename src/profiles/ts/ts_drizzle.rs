@@ -3,21 +3,23 @@ use std::collections::HashSet;
 use crate::{
     outputs::OutputBuilder,
     syntax::{
-        FieldReferenceKind, FieldType, FieldFunctionName, FunctionNamespace, ObjectType, RepackError,
+        CustomFieldType, FieldFunctionName, FieldReferenceKind, FieldType, FunctionNamespace,
+        ObjectType, RepackError,
     },
 };
 
 pub struct TypescriptDrizzleBuilder;
 
-fn drizzle_type(typ: &FieldType) -> Option<(&'static str, &'static str)> {
+fn drizzle_type(typ: &FieldType) -> Option<(&'static str, String)> {
     Some(match typ {
-        FieldType::Int32 => ("integer", "integer()"),
-        FieldType::Int64 => ("bigint", "bigint({ mode: 'number' })"),
-        FieldType::Float64 => ("doublePrecision", "doublePrecision()"),
-        FieldType::DateTime => ("timestamp", "timestamp({ withTimezone: true })"),
-        FieldType::String => ("varchar", "varchar()"),
-        FieldType::Boolean => ("boolean", "boolean()"),
-        FieldType::Uuid => ("uuid", "uuid()"),
+        FieldType::Int32 => ("integer", "integer()".to_string()),
+        FieldType::Int64 => ("bigint", "bigint({ mode: 'number' })".to_string()),
+        FieldType::Float64 => ("doublePrecision", "doublePrecision()".to_string()),
+        FieldType::DateTime => ("timestamp", "timestamp({ withTimezone: true })".to_string()),
+        FieldType::String => ("varchar", "varchar()".to_string()),
+        FieldType::Boolean => ("boolean", "boolean()".to_string()),
+        FieldType::Uuid => ("uuid", "uuid()".to_string()),
+        FieldType::Custom(name, CustomFieldType::Enum) => ("", format!("{}()", name)),
         _ => return None,
     })
 }
@@ -35,6 +37,20 @@ impl OutputBuilder for TypescriptDrizzleBuilder {
         let table_type = "pgTable".to_string();
         let mut drizzle_imports = HashSet::<String>::new();
         drizzle_imports.insert(table_type.clone());
+
+        for enm in description.enums() {
+            drizzle_imports.insert("pgEnum".to_string());
+            tables.push(format!(
+                "export const {} = pgEnum('{}', [{}])",
+                enm.name,
+                enm.name,
+                enm.options
+                    .iter()
+                    .map(|x| format!("'{}'", x))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
+        }
 
         for obj in description.objects() {
             if obj.object_type != ObjectType::Record || obj.inherits.is_some() {
@@ -86,7 +102,9 @@ impl OutputBuilder for TypescriptDrizzleBuilder {
                     modifier_prefix,
                     modifiers.join(".")
                 ));
-                drizzle_imports.insert(typ.0.to_string());
+                if !typ.0.is_empty() {
+                    drizzle_imports.insert(typ.0.to_string());
+                }
             }
 
             let def = format!(

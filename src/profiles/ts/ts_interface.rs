@@ -28,7 +28,7 @@ impl OutputBuilder for TypescriptInterfaceBuilder {
                 } else {
                     ""
                 };
-                if let FieldType::Custom(name) = field.field_type() {
+                if let FieldType::Custom(name, _) = field.field_type() {
                     if !imports.contains(name) {
                         imports.push(name.clone());
                     }

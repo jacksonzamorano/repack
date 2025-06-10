@@ -1,5 +1,11 @@
 use std::fmt::Display;
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum CustomFieldType {
+    Object,
+    Enum,
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum FieldType {
     String,
@@ -9,7 +15,7 @@ pub enum FieldType {
     Boolean,
     DateTime,
     Uuid,
-    Custom(String),
+    Custom(String, CustomFieldType),
     FutureType,
 }
 impl Display for FieldType {
@@ -22,15 +28,15 @@ impl Display for FieldType {
             FieldType::Boolean => "boolean".to_string(),
             FieldType::DateTime => "datetime".to_string(),
             FieldType::Uuid => "uuid".to_string(),
-            FieldType::Custom(s) => s.clone(),
+            FieldType::Custom(s, _) => s.clone(),
             FieldType::FutureType => "FUTURE TYPE".to_string(),
         };
         write!(f, "{}", res)
     }
 }
 impl FieldType {
-    pub fn from_string(s: &str) -> FieldType {
-        match s {
+    pub fn from_string(s: &str) -> Option<FieldType> {
+        Some(match s {
             "string" => FieldType::String,
             "int64" => FieldType::Int64,
             "int32" => FieldType::Int32,
@@ -39,7 +45,7 @@ impl FieldType {
             "datetime" => FieldType::DateTime,
             "uuid" => FieldType::Uuid,
             "___" => FieldType::FutureType,
-            _ => FieldType::Custom(s.to_string()),
-        }
+            _ => return None,
+        })
     }
 }

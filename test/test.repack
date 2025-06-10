@@ -35,6 +35,7 @@ record User @users #private #models {
 	login_count int64 db:default("0")
 	last_login datetime?
 	total_cost float64 db:default("0")
+	permission UserPermission
 }
 
 record Organization @organizations #models #data {
@@ -90,4 +91,10 @@ struct OrganizationDirectory #data {
 record TempIdList @id_list #models {
 	id int32 db:pk
 	db:temporary
+}
+
+enum UserPermission #models #data #private {
+	guest
+	user
+	admin
 }

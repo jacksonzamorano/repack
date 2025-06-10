@@ -1,4 +1,5 @@
 mod dependancies;
+mod enums;
 mod errors;
 mod field;
 mod field_function;
@@ -12,6 +13,7 @@ mod snippet;
 mod tokens;
 mod types;
 
+pub use enums::*;
 pub use errors::*;
 pub use field::*;
 pub use field_function::*;

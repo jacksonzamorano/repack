@@ -6,7 +6,7 @@ pub fn type_to_rust(field_type: &crate::syntax::FieldType) -> Option<String> {
         crate::syntax::FieldType::Int64 => Some("i64".to_string()),
         crate::syntax::FieldType::String => Some("String".to_string()),
         crate::syntax::FieldType::Float64 => Some("f64".to_string()),
-        crate::syntax::FieldType::Custom(name) => Some(name.to_string()),
+        crate::syntax::FieldType::Custom(name, _) => Some(name.to_string()),
         crate::syntax::FieldType::DateTime => Some("DateTime<Utc>".to_string()),
         crate::syntax::FieldType::Uuid => Some("Uuid".to_string()),
         _ => None,

@@ -25,7 +25,7 @@ impl OutputBuilder for TypescriptClassBuilder {
                     ))?;
                 let optional = if field.optional { "?" } else { "" };
                 let arr = if field.array { "[]" } else { "" };
-                if let crate::syntax::FieldType::Custom(name) = &field.field_type() {
+                if let crate::syntax::FieldType::Custom(name, _) = &field.field_type() {
                     if !imports.contains(name) {
                         imports.push(name.clone());
                     }

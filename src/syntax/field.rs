@@ -17,6 +17,7 @@ pub enum FieldReferenceKind {
 #[derive(Debug, Clone)]
 pub struct Field {
     pub name: String, // Could be name or aliased field name
+    pub field_type_string: Option<String>,
     pub location: FieldLocation,
     pub field_type: Option<FieldType>,
     pub optional: bool,
@@ -38,12 +39,13 @@ impl Field {
 
     pub fn from_contents(name: String, contents: &mut FileContents) -> Option<Field> {
         let type_token = contents.take()?;
-        let field_type_loc: (Option<FieldType>, FieldLocation) = match type_token {
+        let field_type_loc: (Option<FieldType>, Option<String>, FieldLocation) = match type_token {
             Token::Literal(literal) => (
-                Some(FieldType::from_string(&literal)),
+                FieldType::from_string(&literal),
+                Some(literal.clone()),
                 FieldLocation {
                     reference: FieldReferenceKind::Local,
-                    name: literal,
+                    name: name.clone(),
                 },
             ),
             Token::From => {
@@ -57,6 +59,7 @@ impl Field {
                 };
                 contents.skip(); // Skip )
                 (
+                    None,
                     None,
                     FieldLocation {
                         reference: FieldReferenceKind::JoinData(entity_name),
@@ -75,6 +78,7 @@ impl Field {
                 };
                 contents.skip(); // Skip )
                 (
+                    None,
                     None,
                     FieldLocation {
                         reference: FieldReferenceKind::FieldType(entity_name),
@@ -127,7 +131,8 @@ impl Field {
         Some(Field {
             name,
             field_type: field_type_loc.0,
-            location: field_type_loc.1,
+            field_type_string: field_type_loc.1,
+            location: field_type_loc.2,
             optional,
             array: is_many,
             functions,

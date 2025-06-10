@@ -1,15 +1,14 @@
-
 use crate::syntax::FieldReferenceKind;
 
 use super::{
-    FieldType, FileContents, Object, ObjectType, Output, RepackError, RepackErrorKind, Snippet,
-    Token, dependancies::graph_valid, language,
+    dependancies::graph_valid, language, CustomFieldType, Enum, FieldType, FileContents, Object, ObjectType, Output, RepackError, RepackErrorKind, Snippet, Token
 };
 
 #[derive(Debug)]
 pub struct ParseResult {
     pub objects: Vec<Object>,
     pub languages: Vec<Output>,
+    pub enums: Vec<Enum>,
 }
 
 impl ParseResult {
@@ -19,6 +18,7 @@ impl ParseResult {
         let mut objects = Vec::new();
         let mut snippets = Vec::new();
         let mut languages = Vec::new();
+        let mut enums = Vec::new();
 
         while let Some(token) = contents.next() {
             match *token {
@@ -33,6 +33,9 @@ impl ParseResult {
                         ObjectType::Struct,
                         &mut contents,
                     ));
+                }
+                Token::EnumType => {
+                    enums.push(Enum::read_from_contents(&mut contents));
                 }
                 Token::SnippetType => {
                     snippets.push(Snippet::read_from_contents(&mut contents));
@@ -141,6 +144,19 @@ impl ParseResult {
             while field_idx < objects[object_idx].fields.len() {
                 if objects[object_idx].fields[field_idx].field_type.is_none() {
                     match &objects[object_idx].fields[field_idx].location.reference {
+                        FieldReferenceKind::Local => {
+                            if let Some(lookup_name) = &objects[object_idx].fields[field_idx].field_type_string {
+                                if objects.iter().any(|obj| obj.name == *lookup_name) {
+                                    objects[object_idx].fields[field_idx].field_type = Some(
+                                        FieldType::Custom(lookup_name.clone(), CustomFieldType::Object)
+                                    );
+                                } else if enums.iter().any(|en| en.name == *lookup_name) {
+                                    objects[object_idx].fields[field_idx].field_type = Some(
+                                        FieldType::Custom(lookup_name.clone(), CustomFieldType::Enum)
+                                    );
+                                }
+                            }
+                        },
                         FieldReferenceKind::JoinData(joining_field) => {
                             let Some(referenced_field) = &objects[object_idx]
                                 .fields
@@ -232,15 +248,16 @@ impl ParseResult {
                             objects[object_idx].fields[field_idx].field_type =
                                 referenced_foreign_field.field_type.clone();
                         }
-                        _ => {}
                     }
                 }
 
                 // Ensure custom types are resolved
-                if let Some(FieldType::Custom(object_name)) =
+                if let Some(FieldType::Custom(object_name, _)) =
                     &objects[object_idx].fields[field_idx].field_type
                 {
-                    if !objects.iter().any(|o| o.name == *object_name) {
+                    if !objects.iter().any(|o| o.name == *object_name)
+                        && !enums.iter().any(|e| e.name == *object_name)
+                    {
                         errors.push(RepackError::from_field_with_msg(
                             RepackErrorKind::CustomTypeNotDefined,
                             &objects[object_idx],
@@ -269,7 +286,11 @@ impl ParseResult {
         if !errors.is_empty() {
             Err(errors)
         } else {
-            Ok(ParseResult { objects, languages })
+            Ok(ParseResult {
+                objects,
+                languages,
+                enums,
+            })
         }
     }
 }

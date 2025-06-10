@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
 use super::{
-    Field, FieldType, FileContents, FunctionNamespace, ObjectFunction, RepackError,
-    RepackErrorKind, Token, field::FieldReferenceKind,
+    CustomFieldType, Field, FieldType, FileContents, FunctionNamespace, ObjectFunction,
+    RepackError, RepackErrorKind, Token, field::FieldReferenceKind,
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -141,12 +141,14 @@ impl Object {
                     ));
                     continue;
                 };
-                if let FieldType::Custom(_) = field_type {
-                    errors.push(RepackError::from_field(
-                        RepackErrorKind::CustomTypeNotAllowed,
-                        self,
-                        field,
-                    ));
+                if let FieldType::Custom(_, obj_type) = field_type {
+                    if *obj_type != CustomFieldType::Enum {
+                        errors.push(RepackError::from_field(
+                            RepackErrorKind::CustomTypeNotAllowed,
+                            self,
+                            field,
+                        ));
+                    }
                 }
                 if field.array {
                     errors.push(RepackError::from_field(

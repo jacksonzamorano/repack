@@ -1,0 +1,60 @@
+impl ::core::fmt::Debug for __typ {
+    #[inline]
+    fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+        ::core::fmt::Formatter::write_str(
+            f,
+            match self {
+                ApplicationEnvironment::Development => "Development",
+                ApplicationEnvironment::Production => "Production",
+                ApplicationEnvironment::StagingDeploy => "StagingDeploy",
+            },
+        )
+    }
+}
+impl tusk_rs::postgres_types::ToSql for __typ {
+    fn to_sql(
+        &self,
+        _type: &postgres_types::Type,
+        buf: &mut postgres_types::private::BytesMut,
+    ) -> std::result::Result<
+        postgres_types::IsNull,
+        std::boxed::Box<dyn std::error::Error + std::marker::Sync + std::marker::Send>,
+    > {
+        let s = match *self {
+			__to_sql_cases
+        };
+        buf.extend_from_slice(s.as_bytes());
+        std::result::Result::Ok(postgres_types::IsNull::No)
+    }
+    fn accepts(type_: &postgres_types::Type) -> bool {
+        if type_.name() != "__typ" {
+            return false;
+        }
+        match *type_.kind() {
+            ::postgres_types::Kind::Enum(ref variants) => {
+                if variants.len() != 3usize {
+                    return false;
+                }
+                variants
+                    .iter()
+                    .all(|v| {
+                        match &**v {
+							__accepts_cases,
+                            _ => false,
+                        }
+                    })
+            }
+            _ => false,
+        }
+    }
+    fn to_sql_checked(
+        &self,
+        ty: &::postgres_types::Type,
+        out: &mut ::postgres_types::private::BytesMut,
+    ) -> ::std::result::Result<
+        ::postgres_types::IsNull,
+        Box<dyn ::std::error::Error + ::std::marker::Sync + ::std::marker::Send>,
+    > {
+        ::postgres_types::__to_sql_checked(self, ty, out)
+    }
+}
