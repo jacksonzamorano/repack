@@ -24,7 +24,7 @@ output typescript_interface @test/ts_interfaces #data {
 }
 output typescript_drizzle @test/ts_drizzle #models;
 output rust @test/rust_vanilla #data #private;
-output rust_tusk @"../repack-tusk-test/src" #models #views;
+output rust_tusk @test/rust_tusk #models #views;
 
 record User @users #private #models {
 	!base
