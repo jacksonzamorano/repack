@@ -1,6 +1,9 @@
 use crate::outputs::OutputBuilder;
 
-use super::{DescriptionBuilder, PostgresBuilder, RustBuilder, TypescriptClassBuilder, TypescriptInterfaceBuilder, TypescriptDrizzleBuilder};
+use super::{
+    DescriptionBuilder, PostgresBuilder, RustBuilder, RustTuskBuilder, TypescriptClassBuilder,
+    TypescriptDrizzleBuilder, TypescriptInterfaceBuilder,
+};
 
 #[derive(Debug)]
 pub enum OutputProfile {
@@ -9,7 +12,8 @@ pub enum OutputProfile {
     TypescriptClass,
     TypescriptInterface,
     TypescriptDrizzle,
-    Rust
+    Rust,
+    RustTusk,
 }
 
 impl OutputProfile {
@@ -21,6 +25,7 @@ impl OutputProfile {
             "typescript_interface" => OutputProfile::TypescriptInterface,
             "typescript_drizzle" => OutputProfile::TypescriptDrizzle,
             "rust" => OutputProfile::Rust,
+            "rust_tusk" => OutputProfile::RustTusk,
             _ => return None,
         })
     }
@@ -31,6 +36,7 @@ impl OutputProfile {
             OutputProfile::TypescriptClass => Box::new(TypescriptClassBuilder {}),
             OutputProfile::TypescriptInterface => Box::new(TypescriptInterfaceBuilder {}),
             Self::TypescriptDrizzle => Box::new(TypescriptDrizzleBuilder {}),
+            Self::RustTusk => Box::new(RustTuskBuilder {}),
             OutputProfile::Rust => Box::new(RustBuilder {}),
         }
     }

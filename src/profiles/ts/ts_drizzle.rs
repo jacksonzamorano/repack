@@ -17,6 +17,7 @@ fn drizzle_type(typ: &FieldType) -> Option<(&'static str, &'static str)> {
         FieldType::DateTime => ("timestamp", "timestamp({ withTimezone: true })"),
         FieldType::String => ("varchar", "varchar()"),
         FieldType::Boolean => ("boolean", "boolean()"),
+        FieldType::Uuid => ("uuid", "uuid()"),
         _ => return None,
     })
 }

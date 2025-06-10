@@ -26,7 +26,9 @@ impl OutputBuilder for RustBuilder {
                         field.field_type().to_string(),
                     ))?;
                 if *field.field_type() == FieldType::DateTime {
-                    imports.insert("use chrono::NaiveDateTime;".to_string());
+                    imports.insert("use chrono::{DateTime, Utc};".to_string());
+                } else if *field.field_type() == FieldType::Uuid {
+                    imports.insert("use uuid::Uuid;".to_string());
                 }
                 let optional = if field.optional { "Option<" } else { "" };
                 let arr = if field.array {

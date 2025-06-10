@@ -16,6 +16,7 @@ fn type_to_psql(field_type: &FieldType) -> Option<String> {
         FieldType::String => Some("TEXT".to_string()),
         FieldType::Float64 => Some("FLOAT8".to_string()),
         FieldType::DateTime => Some("TIMESTAMPTZ".to_string()),
+        FieldType::Uuid => Some("UUID".to_string()),
         _ => None,
     }
 }

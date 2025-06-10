@@ -8,6 +8,7 @@ pub enum FieldType {
     Float64,
     Boolean,
     DateTime,
+    Uuid,
     Custom(String),
     FutureType,
 }
@@ -20,6 +21,7 @@ impl Display for FieldType {
             FieldType::Float64 => "float64".to_string(),
             FieldType::Boolean => "boolean".to_string(),
             FieldType::DateTime => "datetime".to_string(),
+            FieldType::Uuid => "uuid".to_string(),
             FieldType::Custom(s) => s.clone(),
             FieldType::FutureType => "FUTURE TYPE".to_string(),
         };
@@ -35,6 +37,7 @@ impl FieldType {
             "float64" => FieldType::Float64,
             "boolean" => FieldType::Boolean,
             "datetime" => FieldType::DateTime,
+            "uuid" => FieldType::Uuid,
             "___" => FieldType::FutureType,
             _ => FieldType::Custom(s.to_string()),
         }
