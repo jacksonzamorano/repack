@@ -1,0 +1,4 @@
+output badlang @./out;
+
+record Foo {
+}
