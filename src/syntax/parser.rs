@@ -48,7 +48,6 @@ impl FileContents {
     }
 
     pub fn add(&mut self, filename: &str) {
-        dbg!(filename);
         let Ok(mut file) = std::fs::File::open(filename) else {
             println!("[EXIT] Unable to load requested file '{}'", filename);
             exit(5);
