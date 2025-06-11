@@ -23,9 +23,10 @@ impl OutputBuilder for RustTuskBuilder {
         let mut output = String::new();
 
         for enm in description.enums() {
-            imports.insert("use tusk_rs::ToSql;".to_string());
+            imports.insert("use tusk_rs::JsonRetrieve;".to_string());
+            imports.insert("use tusk_rs::ToJson;".to_string());
             output.push_str(&format!(
-                "#[derive(Debug)]\npub enum {} {{\n{}\n}}\n\n",
+                "#[derive(Debug,JsonRetrieve,ToJson,Default)]\npub enum {} {{\n#[default]\n\tGone,\n{}\n}}\n\n",
                 enm.name,
                 enm.options
                     .iter()
@@ -35,6 +36,7 @@ impl OutputBuilder for RustTuskBuilder {
             ));
             let impl_data = ENUM_DATA
                 .to_string()
+                .replace("__typ_lower", &enm.name.to_lowercase())
                 .replace("__typ", &enm.name)
                 .replace(
                     "__to_sql_cases",
@@ -45,20 +47,30 @@ impl OutputBuilder for RustTuskBuilder {
                         .join(",\n"),
                 )
                 .replace(
+                    "__from_sql_cases",
+                    &enm.options
+                        .iter()
+                        .map(|x| format!("\t\t\"{}\" => std::result::Result::Ok(Self::{})", x, x))
+                        .collect::<Vec<_>>()
+                        .join(",\n"),
+                )
+                .replace(
                     "__accepts_cases",
                     &enm.options
                         .iter()
                         .map(|x| format!("\t\t\"{}\" => true", x))
                         .collect::<Vec<_>>()
                         .join(",\n"),
-                );
+                )
+                .replace("__count", &format!("{}", enm.options.len()));
             output.push_str(&impl_data);
         }
 
         for object in description.objects() {
             let mut derives = Vec::<String>::new();
             let mut write_fields = Vec::<String>::new();
-            imports.insert("use tusk_rs::{FromJson,ToJson};".to_string());
+            imports.insert("use tusk_rs::FromJson;".to_string());
+            imports.insert("use tusk_rs::ToJson;".to_string());
             derives.push("Debug".to_string());
             derives.push("FromJson".to_string());
             derives.push("ToJson".to_string());
