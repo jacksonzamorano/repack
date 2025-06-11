@@ -1,4 +1,4 @@
-use std::{io::Read, path::PathBuf};
+use std::{fs, io::Read, path::PathBuf, process::exit};
 
 use super::Token;
 
@@ -23,12 +23,33 @@ impl FileContents {
 
     pub fn add_relative(&mut self, filename: &str) {
         let mut path = PathBuf::from(&self.root);
-        path.push(filename);
-        self.add(path.to_str().unwrap())
+        if filename.ends_with("*") {
+            path.push(filename);
+            path.pop();
+            let Ok(mut folder_contents) = fs::read_dir(&path) else {
+                println!(
+                    "[EXIT] Unable to load requested folder '{}'",
+                    path.to_str().unwrap()
+                );
+                exit(5);
+            };
+            while let Some(Ok(file)) = folder_contents.next() {
+                let path = file.path();
+                if path.ends_with(".repack") {
+                    self.add(path.to_str().unwrap());
+                }
+            }
+        } else {
+            path.push(filename);
+            self.add(path.to_str().unwrap())
+        }
     }
 
     pub fn add(&mut self, filename: &str) {
-        let mut file = std::fs::File::open(filename).expect("Unable to open file");
+        let Ok(mut file) = std::fs::File::open(filename) else {
+            println!("[EXIT] Unable to load requested file '{}'", filename);
+            exit(5);
+        };
         let mut contents = vec![];
         _ = file.read_to_end(&mut contents);
 

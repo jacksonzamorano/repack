@@ -1,4 +1,4 @@
-import "test-import.repack"
+import "extras/*"
 
 // Provide a base, with ID and created date.
 // All DB models will inherit.

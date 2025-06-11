@@ -1,4 +1,0 @@
-struct UserWithOrganization #data {
-	user UserPublic
-	organization Organization
-}
