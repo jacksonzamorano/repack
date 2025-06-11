@@ -35,8 +35,10 @@ impl FileContents {
             };
             while let Some(Ok(file)) = folder_contents.next() {
                 let path = file.path();
-                if path.ends_with(".repack") {
-                    self.add(path.to_str().unwrap());
+                if let Some(extension) = path.extension() {
+                    if extension == "repack" {
+                        self.add(path.to_str().unwrap());
+                    }
                 }
             }
         } else {
@@ -46,6 +48,7 @@ impl FileContents {
     }
 
     pub fn add(&mut self, filename: &str) {
+        dbg!(filename);
         let Ok(mut file) = std::fs::File::open(filename) else {
             println!("[EXIT] Unable to load requested file '{}'", filename);
             exit(5);
