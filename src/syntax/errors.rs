@@ -25,6 +25,9 @@ pub enum RepackErrorKind {
     ExpectedArgument,
     SnippetNotFound,
     DuplicateFieldNames,
+    UnknownExplicitJoin,
+    ExplicitJoinObjectNotFound,
+    ExplicitJoinFieldNotFound,
 }
 impl RepackErrorKind {
     pub fn as_string(&self) -> &'static str {
@@ -61,6 +64,9 @@ impl RepackErrorKind {
             Self::TypeNotResolved => "This type couldn't be resolved.",
             Self::SnippetNotFound => "Expected to use snippet, but it couldn't be found:",
             Self::DuplicateFieldNames => "A field already exists with this name.",
+            Self::UnknownExplicitJoin => "Unknown explicit join:",
+            Self::ExplicitJoinObjectNotFound => "Tried to explicitly join but the object was not found:",
+            Self::ExplicitJoinFieldNotFound => "Tried to explicitly join but the field was not found:",
         }
     }
 }

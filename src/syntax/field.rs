@@ -11,7 +11,8 @@ pub struct FieldLocation {
 pub enum FieldReferenceKind {
     Local = 1,
     FieldType(String) = 2,
-    JoinData(String) = 3,
+    ImplicitJoin(String) = 3,
+    ExplicitJoin(String) = 4,
 }
 
 #[derive(Debug, Clone)]
@@ -62,7 +63,7 @@ impl Field {
                     None,
                     None,
                     FieldLocation {
-                        reference: FieldReferenceKind::JoinData(entity_name),
+                        reference: FieldReferenceKind::ImplicitJoin(entity_name),
                         name: field_name,
                     },
                 )
@@ -82,6 +83,25 @@ impl Field {
                     None,
                     FieldLocation {
                         reference: FieldReferenceKind::FieldType(entity_name),
+                        name: field_name,
+                    },
+                )
+            }
+            Token::With => {
+                contents.skip(); // Skip (
+                let Some(Token::Literal(join_name)) = contents.take() else {
+                    return None;
+                };
+                contents.skip(); // Skip .
+                let Some(Token::Literal(field_name)) = contents.take() else {
+                    return None;
+                };
+                contents.skip(); // Skip )
+                (
+                    None,
+                    None,
+                    FieldLocation {
+                        reference: FieldReferenceKind::ExplicitJoin(join_name),
                         name: field_name,
                     },
                 )

@@ -44,6 +44,11 @@ record Organization @organizations #models #data {
 	email string
 }
 
+record TodoWithList: Todo #models #data {
+	^ list self.list_id = List.id
+	list_title with(list.title)
+}
+
 record Todo @todos #models #data {
 	!base
 	!org_linked

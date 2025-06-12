@@ -1,12 +1,14 @@
 #[derive(Debug, Clone, PartialEq)]
 pub enum FunctionNamespace {
     Database,
+    Usage,
     Custom(String),
 }
 impl FunctionNamespace {
     pub fn from_string(val: &str) -> FunctionNamespace {
         match val {
             "db" => Self::Database,
+            "usage" => Self::Usage,
             _ => Self::Custom(val.to_string()),
         }
     }
@@ -39,6 +41,7 @@ pub enum FieldFunctionName {
     PrimaryKey,
     Unique,
     Cascade,
+    Transient,
     Custom(String),
 }
 
@@ -52,6 +55,7 @@ impl FieldFunctionName {
             "primary_key" => Self::PrimaryKey,
             "unique" => Self::Unique,
             "cascade" => Self::Cascade,
+            "transient" => Self::Transient,
             _ => Self::Custom(val.to_string()),
         }
     }

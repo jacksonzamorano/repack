@@ -48,7 +48,7 @@ impl OutputBuilder for PostgresBuilder {
         }
 
         for enm in description.enums() {
-            sql.push_str(&format!("DROP TYPE {};\n", enm.name));
+            sql.push_str(&format!("DROP TYPE IF EXISTS {};\n", enm.name));
         }
 
         for enm in description.enums() {
@@ -177,6 +177,23 @@ impl OutputBuilder for PostgresBuilder {
                 // Make view
                 let mut fields = Vec::<String>::new();
                 let mut joins = HashMap::<String, String>::new();
+                for join in &object.joins {
+                    let foreign_obj = description.object_by_name(&join.foreign_entity)?;
+
+                    joins.insert(
+                        join.join_name.to_string(),
+                        format!(
+                            "INNER JOIN {} {} ON {}.{} {} {}.{}",
+                            foreign_obj.table(),
+                            join.join_name,
+                            object.table(),
+                            join.local_field,
+                            join.condition,
+                            join.join_name,
+                            join.foreign_field
+                        ),
+                    );
+                }
                 for field in &object.fields {
                     match &field.location.reference {
                         FieldReferenceKind::Local | FieldReferenceKind::FieldType(_) => {
@@ -187,7 +204,7 @@ impl OutputBuilder for PostgresBuilder {
                                 field.name
                             ));
                         }
-                        FieldReferenceKind::JoinData(local_join_key) => {
+                        FieldReferenceKind::ImplicitJoin(local_join_key) => {
                             let join_name = format!("j_{}", local_join_key);
                             if let Entry::Vacant(e) = joins.entry(join_name.clone()) {
                                 let local_join = object
@@ -222,6 +239,12 @@ impl OutputBuilder for PostgresBuilder {
                                 ));
                                 e.insert(join);
                             }
+                        }
+                        FieldReferenceKind::ExplicitJoin(join_name) => {
+                            fields.push(format!(
+                                "\t{}.{} as {}",
+                                join_name, field.location.name, field.name
+                            ));
                         }
                     }
                 }

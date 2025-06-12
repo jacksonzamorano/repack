@@ -20,6 +20,7 @@ pub enum Token {
     Semicolon,
     Ampersand,
     Equals,
+    Hat,
 
     Literal(String),
     OutputType,
@@ -32,6 +33,7 @@ pub enum Token {
     As,
     Where,
     Import,
+    With,
 }
 impl Token {
     pub fn from_byte(byte: u8) -> Option<Token> {
@@ -56,6 +58,7 @@ impl Token {
             b';' => Some(Token::Semicolon),
             b'&' => Some(Token::Ampersand),
             b'=' => Some(Token::Equals),
+            b'^' => Some(Token::Hat),
             _ => None,
         }
     }
@@ -71,6 +74,7 @@ impl Token {
             "import" => Token::Import,
             "snippet" => Token::SnippetType,
             "enum" => Token::EnumType,
+            "with" => Token::With,
 
             _ => Token::Literal(string.trim().to_string()),
         }

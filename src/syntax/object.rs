@@ -12,6 +12,15 @@ pub enum ObjectType {
 }
 
 #[derive(Debug)]
+pub struct ObjectJoin {
+    pub join_name: String,
+    pub local_field: String,
+    pub condition: String,
+    pub foreign_entity: String,
+    pub foreign_field: String,
+}
+
+#[derive(Debug)]
 pub struct Object {
     pub object_type: ObjectType,
     pub name: String,
@@ -21,8 +30,10 @@ pub struct Object {
     pub table_name: Option<String>,
     pub reuse_all: bool,
     pub reuse_exclude: Vec<String>,
+    pub reuse_include: Vec<String>,
     pub use_snippets: Vec<String>,
     pub functions: Vec<ObjectFunction>,
+    pub joins: Vec<ObjectJoin>,
 }
 impl Object {
     pub fn read_from_contents(typ: ObjectType, contents: &mut FileContents) -> Object {
@@ -39,8 +50,10 @@ impl Object {
         let mut table_name = None;
         let mut reuse_all = false;
         let mut reuse_exclude = Vec::new();
+        let mut reuse_include = Vec::new();
         let mut use_snippets = Vec::new();
         let mut functions = Vec::new();
+        let mut joins = Vec::new();
 
         'header: while let Some(token) = contents.next() {
             match token {
@@ -70,9 +83,7 @@ impl Object {
 
         'cmd: while let Some(token) = contents.take() {
             match token {
-                Token::CloseBrace => {
-                    break 'cmd;
-                }
+                Token::CloseBrace => break 'cmd,
                 Token::Literal(lit) => {
                     if let Some(next) = contents.peek() {
                         if *next == Token::Colon {
@@ -89,6 +100,51 @@ impl Object {
                 }
                 Token::Star => {
                     reuse_all = true;
+                }
+                Token::Hat => {
+                    let Some(Token::Literal(join_name)) = contents.take() else {
+                        continue;
+                    };
+                    let Some(Token::Literal(obj_1_name)) = contents.take() else {
+                        continue;
+                    };
+                    contents.skip(); // Skip .
+                    let Some(Token::Literal(obj_1_field)) = contents.take() else {
+                        continue;
+                    };
+                    let Some(Token::Equals) = contents.take() else {
+                        continue;
+                    };
+                    let Some(Token::Literal(obj_2_name)) = contents.take() else {
+                        continue;
+                    };
+                    contents.skip(); // Skip .
+                    let Some(Token::Literal(obj_2_field)) = contents.take() else {
+                        continue;
+                    };
+
+                    if obj_1_name == "self" {
+                        joins.push(ObjectJoin {
+                            join_name: join_name,
+                            local_field: obj_1_field,
+                            condition: "=".to_string(),
+                            foreign_entity: obj_2_name,
+                            foreign_field: obj_2_field,
+                        });
+                    } else if obj_2_name == "self" {
+                        joins.push(ObjectJoin {
+                            join_name: join_name,
+                            local_field: obj_2_field,
+                            condition: "=".to_string(),
+                            foreign_entity: obj_1_name,
+                            foreign_field: obj_1_field,
+                        });
+                    }
+                }
+                Token::Plus => {
+                    if let Some(Token::Literal(lit)) = contents.next() {
+                        reuse_include.push(lit.to_string());
+                    }
                 }
                 Token::Minus => {
                     if let Some(Token::Literal(lit)) = contents.next() {
@@ -112,9 +168,11 @@ impl Object {
             table_name,
             reuse_all,
             reuse_exclude,
+            reuse_include,
             categories,
             use_snippets,
             functions,
+            joins,
         }
     }
 
@@ -218,7 +276,7 @@ impl Object {
                 FieldReferenceKind::FieldType(foreign_obj) => {
                     dependencies.insert(foreign_obj.to_string());
                 }
-                FieldReferenceKind::JoinData(join_name) => {
+                FieldReferenceKind::ImplicitJoin(join_name) => {
                     let Some(ref_field) = self.fields.iter().find(|field| field.name == *join_name)
                     else {
                         continue;

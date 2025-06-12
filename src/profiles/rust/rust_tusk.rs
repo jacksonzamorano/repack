@@ -1,4 +1,7 @@
-use std::collections::{HashMap, HashSet, hash_map::Entry};
+use std::{
+    collections::{HashMap, HashSet, hash_map::Entry},
+    str,
+};
 
 use crate::{
     outputs::OutputBuilder,
@@ -8,7 +11,7 @@ use crate::{
     },
 };
 
-use super::type_to_rust;
+use super::{camel_to_upper, type_to_rust};
 
 const ENUM_DATA: &'static str = include_str!("enum_gen.txt");
 
@@ -102,30 +105,37 @@ impl OutputBuilder for RustTuskBuilder {
             output.push_str(&format!("#[derive({})]\n", derives.join(",")));
             output.push_str(&format!("pub struct {} {{\n", object.name));
             for field in &object.fields {
-                let rust_type =
-                    type_to_rust(field.field_type()).ok_or(RepackError::from_lang_with_msg(
-                        RepackErrorKind::UnsupportedFieldType,
-                        description.output,
-                        field.field_type().to_string(),
-                    ))?;
-                if *field.field_type() == FieldType::DateTime {
-                    imports.insert("use tusk_rs::chrono::{DateTime, Utc};".to_string());
-                } else if *field.field_type() == FieldType::Uuid {
-                    imports.insert("use tusk_rs::uuid::Uuid;".to_string());
+                let field_is_transient = field
+                    .functions_in_namespace(FunctionNamespace::Usage)
+                    .iter()
+                    .any(|x| x.name == FieldFunctionName::Transient);
+
+                if !field_is_transient {
+                    let rust_type =
+                        type_to_rust(field.field_type()).ok_or(RepackError::from_lang_with_msg(
+                            RepackErrorKind::UnsupportedFieldType,
+                            description.output,
+                            field.field_type().to_string(),
+                        ))?;
+                    if *field.field_type() == FieldType::DateTime {
+                        imports.insert("use tusk_rs::chrono::{DateTime, Utc};".to_string());
+                    } else if *field.field_type() == FieldType::Uuid {
+                        imports.insert("use tusk_rs::uuid::Uuid;".to_string());
+                    }
+                    let optional = if field.optional { "Option<" } else { "" };
+                    let arr = if field.array { "Vec<" } else { "" };
+                    let optional_close = if field.optional { ">" } else { "" };
+                    let arr_close = if field.array { ">" } else { "" };
+                    output.push_str(&format!(
+                        "\tpub {}: {}{}{}{}{},\n",
+                        field.name, optional, arr, rust_type, optional_close, arr_close
+                    ));
                 }
-                let optional = if field.optional { "Option<" } else { "" };
-                let arr = if field.array { "Vec<" } else { "" };
-                let optional_close = if field.optional { ">" } else { "" };
-                let arr_close = if field.array { ">" } else { "" };
-                output.push_str(&format!(
-                    "\tpub {}: {}{}{}{}{},\n",
-                    field.name, optional, arr, rust_type, optional_close, arr_close
-                ));
             }
             output.push_str("}\n\n");
             if object.object_type == ObjectType::Record {
                 imports.insert(
-                    "use tusk_rs::{PostgresTable,PostgresReadFields,PostgresField,PostgresJoins,PostgresJoin};"
+                    "use tusk_rs::{PostgresTable,PostgresReadFields,PostgresField,PostgresJoins,PostgresJoin,Columned,ColumnKeys};"
                         .to_string(),
                 );
                 output.push_str(&format!(
@@ -141,15 +151,58 @@ impl OutputBuilder for RustTuskBuilder {
                 ));
                 let mut fields = Vec::<String>::new();
                 let mut joins = HashMap::<String, String>::new();
+                for j in &object.joins {
+                    let foreign_object = description.object_by_name(&j.foreign_entity)?;
+
+                    let join = format!(
+                        "&PostgresJoin {{\
+                                        join_type: \"INNER JOIN\",
+                                        join_name: \"{}\",\
+                                        table: \"{}\",\
+                                        local_field: \"{}\",\
+                                        foreign_field: \"{}\",\
+                                        condition: \"{}\"\
+                                    }}\
+                                    ",
+                        j.join_name,
+                        foreign_object.table(),
+                        j.local_field,
+                        j.foreign_field,
+                        j.condition,
+                    );
+                    joins.insert(j.join_name.to_string(), join);
+                }
+                let mut enum_keys = Vec::<String>::new();
+                let mut enum_values = Vec::<String>::new();
                 for f in &object.fields {
+                    let field_is_transient = f
+                        .functions_in_namespace(FunctionNamespace::Usage)
+                        .iter()
+                        .any(|x| x.name == FieldFunctionName::Transient);
+                    enum_keys.push(camel_to_upper(&f.name));
                     let field = match &f.location.reference {
                         FieldReferenceKind::Local | FieldReferenceKind::FieldType(_) => {
-                            imports.insert("use tusk_rs::local;".to_string());
+                            if !field_is_transient {
+                                imports.insert("use tusk_rs::local;".to_string());
+                            }
+                            enum_values.push(format!(
+                                "\t\t\tSelf::{} => \"{}\"",
+                                camel_to_upper(&f.name),
+                                f.name
+                            ));
                             format!("local!(\"{}\")", f.name)
                         }
-                        FieldReferenceKind::JoinData(join) => {
+                        FieldReferenceKind::ImplicitJoin(join) => {
                             let join_name = format!("j_{}", join);
-                            imports.insert("use tusk_rs::foreign_as;".to_string());
+                            enum_values.push(format!(
+                                "\t\t\tSelf::{} => \"{}.{}\"",
+                                camel_to_upper(&f.name),
+                                join_name,
+                                f.location.name
+                            ));
+                            if !field_is_transient {
+                                imports.insert("use tusk_rs::foreign_as;".to_string());
+                            }
                             if let Entry::Vacant(e) = joins.entry(join_name.clone()) {
                                 let local_join =
                                     object.fields.iter().find(|x| x.name == *join).unwrap();
@@ -187,8 +240,25 @@ impl OutputBuilder for RustTuskBuilder {
                                 join_name, f.location.name, f.name
                             )
                         }
+                        FieldReferenceKind::ExplicitJoin(join_name) => {
+                            enum_values.push(format!(
+                                "\t\t\tSelf::{} => \"{}.{}\"",
+                                camel_to_upper(&f.name),
+                                join_name,
+                                f.location.name
+                            ));
+                            if !field_is_transient {
+                                imports.insert("use tusk_rs::foreign_as;".to_string());
+                            }
+                            format!(
+                                "foreign_as!(\"{}\", \"{}\", \"{}\")",
+                                join_name, f.location.name, f.name
+                            )
+                        }
                     };
-                    fields.push(field);
+                    if !field_is_transient {
+                        fields.push(field);
+                    }
                 }
                 output.push_str(&format!(
                     "\
@@ -231,6 +301,37 @@ impl OutputBuilder for RustTuskBuilder {
                         write_fields.join(",")
                     ));
                 }
+                output.push_str(&format!(
+                    "#[allow(dead_code)]\n\
+                    pub enum {}Keys {{\n\
+                        {}\n\
+                        }}\n\n\
+                        impl ColumnKeys for {}Keys {{\n\
+                            \tfn name(&self) -> &'static str {{\n\
+                                \t\tmatch self {{\n\
+                                    {}\n\
+                                \t\t}}\n\
+                            \t}}\n\
+                        }}\n\n\
+                        impl Columned for {} {{\n\
+                            \ttype Keys = {}Keys;\n\
+                        }}\n\n\
+                ",
+                    object.name,
+                    enum_keys
+                        .into_iter()
+                        .map(|x| format!("\t{}", x))
+                        .collect::<Vec<_>>()
+                        .join(",\n"),
+                    object.name,
+                    enum_values
+                        .into_iter()
+                        .map(|x| format!("\t\t\t{}", x))
+                        .collect::<Vec<_>>()
+                        .join(",\n"),
+                    object.name,
+                    object.name,
+                ));
             }
         }
         description.append(

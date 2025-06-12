@@ -1,7 +1,8 @@
 use crate::syntax::FieldReferenceKind;
 
 use super::{
-    dependancies::graph_valid, language, CustomFieldType, Enum, FieldType, FileContents, Object, ObjectType, Output, RepackError, RepackErrorKind, Snippet, Token
+    CustomFieldType, Enum, FieldType, FileContents, Object, ObjectType, Output, RepackError,
+    RepackErrorKind, Snippet, Token, dependancies::graph_valid, language,
 };
 
 #[derive(Debug)]
@@ -127,10 +128,16 @@ impl ParseResult {
                     continue;
                 };
 
+                let copy = objects[parent_obj_idx].fields.clone();
                 if objects[object_idx].reuse_all {
-                    let copy = objects[parent_obj_idx].fields.clone();
                     for c in copy {
                         if !objects[object_idx].reuse_exclude.contains(&c.name) {
+                            objects[object_idx].fields.push(c);
+                        }
+                    }
+                } else {
+                    for c in copy {
+                        if objects[object_idx].reuse_include.contains(&c.name) {
                             objects[object_idx].fields.push(c);
                         }
                     }
@@ -145,19 +152,25 @@ impl ParseResult {
                 if objects[object_idx].fields[field_idx].field_type.is_none() {
                     match &objects[object_idx].fields[field_idx].location.reference {
                         FieldReferenceKind::Local => {
-                            if let Some(lookup_name) = &objects[object_idx].fields[field_idx].field_type_string {
+                            if let Some(lookup_name) =
+                                &objects[object_idx].fields[field_idx].field_type_string
+                            {
                                 if objects.iter().any(|obj| obj.name == *lookup_name) {
-                                    objects[object_idx].fields[field_idx].field_type = Some(
-                                        FieldType::Custom(lookup_name.clone(), CustomFieldType::Object)
-                                    );
+                                    objects[object_idx].fields[field_idx].field_type =
+                                        Some(FieldType::Custom(
+                                            lookup_name.clone(),
+                                            CustomFieldType::Object,
+                                        ));
                                 } else if enums.iter().any(|en| en.name == *lookup_name) {
-                                    objects[object_idx].fields[field_idx].field_type = Some(
-                                        FieldType::Custom(lookup_name.clone(), CustomFieldType::Enum)
-                                    );
+                                    objects[object_idx].fields[field_idx].field_type =
+                                        Some(FieldType::Custom(
+                                            lookup_name.clone(),
+                                            CustomFieldType::Enum,
+                                        ));
                                 }
                             }
-                        },
-                        FieldReferenceKind::JoinData(joining_field) => {
+                        }
+                        FieldReferenceKind::ImplicitJoin(joining_field) => {
                             let Some(referenced_field) = &objects[object_idx]
                                 .fields
                                 .iter()
@@ -247,6 +260,49 @@ impl ParseResult {
                             };
                             objects[object_idx].fields[field_idx].field_type =
                                 referenced_foreign_field.field_type.clone();
+                        }
+                        FieldReferenceKind::ExplicitJoin(join_name) => {
+                            let Some(join) = objects[object_idx]
+                                .joins
+                                .iter()
+                                .find(|x| x.join_name == *join_name)
+                            else {
+                                errors.push(RepackError::from_field_with_msg(
+                                    RepackErrorKind::UnknownExplicitJoin,
+                                    &objects[object_idx],
+                                    &objects[object_idx].fields[field_idx],
+                                    join_name.to_string(),
+                                ));
+                                field_idx += 1;
+                                continue;
+                            };
+                            let Some(foreign_entity) =
+                                objects.iter().find(|x| x.name == *join.foreign_entity)
+                            else {
+                                errors.push(RepackError::from_field_with_msg(
+                                    RepackErrorKind::ExplicitJoinObjectNotFound,
+                                    &objects[object_idx],
+                                    &objects[object_idx].fields[field_idx],
+                                    join.foreign_entity.to_string(),
+                                ));
+                                field_idx += 1;
+                                continue;
+                            };
+                            let Some(field) = foreign_entity
+                                .fields
+                                .iter()
+                                .find(|x| x.name == *join.foreign_field) else 
+                            {
+                                errors.push(RepackError::from_field_with_msg(
+                                    RepackErrorKind::ExplicitJoinFieldNotFound,
+                                    &objects[object_idx],
+                                    &objects[object_idx].fields[field_idx],
+                                    join.foreign_field.to_string(),
+                                ));
+                                field_idx += 1;
+                                continue;
+                            };
+                            objects[object_idx].fields[field_idx].field_type = field.field_type.clone();
                         }
                     }
                 }
