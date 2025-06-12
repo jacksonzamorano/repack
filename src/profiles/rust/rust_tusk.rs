@@ -172,29 +172,38 @@ impl OutputBuilder for RustTuskBuilder {
                     );
                     joins.insert(j.join_name.to_string(), join);
                 }
-                let mut enum_keys = Vec::<String>::new();
-                let mut enum_values = Vec::<String>::new();
+                let mut enum_read_keys = Vec::<String>::new();
+                let mut enum_read_values = Vec::<String>::new();
+                let mut enum_write_keys = Vec::<String>::new();
+                let mut enum_write_values = Vec::<String>::new();
                 for f in &object.fields {
                     let field_is_transient = f
                         .functions_in_namespace(FunctionNamespace::Usage)
                         .iter()
                         .any(|x| x.name == FieldFunctionName::Transient);
-                    enum_keys.push(camel_to_upper(&f.name));
+                    enum_read_keys.push(camel_to_upper(&f.name));
                     let field = match &f.location.reference {
                         FieldReferenceKind::Local | FieldReferenceKind::FieldType(_) => {
                             if !field_is_transient {
                                 imports.insert("use tusk_rs::local;".to_string());
                             }
-                            enum_values.push(format!(
+                            enum_read_values.push(format!(
+                                "\t\t\tSelf::{} => \"{}.{}\"",
+                                camel_to_upper(&f.name),
+                                object.table(),
+                                f.name
+                            ));
+                            enum_write_values.push(format!(
                                 "\t\t\tSelf::{} => \"{}\"",
                                 camel_to_upper(&f.name),
                                 f.name
                             ));
+                            enum_write_keys.push(camel_to_upper(&f.name));
                             format!("local!(\"{}\")", f.name)
                         }
                         FieldReferenceKind::ImplicitJoin(join) => {
                             let join_name = format!("j_{}", join);
-                            enum_values.push(format!(
+                            enum_read_values.push(format!(
                                 "\t\t\tSelf::{} => \"{}.{}\"",
                                 camel_to_upper(&f.name),
                                 join_name,
@@ -241,7 +250,7 @@ impl OutputBuilder for RustTuskBuilder {
                             )
                         }
                         FieldReferenceKind::ExplicitJoin(join_name) => {
-                            enum_values.push(format!(
+                            enum_read_values.push(format!(
                                 "\t\t\tSelf::{} => \"{}.{}\"",
                                 camel_to_upper(&f.name),
                                 join_name,
@@ -303,10 +312,21 @@ impl OutputBuilder for RustTuskBuilder {
                 }
                 output.push_str(&format!(
                     "#[allow(dead_code)]\n\
-                    pub enum {}Keys {{\n\
+                    pub enum {}ReadKeys {{\n\
                         {}\n\
                         }}\n\n\
-                        impl ColumnKeys for {}Keys {{\n\
+                        impl ColumnKeys for {}ReadKeys {{\n\
+                            \tfn name(&self) -> &'static str {{\n\
+                                \t\tmatch self {{\n\
+                                    {}\n\
+                                \t\t}}\n\
+                            \t}}\n\
+                        }}\n\n\
+                    #[allow(dead_code)]\n\
+                    pub enum {}WriteKeys {{\n\
+                        {}\n\
+                        }}\n\n\
+                        impl ColumnKeys for {}WriteKeys {{\n\
                             \tfn name(&self) -> &'static str {{\n\
                                 \t\tmatch self {{\n\
                                     {}\n\
@@ -314,23 +334,37 @@ impl OutputBuilder for RustTuskBuilder {
                             \t}}\n\
                         }}\n\n\
                         impl Columned for {} {{\n\
-                            \ttype Keys = {}Keys;\n\
+                            \ttype ReadKeys = {}ReadKeys;\n\
+                            \ttype WriteKeys = {}WriteKeys;\n\
                         }}\n\n\
                 ",
                     object.name,
-                    enum_keys
+                    enum_read_keys
                         .into_iter()
                         .map(|x| format!("\t{}", x))
                         .collect::<Vec<_>>()
                         .join(",\n"),
                     object.name,
-                    enum_values
+                    enum_read_values
+                        .into_iter()
+                        .map(|x| format!("\t\t\t{}", x))
+                        .collect::<Vec<_>>()
+                        .join(",\n"),
+                    object.name,
+                    enum_write_keys
+                        .into_iter()
+                        .map(|x| format!("\t{}", x))
+                        .collect::<Vec<_>>()
+                        .join(",\n"),
+                    object.name,
+                    enum_write_values
                         .into_iter()
                         .map(|x| format!("\t\t\t{}", x))
                         .collect::<Vec<_>>()
                         .join(",\n"),
                     object.name,
                     object.name,
+                    object.name
                 ));
             }
         }
