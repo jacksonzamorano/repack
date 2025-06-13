@@ -44,7 +44,7 @@ record Organization @organizations #models #data {
 	email string
 }
 
-record TodoWithList: Todo #models #data {
+record TodoWithList: Todo #data {
 	^ list self.list_id = List.id
 	list_title with(list.title)
 }
@@ -99,7 +99,7 @@ record TempIdList @id_list #models {
 }
 
 enum UserPermission #models #data #private {
-	guest
-	user
-	admin
+	Guest
+	User
+	Admin
 }

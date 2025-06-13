@@ -8,8 +8,7 @@ impl tusk_rs::ToSql for __typ {
         std::boxed::Box<dyn std::error::Error + std::marker::Sync + std::marker::Send>,
     > {
         let s = match *self {
-			__to_sql_cases,
-			Self::Gone => panic!("__typ: Attempted to write same field twice!")
+			__to_sql_cases
         };
         buf.extend_from_slice(s.as_bytes());
         std::result::Result::Ok(tusk_rs::tokio_postgres::types::IsNull::No)

@@ -1,9 +1,11 @@
+use std::collections::HashSet;
+
 use crate::{
     outputs::OutputBuilder,
-    syntax::{RepackError, RepackErrorKind},
+    syntax::{CustomFieldType, RepackError, RepackErrorKind},
 };
 
-use super::{make_index, type_to_ts};
+use super::{enum_type, make_index, type_to_ts};
 
 pub struct TypescriptClassBuilder;
 
@@ -12,8 +14,19 @@ impl OutputBuilder for TypescriptClassBuilder {
         &self,
         description: &mut crate::outputs::OutputDescription,
     ) -> Result<(), RepackError> {
+        for enm in description.enums() {
+            let file_name = format!("{}.ts", enm.name);
+            description.append(&file_name, enum_type(enm));
+            if make_index(description) {
+                description.append(
+                    "index.ts",
+                    format!("export type {{ {} }} from './{}';\n", enm.name, enm.name),
+                );
+            }
+        }
         for object in description.objects() {
             let mut imports: Vec<String> = Vec::new();
+            let mut import_as_types: HashSet<String> = HashSet::new();
             let mut output = String::new();
             output.push_str(&format!("export class {} {{\n", object.name));
             for field in &object.fields {
@@ -25,7 +38,13 @@ impl OutputBuilder for TypescriptClassBuilder {
                     ))?;
                 let optional = if field.optional { "?" } else { "" };
                 let arr = if field.array { "[]" } else { "" };
-                if let crate::syntax::FieldType::Custom(name, _) = &field.field_type() {
+                if let crate::syntax::FieldType::Custom(name, typ) = &field.field_type() {
+                    match typ {
+                        CustomFieldType::Enum => {
+                            import_as_types.insert(name.clone());
+                        }
+                        _ => {}
+                    };
                     if !imports.contains(name) {
                         imports.push(name.clone());
                     }
@@ -41,7 +60,16 @@ impl OutputBuilder for TypescriptClassBuilder {
             for import in imports {
                 description.append(
                     &file_name,
-                    format!("import {{ {} }} from './{}';\n", import, import),
+                    format!(
+                        "import{} {{ {} }} from './{}';\n",
+                        if import_as_types.contains(&import) {
+                            " type"
+                        } else {
+                            ""
+                        },
+                        import,
+                        import
+                    ),
                 );
             }
             description.append(&file_name, output);

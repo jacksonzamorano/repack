@@ -1,8 +1,13 @@
-use crate::{outputs::OutputDescription, syntax::FieldType};
+use crate::{outputs::OutputDescription, syntax::{Enum, FieldType}};
 
 pub fn make_index(desc: &OutputDescription) -> bool {
     desc.bool("make_index", false)
 }
+
+pub fn enum_type(enm: &Enum) -> String {
+    format!("export type {} = {};", enm.name, enm.options.iter().map(|x| format!("\"{}\"", x)).collect::<Vec<_>>().join(" | "))
+}
+
 
 pub fn type_to_ts(field_type: &crate::syntax::FieldType) -> Option<String> {
     match field_type {

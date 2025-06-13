@@ -29,11 +29,40 @@ impl OutputBuilder for RustTuskBuilder {
             imports.insert("use tusk_rs::JsonRetrieve;".to_string());
             imports.insert("use tusk_rs::ToJson;".to_string());
             output.push_str(&format!(
-                "#[derive(Debug,JsonRetrieve,ToJson,Default)]\npub enum {} {{\n#[default]\n\tGone,\n{}\n}}\n\n",
+                "#[derive(Debug,JsonRetrieve,ToJson,Clone)]\npub enum {} {{\n\
+                    {}\n\
+                    }}\n\n\
+                    impl {} {{\n\
+                        #[allow(dead_code)]
+                        fn from_string(val: &str) -> Option<{}> {{\n\
+                            match val {{\n\
+                                {},\n\
+                                _ => None
+                            }}\n\
+                        }}\n\
+                        #[allow(dead_code)]
+                        fn to_string(&self) -> &'static str {{\n\
+                            match self {{\n\
+                                {}\n\
+                            }}\n\
+                        }}\n\
+                    }}\n",
                 enm.name,
                 enm.options
                     .iter()
                     .map(|x| format!("\t{}", x))
+                    .collect::<Vec<_>>()
+                    .join(",\n"),
+                enm.name,
+                enm.name,
+                enm.options
+                    .iter()
+                    .map(|x| format!("\t\t\t\"{}\" => Some(Self::{})", x, x))
+                    .collect::<Vec<_>>()
+                    .join(",\n"),
+                enm.options
+                    .iter()
+                    .map(|x| format!("\t\t\tSelf::{} => \"{}\"", x, x))
                     .collect::<Vec<_>>()
                     .join(",\n")
             ));
