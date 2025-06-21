@@ -99,13 +99,12 @@ impl FileContents {
                             if !byte.is_ascii_whitespace() {
                                 buf.push(byte as char);
                             } else if !buf.is_empty() {
-                                // Handle the buffer content
                                 self.contents.push(Token::from_string(&buf));
                                 buf.clear();
                             }
                         }
                     }
-                } else if byte.is_ascii_whitespace() {
+                } else if byte == b'\n' || byte == b'\r' {
                     in_comment = false;
                 }
             }
