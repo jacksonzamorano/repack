@@ -4,6 +4,8 @@ use outputs::OutputDescription;
 use profiles::OutputProfile;
 use syntax::{FileContents, ParseResult};
 
+use crate::profiles::TemplatedLanguage;
+
 mod outputs;
 mod profiles;
 mod syntax;
@@ -14,6 +16,9 @@ enum Behavior {
 }
 
 fn main() {
+    dbg!(TemplatedLanguage::from_file("/Users/jackson/Developer/Rust/repack/test/rust_common.lang").unwrap());
+
+    exit(1);
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 2 {
         let msg = include_bytes!("usage.txt");

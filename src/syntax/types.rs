@@ -6,6 +6,31 @@ pub enum CustomFieldType {
     Enum,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub enum CoreType {
+    String,
+    Int64,
+    Int32,
+    Float64,
+    Boolean,
+    DateTime,
+    Uuid
+}
+impl CoreType {
+    pub fn from_string(s: &str) -> Option<CoreType> {
+        Some(match s {
+            "string" => Self::String,
+            "int64" => Self::Int64,
+            "int32" => Self::Int32,
+            "float64" => Self::Float64,
+            "boolean" => Self::Boolean,
+            "datetime" => Self::DateTime,
+            "uuid" => Self::Uuid,
+            _ => return None,
+        })
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum FieldType {
     String,
@@ -16,7 +41,6 @@ pub enum FieldType {
     DateTime,
     Uuid,
     Custom(String, CustomFieldType),
-    FutureType,
 }
 impl Display for FieldType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -29,7 +53,6 @@ impl Display for FieldType {
             FieldType::DateTime => "datetime".to_string(),
             FieldType::Uuid => "uuid".to_string(),
             FieldType::Custom(s, _) => s.clone(),
-            FieldType::FutureType => "FUTURE TYPE".to_string(),
         };
         write!(f, "{}", res)
     }
@@ -44,7 +67,6 @@ impl FieldType {
             "boolean" => FieldType::Boolean,
             "datetime" => FieldType::DateTime,
             "uuid" => FieldType::Uuid,
-            "___" => FieldType::FutureType,
             _ => return None,
         })
     }

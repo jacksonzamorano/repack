@@ -1,5 +1,3 @@
-import "extras/*"
-
 // Provide a base, with ID and created date.
 // All DB models will inherit.
 snippet base {
@@ -14,17 +12,17 @@ snippet org_linked {
 	db:index("org_id")
 }
 
-output description @test/description;
-output postgres @test/postgres #models #views;
-output typescript_class @test/ts_classes #data {
+// output description @test/description;
+// output postgres @test/postgres #models #views;
+// output typescript_class @test/ts_classes #data {
 	make_index true
 }
-output typescript_interface @test/ts_interfaces #data {
+// output typescript_interface @test/ts_interfaces #data {
 	make_index true
 }
-output typescript_drizzle @test/ts_drizzle #models;
+// output typescript_drizzle @test/ts_drizzle #models;
 output rust @test/rust_vanilla #data #private;
-output rust_tusk @test/rust_tusk #models #views;
+// output rust_tusk @test/rust_tusk #models #views;
 
 record User @users #private #models {
 	!base
@@ -36,6 +34,12 @@ record User @users #private #models {
 	last_login datetime?
 	total_cost float64 db:default("0")
 	permission UserPermission
+}
+
+struct UserCreateDto {
+	email string
+	password string
+	name string
 }
 
 record Organization @organizations #models #data {

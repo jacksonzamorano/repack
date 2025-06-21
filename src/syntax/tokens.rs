@@ -34,6 +34,7 @@ pub enum Token {
     Where,
     Import,
     With,
+    Convert,
 }
 impl Token {
     pub fn from_byte(byte: u8) -> Option<Token> {
@@ -75,6 +76,7 @@ impl Token {
             "snippet" => Token::SnippetType,
             "enum" => Token::EnumType,
             "with" => Token::With,
+            "conversion" => Token::Convert,
 
             _ => Token::Literal(string.trim().to_string()),
         }

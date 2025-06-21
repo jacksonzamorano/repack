@@ -1,0 +1,21 @@
+#id rust
+#name Rust Common
+#type string String
+#type int32 i32
+#type int64 i64
+#array Vec<$type>
+#optional Option<$type>
+
+#define record.base
+pub struct $name {
+	$fields
+}
+---
+
+#define record.field struct.field
+pub $name: $type
+---
+
+#define record.field.splitter struct.field.splitter
+,
+---
