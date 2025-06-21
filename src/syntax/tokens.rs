@@ -34,6 +34,7 @@ pub enum Token {
     Where,
     Import,
     With,
+    Blueprint,
     Convert,
 }
 impl Token {
@@ -77,6 +78,7 @@ impl Token {
             "enum" => Token::EnumType,
             "with" => Token::With,
             "conversion" => Token::Convert,
+            "blueprint" => Token::Blueprint,
 
             _ => Token::Literal(string.trim().to_string()),
         }

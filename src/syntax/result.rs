@@ -10,6 +10,7 @@ pub struct ParseResult {
     pub objects: Vec<Object>,
     pub languages: Vec<Output>,
     pub enums: Vec<Enum>,
+    pub include_blueprints: Vec<String>
 }
 
 impl ParseResult {
@@ -20,6 +21,7 @@ impl ParseResult {
         let mut snippets = Vec::new();
         let mut languages = Vec::new();
         let mut enums = Vec::new();
+        let mut include_blueprints = Vec::new();
 
         while let Some(token) = contents.next() {
             match *token {
@@ -49,6 +51,11 @@ impl ParseResult {
                 Token::Import => {
                     if let Some(Token::Literal(path)) = contents.take() {
                         contents.add_relative(&path);
+                    }
+                }
+                Token::Blueprint => {
+                    if let Some(Token::Literal(path)) = contents.take() {
+                        include_blueprints.push(path);
                     }
                 }
                 _ => {}
@@ -346,6 +353,7 @@ impl ParseResult {
                 objects,
                 languages,
                 enums,
+                include_blueprints
             })
         }
     }

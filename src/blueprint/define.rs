@@ -1,4 +1,4 @@
-use crate::profiles::{FlyContext, FlyContextualizedVariable};
+use crate::blueprint::{BlueprintContext};
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum TemplateDefineSection {
@@ -28,15 +28,15 @@ impl TemplateDefineSection {
         })
     }
 
-    pub fn context(&self) -> &'static FlyContext {
+    pub fn context(&self) -> &'static BlueprintContext {
         match self {
-            Self::RecordBase => &FlyContext::Record,
-            Self::StructBase => &FlyContext::Struct,
-            Self::EnumBase => &FlyContext::Enum,
-            Self::RecordField | Self::StructField => &FlyContext::Field,
-            Self::EnumCase => &FlyContext::Case,
+            Self::RecordBase => &BlueprintContext::Record,
+            Self::StructBase => &BlueprintContext::Struct,
+            Self::EnumBase => &BlueprintContext::Enum,
+            Self::RecordField | Self::StructField => &BlueprintContext::Field,
+            Self::EnumCase => &BlueprintContext::Case,
             Self::RecordFieldSplitter | Self::StructFieldSplitter | Self::EnumCaseSplitter => {
-                &FlyContext::Global
+                &BlueprintContext::Global
             }
         }
     }

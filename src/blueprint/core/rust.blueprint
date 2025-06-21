@@ -16,6 +16,16 @@ pub struct $name {
 pub $name: $type
 ---
 
-#define record.field.splitter struct.field.splitter
+#define record.field.splitter struct.field.splitter enum.case.splitter
 ,
 ---
+
+#define enum.base
+pub enum $name {
+	$cases
+}
+---
+
+#define enum.case {
+	$name
+}
