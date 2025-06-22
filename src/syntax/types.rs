@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum CustomFieldType {
@@ -14,7 +14,7 @@ pub enum CoreType {
     Float64,
     Boolean,
     DateTime,
-    Uuid
+    Uuid,
 }
 impl CoreType {
     pub fn from_string(s: &str) -> Option<CoreType> {
@@ -30,44 +30,40 @@ impl CoreType {
         })
     }
 }
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum FieldType {
-    String,
-    Int64,
-    Int32,
-    Float64,
-    Boolean,
-    DateTime,
-    Uuid,
-    Custom(String, CustomFieldType),
-}
-impl Display for FieldType {
+impl Display for CoreType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let res = match self {
-            FieldType::String => "string".to_string(),
-            FieldType::Int64 => "int64".to_string(),
-            FieldType::Int32 => "int32".to_string(),
-            FieldType::Float64 => "float64".to_string(),
-            FieldType::Boolean => "boolean".to_string(),
-            FieldType::DateTime => "datetime".to_string(),
-            FieldType::Uuid => "uuid".to_string(),
-            FieldType::Custom(s, _) => s.clone(),
+            Self::String => "string".to_string(),
+            Self::Int64 => "int64".to_string(),
+            Self::Int32 => "int32".to_string(),
+            Self::Float64 => "float64".to_string(),
+            Self::Boolean => "boolean".to_string(),
+            Self::DateTime => "datetime".to_string(),
+            Self::Uuid => "uuid".to_string(),
         };
         write!(f, "{}", res)
     }
 }
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum FieldType {
+    Core(CoreType),
+    Custom(String, CustomFieldType),
+}
+impl Display for FieldType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FieldType::Core(s) => {
+                write!(f, "{}", s)
+            }
+            FieldType::Custom(s, _) => {
+                write!(f, "{}", s)
+            }
+        }
+    }
+}
 impl FieldType {
     pub fn from_string(s: &str) -> Option<FieldType> {
-        Some(match s {
-            "string" => FieldType::String,
-            "int64" => FieldType::Int64,
-            "int32" => FieldType::Int32,
-            "float64" => FieldType::Float64,
-            "boolean" => FieldType::Boolean,
-            "datetime" => FieldType::DateTime,
-            "uuid" => FieldType::Uuid,
-            _ => return None,
-        })
+        CoreType::from_string(s).map(|x| FieldType::Core(x))
     }
 }

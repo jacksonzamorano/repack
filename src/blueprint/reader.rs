@@ -1,4 +1,4 @@
-use std::{iter::Peekable};
+use std::iter::Peekable;
 
 use crate::blueprint::{BlueprintContext, BlueprintToken};
 
@@ -102,6 +102,14 @@ impl<'a> BlueprintFileReader<'a> {
                 temp_token = String::new();
             } else {
                 temp_token.push(*next as char);
+            }
+        }
+
+        loop {
+            if matches!(tokens.last(), Some(BlueprintToken::NewLine)) {
+                tokens.pop();
+            } else {
+                break;
             }
         }
 
