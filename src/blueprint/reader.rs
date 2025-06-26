@@ -46,6 +46,9 @@ impl<'a> BlueprintFileReader<'a> {
                                     }
                                     temp = String::new();
                                     if *in_block_read == b'}' {
+                                        if sd.secondary_token.is_empty() && sd.contents.is_empty() {
+                                            sd.is_ended = true;
+                                        }
                                         break;
                                     }
                                 }
@@ -70,13 +73,15 @@ impl<'a> BlueprintFileReader<'a> {
                 }
                 temp.push('$');
             }
-            if next.is_ascii_whitespace() && !temp.is_empty() {
-                return Some(FlyToken::Literal(temp));
-            } else {
-                temp.push(*next as char);
-                if matches!(self.reader.peek(), Some(b'$')) {
-                    return Some(FlyToken::Literal(temp));
+            temp.push(*next as char);
+            if matches!(self.reader.peek(), Some(b'$')) {
+                if temp.starts_with('\n') || temp.starts_with('\t') {
+                    temp.remove(0);
                 }
+                if temp.ends_with('\n') || temp.ends_with('\t') {
+                    temp.remove(temp.len() - 1);
+                }
+                return Some(FlyToken::Literal(temp));
             }
         }
 

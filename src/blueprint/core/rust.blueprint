@@ -1,12 +1,27 @@
 ${meta id:rust/}
 ${meta name:Rust Compiler/}
 
-${type int64}i64${/type}
-${type string}string${/type}
+${define int32}i32${/define}
+${define int64}i64${/define}
+${define float64}f64${/define}
+${define string}string${/define}
+${define boolean}bool${/define}
+${define datetime}chrono::DateTime${/define}
 
-${each object}
-pub struct ${name}
-	${each fields}
-	pub ${name}: ${if optional:Option</}${type}${if optional}>${/if}${if sep:,/}
+${each object:\n}
+#[derive(Debug)]
+pub struct ${name} {
+	${each field:\n}
+	pub ${name}: ${if optional:Option</}${type}${if optional}>${/if}${if sep:, /}
 	${/each}
+}
+${/each}
+
+${each enum:\n}
+#[derive(Debug, Clone)]
+pub enum ${name} {
+	${each case:\n}
+	${name}${if sep:,/}
+	${/each}
+}
 ${/each}

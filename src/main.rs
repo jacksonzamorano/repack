@@ -72,7 +72,7 @@ fn main() {
                     );
                     continue;
                 };
-                let builder = BlueprintRenderer::new(&parse_result, &bp, &output);
+                let builder = BlueprintRenderer::new(&parse_result, bp, output);
                 match builder.build() {
                     Ok(_) => {
                         println!("[{}] Built successfully!", output.profile);

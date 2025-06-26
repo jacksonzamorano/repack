@@ -1,7 +1,7 @@
 use super::SnippetDetails;
 use crate::{
     blueprint::{BlueprintFileReader, FlyToken},
-    syntax::{CoreType, FieldType},
+    syntax::CoreType,
 };
 use std::collections::HashMap;
 
@@ -19,7 +19,7 @@ impl SnippetMainTokenName {
             "meta" => Self::Meta,
             "if" => Self::If,
             "each" => Self::Each,
-            "type" => Self::TypeDef,
+            "define" => Self::TypeDef,
             _ => Self::Variable(val.to_string()),
         }
     }
@@ -30,6 +30,9 @@ pub enum SnippetSecondaryTokenName {
     Id,
     Name,
     Object,
+    Field,
+    Enum,
+    Case,
 
     // TypeDef
     String,
@@ -44,30 +47,28 @@ pub enum SnippetSecondaryTokenName {
 }
 impl SnippetSecondaryTokenName {
     fn from_string(val: &str) -> Self {
-        if let Some(ct) = CoreType::from_string(&val) {
-            return Self::from_type(&FieldType::Core(ct));
+        if let Some(ct) = CoreType::from_string(val) {
+            return Self::from_type(&ct);
         }
         match val {
             "id" => Self::Id,
             "name" => Self::Name,
             "object" => Self::Object,
+            "field" => Self::Field,
+            "enum" => Self::Enum,
+            "case" => Self::Case,
             _ => Self::Arbitrary(val.to_string()),
         }
     }
-    pub fn from_type(typ: &FieldType) -> SnippetSecondaryTokenName {
+    pub fn from_type(typ: &CoreType) -> SnippetSecondaryTokenName {
         match typ {
-            FieldType::Core(core) => match core {
-                CoreType::Uuid => Self::Uuid,
-                CoreType::Int64 => Self::Int64,
-                CoreType::Int32 => Self::Int32,
-                CoreType::String => Self::String,
-                CoreType::Float64 => Self::Float64,
-                CoreType::Boolean => Self::Boolean,
-                CoreType::DateTime => Self::DateTime,
-            },
-            FieldType::Custom(name, _) => {
-                return SnippetSecondaryTokenName::Arbitrary(name.clone());
-            }
+            CoreType::Uuid => Self::Uuid,
+            CoreType::Int64 => Self::Int64,
+            CoreType::Int32 => Self::Int32,
+            CoreType::String => Self::String,
+            CoreType::Float64 => Self::Float64,
+            CoreType::Boolean => Self::Boolean,
+            CoreType::DateTime => Self::DateTime,
         }
     }
 }
@@ -82,6 +83,8 @@ pub enum BlueprintError {
     NoSections,
     InconsistentContexts,
     CouldNotCreateContext(&'static str),
+    TypeNotSupported(String),
+    VariableNotFound(String),
 }
 impl BlueprintError {
     pub fn output(&self) -> String {
@@ -96,57 +99,23 @@ pub struct SectionContent {
     pub literal_string_value: String,
 }
 
+#[derive(Debug)]
 pub struct SnippetReference<'a> {
     pub details: &'a SnippetDetails,
     pub contents: &'a [FlyToken],
 }
 impl<'a> SnippetReference<'a> {
     pub fn main_token(&self) -> SnippetMainTokenName {
-        return SnippetMainTokenName::from_string(&self.details.main_token)
+        SnippetMainTokenName::from_string(&self.details.main_token)
     }
     pub fn secondary_token(&self) -> SnippetSecondaryTokenName {
-        return SnippetSecondaryTokenName::from_string(&self.details.secondary_token)
+        SnippetSecondaryTokenName::from_string(&self.details.secondary_token)
     }
     pub fn from_content(content: &'a SectionContent) -> Self {
         Self {
             details: &content.details,
             contents: &content.contents,
         }
-    }
-    pub fn slice_content(content: &'a SectionContent, starting_at: usize) -> Option<Self> {
-        let content_details = match &content.contents[starting_at] {
-            FlyToken::Snippet(snip_details) => snip_details,
-            _ => return None,
-        };
-        let mut end_index = starting_at + 1;
-        let mut embed_count = 0;
-        if !content.details.is_ended {
-            while end_index < content.contents.len() {
-                let in_block = &content.contents[end_index];
-                match &in_block {
-                    FlyToken::SnippetEnd(end_name) if *end_name == content.details.main_token => {
-                        embed_count -= 1;
-                        if embed_count == 0 {
-                            break;
-                        }
-                        end_index += 1;
-                    }
-                    FlyToken::Snippet(embedded)
-                        if embedded.main_token == content.details.main_token =>
-                    {
-                        embed_count += 1;
-                        end_index += 1;
-                    }
-                    _ => {
-                        end_index += 1;
-                    },
-                }
-            }
-        }
-        Some(Self {
-            details: &content_details,
-            contents: &content.contents[starting_at..end_index],
-        })
     }
 }
 
@@ -190,6 +159,7 @@ impl Blueprint {
                                 if embed_count == 0 {
                                     break;
                                 }
+                                content.contents.push(in_block);
                             }
                             FlyToken::Snippet(embedded)
                                 if embedded.main_token == content.details.main_token =>
