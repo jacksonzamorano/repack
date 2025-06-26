@@ -45,7 +45,7 @@ pub enum SnippetSecondaryTokenName {
 impl SnippetSecondaryTokenName {
     fn from_string(val: &str) -> Self {
         if let Some(ct) = CoreType::from_string(&val) {
-            return Self::from_type(&FieldType::Core(ct))
+            return Self::from_type(&FieldType::Core(ct));
         }
         match val {
             "id" => Self::Id,
@@ -101,6 +101,12 @@ pub struct SnippetReference<'a> {
     pub contents: &'a [FlyToken],
 }
 impl<'a> SnippetReference<'a> {
+    pub fn main_token(&self) -> SnippetMainTokenName {
+        return SnippetMainTokenName::from_string(&self.details.main_token)
+    }
+    pub fn secondary_token(&self) -> SnippetSecondaryTokenName {
+        return SnippetSecondaryTokenName::from_string(&self.details.secondary_token)
+    }
     pub fn from_content(content: &'a SectionContent) -> Self {
         Self {
             details: &content.details,
@@ -112,9 +118,34 @@ impl<'a> SnippetReference<'a> {
             FlyToken::Snippet(snip_details) => snip_details,
             _ => return None,
         };
+        let mut end_index = starting_at + 1;
+        let mut embed_count = 0;
+        if !content.details.is_ended {
+            while end_index < content.contents.len() {
+                let in_block = &content.contents[end_index];
+                match &in_block {
+                    FlyToken::SnippetEnd(end_name) if *end_name == content.details.main_token => {
+                        embed_count -= 1;
+                        if embed_count == 0 {
+                            break;
+                        }
+                        end_index += 1;
+                    }
+                    FlyToken::Snippet(embedded)
+                        if embedded.main_token == content.details.main_token =>
+                    {
+                        embed_count += 1;
+                        end_index += 1;
+                    }
+                    _ => {
+                        end_index += 1;
+                    },
+                }
+            }
+        }
         Some(Self {
             details: &content_details,
-            contents: &[],
+            contents: &content.contents[starting_at..end_index],
         })
     }
 }

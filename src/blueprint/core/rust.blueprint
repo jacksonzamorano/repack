@@ -7,6 +7,6 @@ ${type string}string${/type}
 ${each object}
 pub struct ${name}
 	${each fields}
-	pub ${name}: ${if optional:Option</}${type}${if optional}>${/if}
+	pub ${name}: ${if optional:Option</}${type}${if optional}>${/if}${if sep:,/}
 	${/each}
 ${/each}

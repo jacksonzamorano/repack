@@ -3,7 +3,8 @@ use std::collections::HashMap;
 use crate::syntax::{Field, Object, Output, ParseResult};
 
 use super::{
-    Blueprint, BlueprintError, SectionContent, SnippetMainTokenName, SnippetSecondaryTokenName,
+    Blueprint, BlueprintError, FlyToken, SectionContent, SnippetMainTokenName, SnippetReference,
+    SnippetSecondaryTokenName,
 };
 
 struct BlueprintExecutionContext<'a> {
@@ -38,7 +39,11 @@ impl<'a> BlueprintExecutionContext<'a> {
             field: None,
         }
     }
-    fn from_field(field: &'a Field, config: &'a Blueprint) -> Result<Self, BlueprintError> {
+    fn from_field(
+        field: &'a Field,
+        config: &'a Blueprint,
+        is_last: bool,
+    ) -> Result<Self, BlueprintError> {
         let mut variables = HashMap::new();
         let mut flags = HashMap::new();
 
@@ -54,6 +59,7 @@ impl<'a> BlueprintExecutionContext<'a> {
         variables.insert("name", Some(&field.name));
         variables.insert("type", Some(&resolved_type));
         flags.insert("optional", field.optional);
+        flags.insert("sep", !is_last);
 
         Ok(Self {
             variables,
@@ -82,17 +88,85 @@ impl<'a> BlueprintRenderer<'a> {
         };
     }
 
-    fn render_section<'b>(
-        content: SectionContent,
+    fn render_snippet<'b>(
+        &self,
+        content: &'b [FlyToken],
         context: BlueprintExecutionContext<'b>,
     ) -> String {
+        let mut value = String::new();
+        let mut index = 0;
+        while index < content.len() {
+            let c = &content[index];
+            match c {
+                FlyToken::Literal(lit_val) => value.push_str(&lit_val),
+                FlyToken::Snippet(snip) => {
+                    let mut starting_at = index;
+                    let mut end_index = starting_at + 1;
+                    let mut embed_count = 0;
+                    if !snip.is_ended {
+                        while end_index < content.len() {
+                            let in_block = &content[end_index];
+                            match &in_block {
+                                FlyToken::SnippetEnd(end_name) if *end_name == snip.main_token => {
+                                    embed_count -= 1;
+                                    if embed_count == 0 {
+                                        break;
+                                    }
+                                    end_index += 1;
+                                }
+                                FlyToken::Snippet(embedded)
+                                    if embedded.main_token == snip.main_token =>
+                                {
+                                    embed_count += 1;
+                                    end_index += 1;
+                                }
+                                _ => {
+                                    end_index += 1;
+                                }
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            };
+            index += 1;
+        }
+        return value;
+    }
+
+    fn render_section<'b>(
+        &self,
+        content: SnippetReference<'b>,
+        context: BlueprintExecutionContext<'b>,
+    ) -> String {
+        let mut value = String::new();
+        match content.main_token() {
+            SnippetMainTokenName::Each => {
+                match content.secondary_token() {
+                    SnippetSecondaryTokenName::Object => {
+                        for obj in &self.parse_result.objects {
+                            value.push_str(&self.render_snippet(content.contents, BlueprintExecutionContext::from_object(&obj)));
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            _ => {}
+        };
+
         return String::new();
     }
 
     pub fn build(self) -> Result<(), BlueprintError> {
+        let mut output = String::new();
         for section in &self.blueprint.sections {
             match section.0.0 {
-                SnippetMainTokenName::Each => {}
+                SnippetMainTokenName::Each | SnippetMainTokenName::If => {
+                    output.push_str(&self.render_section(
+                        SnippetReference::from_content(section.1),
+                        BlueprintExecutionContext::new(),
+                    ));
+                }
                 _ => {}
             }
         }
