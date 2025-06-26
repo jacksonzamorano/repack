@@ -125,7 +125,7 @@ impl Object {
 
                     if obj_1_name == "self" {
                         joins.push(ObjectJoin {
-                            join_name: join_name,
+                            join_name,
                             local_field: obj_1_field,
                             condition: "=".to_string(),
                             foreign_entity: obj_2_name,
@@ -133,7 +133,7 @@ impl Object {
                         });
                     } else if obj_2_name == "self" {
                         joins.push(ObjectJoin {
-                            join_name: join_name,
+                            join_name,
                             local_field: obj_2_field,
                             condition: "=".to_string(),
                             foreign_entity: obj_1_name,

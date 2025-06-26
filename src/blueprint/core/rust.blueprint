@@ -1,37 +1,12 @@
-#id rust
-#name Rust Common
-#type string String
-#type int32 i32
-#type int64 i64
-#type datetime chrono::NaiveDateTime
-#type float64 f64
-#type boolean bool
-#array Vec<$type>
+${meta id:rust/}
+${meta name:Rust Compiler/}
 
-#define field
-	pub $name: $type
----
+${type int64}i64${/type}
+${type string}string${/type}
 
-#define field.optional
-	pub $name: Option<$type>
----
-
-#define record.base
-pub struct $name {
-$fields
-}
----
-
-#define case.splitter field.splitter
-,
----
-
-#define enum.base
-pub enum $name {
-$cases
-}
----
-
-#define case
-	$name
----
+${each object}
+pub struct ${name}
+	${each fields}
+	pub ${name}: ${if optional:Option</}${type}${if optional}>${/if}
+	${/each}
+${/each}

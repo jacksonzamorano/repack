@@ -1,4 +1,4 @@
-use super::{FileContents, RepackError, RepackErrorKind, Token};
+use super::{FileContents, RepackError, Token};
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -83,13 +83,13 @@ impl Output {
     }
 
     pub fn errors(&self) -> Vec<RepackError> {
-        let mut errors = Vec::new();
+        
         // if OutputProfile::from_keyword(&self.profile).is_none() {
         //     errors.push(RepackError::from_lang(
         //         RepackErrorKind::UnknownLanguage,
         //         self,
         //     ));
         // }
-        errors
+        Vec::new()
     }
 }

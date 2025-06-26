@@ -1,6 +1,7 @@
 use std::{io::Write, path::PathBuf, process::exit};
 
-use blueprint::BlueprintBuilder;
+use blueprint::BlueprintRenderer;
+// use blueprint::BlueprintBuilder;
 use syntax::{FileContents, ParseResult};
 
 use crate::blueprint::BlueprintStore;
@@ -47,7 +48,7 @@ fn main() {
     for add in &parse_result.include_blueprints {
         let mut path = PathBuf::from(&input_file);
         path.pop();
-        path.push(&add);
+        path.push(add);
         match store.load_file(&path) {
             Err(_) => {
                 panic!(
@@ -71,7 +72,7 @@ fn main() {
                     );
                     continue;
                 };
-                let builder = BlueprintBuilder::from_result(&parse_result, output, bp);
+                let builder = BlueprintRenderer::new(&parse_result, &bp, &output);
                 match builder.build() {
                     Ok(_) => {
                         println!("[{}] Built successfully!", output.profile);
@@ -93,15 +94,15 @@ fn main() {
                     );
                     continue;
                 };
-                let builder = BlueprintBuilder::from_result(&parse_result, output, bp);
-                match builder.build() {
-                    Ok(_) => {
-                        println!("[{}] Built successfully!", output.profile);
-                    }
-                    Err(e) => {
-                        println!("[{}] Failed to build:\n\t{}", output.profile, e.output());
-                    }
-                }
+                // let builder = BlueprintBuilder::from_result(&parse_result, output, bp);
+                // match builder.build() {
+                //     Ok(_) => {
+                //         println!("[{}] Built successfully!", output.profile);
+                //     }
+                //     Err(e) => {
+                //         println!("[{}] Failed to build:\n\t{}", output.profile, e.output());
+                //     }
+                // }
             }
         }
     }

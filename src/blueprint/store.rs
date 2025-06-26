@@ -2,7 +2,7 @@ use std::{collections::HashMap, fs::File, io::Read, path::PathBuf, process::exit
 
 use crate::blueprint::{Blueprint, BlueprintError, BlueprintFileReader};
 
-const CORE_BLUEPRINTS: &'static [&'static str] = &[include_str!("core/rust.blueprint")];
+const CORE_BLUEPRINTS: &[&str] = &[include_str!("core/rust.blueprint")];
 
 pub struct BlueprintStore {
     languages: HashMap<String, Blueprint>,
@@ -14,20 +14,17 @@ impl BlueprintStore {
         };
 
         for core in CORE_BLUEPRINTS {
-            match store.load_string(core) {
-                Err(err) => {
-                    println!("[CORE] Could not load core blueprints: {}", err.output());
-                    exit(1);
-                }
-                _ => {}
+            if let Err(err) = store.load_string(core) {
+                println!("[CORE] Could not load core blueprints: {}", err.output());
+                exit(1);
             }
         }
 
-        return store;
+        store
     }
 
     pub fn load_file(&mut self, path: &PathBuf) -> Result<(), BlueprintError> {
-        let mut file = File::open(&path).map_err(|_| BlueprintError::CannotRead)?;
+        let mut file = File::open(path).map_err(|_| BlueprintError::CannotRead)?;
         let mut contents = vec![];
         _ = file.read_to_end(&mut contents);
 

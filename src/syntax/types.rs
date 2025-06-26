@@ -64,6 +64,6 @@ impl Display for FieldType {
 }
 impl FieldType {
     pub fn from_string(s: &str) -> Option<FieldType> {
-        CoreType::from_string(s).map(|x| FieldType::Core(x))
+        CoreType::from_string(s).map(FieldType::Core)
     }
 }

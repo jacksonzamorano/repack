@@ -1,118 +1,85 @@
 use std::iter::Peekable;
 
-use crate::blueprint::{BlueprintContext, BlueprintToken};
+use crate::blueprint::FlyToken;
+
+use super::SnippetDetails;
 
 pub struct BlueprintFileReader<'a> {
     pub reader: Peekable<std::slice::Iter<'a, u8>>,
 }
 impl<'a> BlueprintFileReader<'a> {
-    pub fn next(&mut self) -> Option<String> {
+    pub fn next(&mut self) -> Option<FlyToken> {
         let mut temp = String::new();
+
         while let Some(next) = self.reader.next() {
-            if next.is_ascii_whitespace() {
-                if !temp.is_empty() {
-                    return Some(temp);
+            if *next == b'$' {
+                if let Some(maybe_open_brace) = self.reader.next() {
+                    if *maybe_open_brace == b'{' {
+                        if let Some(maybe_backslash) = self.reader.peek() {
+                            if **maybe_backslash == b'/' {
+                                _ = self.reader.next();
+                                for in_block_read in self.reader.by_ref() {
+                                    if *in_block_read == b'}' {
+                                        break;
+                                    } else {
+                                        temp.push(*in_block_read as char);
+                                    }
+                                }
+                                return Some(FlyToken::SnippetEnd(temp));
+                            }
+                        }
+
+                        let mut sd = SnippetDetails::default();
+
+                        while let Some(in_block_read) = self.reader.next() {
+                            match *in_block_read as char {
+                                ' ' | '}' => {
+                                    if sd.main_token.is_empty() {
+                                        sd.main_token = temp;
+                                    } else if sd.secondary_token.is_empty() {
+                                        sd.secondary_token = temp;
+                                    } else {
+                                        sd.contents.push_str(&temp);
+                                        if *in_block_read == b' ' {
+                                            sd.contents.push(' ');
+                                        }
+                                    }
+                                    temp = String::new();
+                                    if *in_block_read == b'}' {
+                                        break;
+                                    }
+                                }
+                                ':' => {
+                                    sd.secondary_token = temp;
+                                    temp = String::new();
+                                }
+                                '/' => {
+                                    if matches!(self.reader.peek(), Some(b'}')) {
+                                        sd.is_ended = true;
+                                    }
+                                }
+                                _ => {
+                                    temp.push(*in_block_read as char);
+                                }
+                            }
+                        }
+
+                        return Some(FlyToken::Snippet(sd));
+                    }
+                    temp.push('{');
                 }
+                temp.push('$');
+            }
+            if next.is_ascii_whitespace() && !temp.is_empty() {
+                return Some(FlyToken::Literal(temp));
             } else {
                 temp.push(*next as char);
+                if matches!(self.reader.peek(), Some(b'$')) {
+                    return Some(FlyToken::Literal(temp));
+                }
             }
         }
 
         None
-    }
-    pub fn next_token(&mut self) -> Option<BlueprintToken> {
-        self.next()
-            .map(|x| BlueprintToken::from_string(x, &BlueprintContext::Global))
-    }
-    pub fn read_line(&mut self) -> Option<String> {
-        let mut temp_token = String::new();
-        while let Some(next) = self.reader.next() {
-            if *next == b'\n' || *next == b'\r' {
-                if !temp_token.is_empty() {
-                    return Some(temp_token);
-                }
-            } else {
-                temp_token.push(*next as char);
-            }
-        }
-        return None;
-    }
-
-    pub fn read_line_tokens_with_context(&mut self, ctx: &BlueprintContext) -> Vec<BlueprintToken> {
-        let mut tokens = Vec::new();
-        let mut temp_token = String::new();
-        while let Some(next) = self.reader.next() {
-            if let Some(individual_token) = BlueprintToken::from_char(*next as char) {
-                if !temp_token.is_empty() {
-                    tokens.push(BlueprintToken::from_string(temp_token, ctx));
-                }
-                if matches!(individual_token, BlueprintToken::NewLine) {
-                    break;
-                }
-                tokens.push(individual_token);
-                temp_token = String::new();
-                continue;
-            }
-            if next.is_ascii_whitespace() {
-                if !temp_token.is_empty() {
-                    tokens.push(BlueprintToken::from_string(temp_token, ctx));
-                }
-                temp_token = String::new();
-            } else {
-                temp_token.push(*next as char);
-            }
-        }
-
-        return tokens;
-    }
-
-    pub fn read_line_tokens(&mut self) -> Vec<BlueprintToken> {
-        self.read_line_tokens_with_context(&BlueprintContext::Global)
-    }
-
-    pub fn read_block(&mut self, context: &BlueprintContext) -> Vec<BlueprintToken> {
-        let mut tokens = vec![];
-        let mut temp_token = String::new();
-
-        let mut dash_ct = 0usize;
-        while let Some(next) = self.reader.next() {
-            if *next == b'-' {
-                dash_ct += 1;
-                if dash_ct == 3 {
-                    break;
-                }
-            } else if dash_ct > 0 {
-                while dash_ct != 0 {
-                    temp_token += "-";
-                    dash_ct -= 1;
-                }
-            }
-            if let Some(individual_token) = BlueprintToken::from_char(*next as char) {
-                if !temp_token.is_empty() {
-                    tokens.push(BlueprintToken::from_string(temp_token, context));
-                }
-                tokens.push(individual_token);
-                temp_token = String::new();
-                continue;
-            }
-            if next.is_ascii_whitespace() {
-                if !temp_token.is_empty() {
-                    tokens.push(BlueprintToken::from_string(temp_token, context));
-                }
-                temp_token = String::new();
-            } else {
-                temp_token.push(*next as char);
-            }
-        }
-
-        loop {
-            if matches!(tokens.last(), Some(BlueprintToken::NewLine)) {
-                tokens.pop();
-            } else {
-                break;
-            }
-        }
-
-        return tokens;
     }
 }

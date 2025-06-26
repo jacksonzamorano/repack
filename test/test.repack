@@ -1,4 +1,4 @@
-blueprint "overview.blueprint"
+// blueprint "overview.blueprint"
 
 // Provide a base, with ID and created date.
 // All DB models will inherit.
