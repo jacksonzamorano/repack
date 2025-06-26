@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use super::{
-    CustomFieldType, Field, FieldType, FileContents, FunctionNamespace, ObjectFunction,
+    CustomFieldType, Field, FieldType, FileContents, ObjectFunction,
     RepackError, RepackErrorKind, Token, field::FieldReferenceKind,
 };
 
@@ -174,17 +174,6 @@ impl Object {
             functions,
             joins,
         }
-    }
-
-    pub fn table(&self) -> &String {
-        self.table_name.as_ref().unwrap()
-    }
-
-    pub fn functions_in_namespace(&self, ns: FunctionNamespace) -> Vec<&ObjectFunction> {
-        self.functions
-            .iter()
-            .filter(|of| of.namespace == ns)
-            .collect()
     }
 
     pub fn errors(&self) -> Option<Vec<RepackError>> {

@@ -23,8 +23,9 @@ snippet org_linked {
 	make_index true
 }
 // output typescript_drizzle @test/ts_drizzle #models;
-output rust @test/rust_vanilla #data #private;
+// output rust @test/rust_vanilla #data #private;
 // output rust_tusk @test/rust_tusk #models #views;
+output postgres #models #views;
 
 record User @users #private #models {
 	!base

@@ -1,0 +1,21 @@
+{ meta id: postgres }
+{ meta name: PostgreSQL create }
+
+{ define int32: INT4 }
+{ define int64: INT8 }
+{ define float64: FLOAT8 }
+{ define string: TEXT }
+{ define boolean: BOOL }
+{ define datetime: TIMESTAMPTZ }
+
+[ each object ]
+DROP TABLE IF EXISTS {name}
+[ end each ]
+
+[ each object ]
+CREATE TABLE { name } (
+[ each field ]
+	{ name } { type }{ ifn optional:  NOT NULL }[func db.default] DEFAULT {0}[end func][ref] FOREIGN KEY REFERENCES {foreign_entity}({foreign_field})[end ref]{ if sep: , }
+[ end each ]
+)
+[ end each ]

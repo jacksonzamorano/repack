@@ -12,76 +12,79 @@ impl<'a> BlueprintFileReader<'a> {
         let mut temp = String::new();
 
         while let Some(next) = self.reader.next() {
-            if *next == b'$' {
-                if let Some(maybe_open_brace) = self.reader.next() {
-                    if *maybe_open_brace == b'{' {
-                        if let Some(maybe_backslash) = self.reader.peek() {
-                            if **maybe_backslash == b'/' {
-                                _ = self.reader.next();
-                                for in_block_read in self.reader.by_ref() {
-                                    if *in_block_read == b'}' {
-                                        break;
-                                    } else {
-                                        temp.push(*in_block_read as char);
-                                    }
-                                }
-                                return Some(FlyToken::SnippetEnd(temp));
-                            }
+            if *next == b'{' || *next == b'[' {
+                let mut sd = SnippetDetails {
+                    is_ended: *next == b'{',
+                    ..Default::default()
+                };
+                if matches!(self.reader.peek(), Some(b' ')) {
+                    self.reader.next();
+                }
+                match self.reader.peek() {
+                    Some(val) if val.is_ascii_alphanumeric() => {}
+                    _ => {
+                        if *next == b'{' {
+                            return Some(FlyToken::Literal("{".to_string()));
                         }
+                        if *next == b'[' {
+                            return Some(FlyToken::Literal("[".to_string()));
+                        }
+                    }
+                }
 
-                        let mut sd = SnippetDetails::default();
-
-                        while let Some(in_block_read) = self.reader.next() {
-                            match *in_block_read as char {
-                                ' ' | '}' => {
-                                    if sd.main_token.is_empty() {
-                                        sd.main_token = temp;
-                                    } else if sd.secondary_token.is_empty() {
-                                        sd.secondary_token = temp;
-                                    } else {
-                                        sd.contents.push_str(&temp);
-                                        if *in_block_read == b' ' {
+                while let Some(in_block_read) = self.reader.next() {
+                    match *in_block_read as char {
+                        ' ' | '}' | ']' => {
+                            if sd.main_token.is_empty() {
+                                sd.main_token = temp;
+                            } else if sd.secondary_token.is_empty() {
+                                sd.secondary_token = temp;
+                            } else {
+                                sd.contents.push_str(&temp);
+                                if *in_block_read == b' ' {
+                                    match self.reader.peek() {
+                                        Some(b'}') | Some(b']') => {}
+                                        _ => {
                                             sd.contents.push(' ');
                                         }
                                     }
-                                    temp = String::new();
-                                    if *in_block_read == b'}' {
-                                        if sd.secondary_token.is_empty() && sd.contents.is_empty() {
-                                            sd.is_ended = true;
-                                        }
-                                        break;
-                                    }
-                                }
-                                ':' => {
-                                    sd.secondary_token = temp;
-                                    temp = String::new();
-                                }
-                                '/' => {
-                                    if matches!(self.reader.peek(), Some(b'}')) {
-                                        sd.is_ended = true;
-                                    }
-                                }
-                                _ => {
-                                    temp.push(*in_block_read as char);
                                 }
                             }
+                            temp = String::new();
+                            if (*in_block_read == b'}' && *next == b'{')
+                                || (*in_block_read == b']' && *next == b'[')
+                            {
+                                if *in_block_read == b']' {
+                                    while matches!(self.reader.peek(), Some(b'\n')) {
+                                        _ = self.reader.next()
+                                    }
+                                }
+                                if sd.main_token == "end" {
+                                    sd.is_ended = true;
+                                }
+                                break;
+                            }
                         }
-
-                        return Some(FlyToken::Snippet(sd));
+                        ':' if sd.secondary_token.is_empty() => {
+                            sd.secondary_token = temp;
+                            temp = String::new();
+                            if matches!(self.reader.peek(), Some(b' ')) {
+                                self.reader.next();
+                            }
+                        }
+                        _ => {
+                            temp.push(*in_block_read as char);
+                        }
                     }
-                    temp.push('{');
                 }
-                temp.push('$');
+                return Some(FlyToken::Snippet(sd));
             }
             temp.push(*next as char);
-            if matches!(self.reader.peek(), Some(b'$')) {
-                if temp.starts_with('\n') || temp.starts_with('\t') {
-                    temp.remove(0);
+            match self.reader.peek() {
+                Some(b'[') | Some(b'{') => {
+                    return Some(FlyToken::Literal(temp));
                 }
-                if temp.ends_with('\n') || temp.ends_with('\t') {
-                    temp.remove(temp.len() - 1);
-                }
-                return Some(FlyToken::Literal(temp));
+                _ => {}
             }
         }
 

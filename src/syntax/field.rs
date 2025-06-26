@@ -1,4 +1,4 @@
-use super::{FieldFunction, FieldType, FileContents, FunctionNamespace, Token};
+use super::{FieldFunction, FieldType, FileContents, Token};
 
 #[derive(Debug, Clone)]
 pub struct FieldLocation {
@@ -31,10 +31,10 @@ impl Field {
         self.field_type.as_ref().unwrap()
     }
 
-    pub fn functions_in_namespace(&self, ns: FunctionNamespace) -> Vec<&FieldFunction> {
+    pub fn functions_in_namespace(&self, ns: &str) -> Vec<&FieldFunction> {
         self.functions
             .iter()
-            .filter(|x| x.namespace == ns)
+            .filter(|x| x.namespace == *ns)
             .collect()
     }
 

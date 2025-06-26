@@ -2,7 +2,10 @@ use std::{collections::HashMap, fs::File, io::Read, path::PathBuf, process::exit
 
 use crate::blueprint::{Blueprint, BlueprintError, BlueprintFileReader};
 
-const CORE_BLUEPRINTS: &[&str] = &[include_str!("core/rust.blueprint")];
+const CORE_BLUEPRINTS: &[&str] = &[
+    include_str!("core/rust.blueprint"),
+    include_str!("core/postgres.blueprint"),
+];
 
 pub struct BlueprintStore {
     languages: HashMap<String, Blueprint>,

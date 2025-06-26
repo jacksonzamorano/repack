@@ -3,11 +3,6 @@ use super::{Field, Object, Output};
 #[derive(Debug)]
 #[repr(u32)]
 pub enum RepackErrorKind {
-    CannotWriteFile,
-    UnsupportedObjectType,
-    UnsupportedFieldType,
-    ObjectNotIncluded,
-    UnknownLanguage,
     CircularDependancy,
     RefFieldUnresolvable,
     JoinFieldUnresolvable,
@@ -21,8 +16,6 @@ pub enum RepackErrorKind {
     CustomTypeNotAllowed,
     CustomTypeNotDefined,
     TypeNotResolved,
-    ExpectedReference,
-    ExpectedArgument,
     SnippetNotFound,
     DuplicateFieldNames,
     UnknownExplicitJoin,
@@ -32,19 +25,9 @@ pub enum RepackErrorKind {
 impl RepackErrorKind {
     pub fn as_string(&self) -> &'static str {
         match self {
-            Self::UnsupportedObjectType => "This object isn't supported by this builder.",
-            Self::CannotWriteFile => "Cannot write to a requested file.",
-            Self::UnsupportedFieldType => "This builder doesn't support",
-            Self::ObjectNotIncluded => {
-                "The following object was required but not a part of this output:"
-            }
-            Self::ExpectedArgument => {
-                "This function expects more arguments, totalling"
-            }
             Self::CircularDependancy => {
                 "This definition creates a circular dependancy with:"
             }
-            Self::UnknownLanguage => "Repack doesn't recognize this language. Make sure you are running the latest version.",
             Self::RefFieldUnresolvable => "Could not resolve the 'ref' reference:",
             Self::JoinFieldUnresolvable => "Could not resolve the 'from' reference:",
             Self::ParentObjectDoesNotExist => "Parent object couldn't be found:",
@@ -58,9 +41,6 @@ impl RepackErrorKind {
                 "Custom types are not available in this context."
             }
             Self::CustomTypeNotDefined => "The custom type cannot be resolved:",
-            Self::ExpectedReference => {
-                "Expected a reference but got a local or join field."
-            },
             Self::TypeNotResolved => "This type couldn't be resolved.",
             Self::SnippetNotFound => "Expected to use snippet, but it couldn't be found:",
             Self::DuplicateFieldNames => "A field already exists with this name.",

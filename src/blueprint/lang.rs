@@ -9,8 +9,12 @@ use std::collections::HashMap;
 pub enum SnippetMainTokenName {
     Meta,
     If,
+    Ifn,
     Each,
     TypeDef,
+    Func,
+    Join,
+    Ref,
     Variable(String),
 }
 impl SnippetMainTokenName {
@@ -18,8 +22,12 @@ impl SnippetMainTokenName {
         match val {
             "meta" => Self::Meta,
             "if" => Self::If,
+            "ifn" => Self::Ifn,
             "each" => Self::Each,
             "define" => Self::TypeDef,
+            "func" => Self::Func,
+            "join" => Self::Join,
+            "ref" => Self::Ref,
             _ => Self::Variable(val.to_string()),
         }
     }
@@ -85,6 +93,8 @@ pub enum BlueprintError {
     CouldNotCreateContext(&'static str),
     TypeNotSupported(String),
     VariableNotFound(String),
+    InvalidFunctionSyntax,
+    FunctionMissingArgument(String, String),
 }
 impl BlueprintError {
     pub fn output(&self) -> String {
@@ -111,12 +121,6 @@ impl<'a> SnippetReference<'a> {
     pub fn secondary_token(&self) -> SnippetSecondaryTokenName {
         SnippetSecondaryTokenName::from_string(&self.details.secondary_token)
     }
-    pub fn from_content(content: &'a SectionContent) -> Self {
-        Self {
-            details: &content.details,
-            contents: &content.contents,
-        }
-    }
 }
 
 #[allow(dead_code)]
@@ -124,79 +128,84 @@ impl<'a> SnippetReference<'a> {
 pub struct Blueprint {
     pub id: String,
     pub name: String,
-    pub sections: HashMap<SnippetIdentifier, SectionContent>,
+    pub utilities: HashMap<SnippetIdentifier, SectionContent>,
+    pub tokens: Vec<FlyToken>,
 }
 impl Blueprint {
     pub fn new(mut reader: BlueprintFileReader) -> Result<Blueprint, BlueprintError> {
         let mut lang = Blueprint {
             id: String::new(),
             name: String::new(),
-            sections: HashMap::new(),
+            utilities: HashMap::new(),
+            tokens: Vec::new(),
         };
 
         loop {
             let Some(next) = reader.next() else {
                 break;
             };
-            if let FlyToken::Snippet(snip) = next {
+            if let FlyToken::Snippet(snip) = &next {
                 let (main, secondary) = (
                     SnippetMainTokenName::from_string(&snip.main_token),
                     SnippetSecondaryTokenName::from_string(&snip.secondary_token),
                 );
-                let mut content = SectionContent {
-                    details: snip,
-                    contents: Vec::new(),
-                    literal_string_value: String::new(),
-                };
-                let mut embed_count = 1;
-                if !content.details.is_ended {
-                    while let Some(in_block) = reader.next() {
-                        match &in_block {
-                            FlyToken::SnippetEnd(end_name)
-                                if *end_name == content.details.main_token =>
-                            {
-                                embed_count -= 1;
-                                if embed_count == 0 {
-                                    break;
+
+                match main {
+                    SnippetMainTokenName::TypeDef | SnippetMainTokenName::Meta => {
+                        let mut participating_tokens = Vec::new();
+                        if !snip.is_ended {
+                            while let Some(in_block) = reader.next() {
+                                match &in_block {
+                                    FlyToken::Snippet(det)
+                                        if det.main_token == "end"
+                                            && det.secondary_token == snip.main_token =>
+                                    {
+                                        break;
+                                    }
+                                    _ => {
+                                        participating_tokens.push(in_block);
+                                    }
                                 }
-                                content.contents.push(in_block);
                             }
-                            FlyToken::Snippet(embedded)
-                                if embedded.main_token == content.details.main_token =>
-                            {
-                                embed_count += 1;
-                                content.contents.push(in_block);
-                            }
-                            _ => content.contents.push(in_block),
                         }
+                        let mut literal_string_value = snip.contents.clone();
+                        for t in &participating_tokens {
+                            match t {
+                                FlyToken::Literal(val) => {
+                                    literal_string_value.push_str(val);
+                                }
+                                _ => {}
+                            }
+                        }
+
+                        let contents = SectionContent {
+                            contents: participating_tokens,
+                            details: snip.clone(),
+                            literal_string_value,
+                        };
+                        lang.utilities.insert((main, secondary), contents);
                     }
+                    _ => lang.tokens.push(next),
                 }
-                let mut content_literal_value = String::new();
-                content_literal_value.push_str(&content.details.contents);
-                for c in &content.contents {
-                    if let FlyToken::Literal(lit) = c {
-                        content_literal_value.push_str(lit)
-                    }
-                }
-                content.literal_string_value = content_literal_value;
-                lang.sections.insert((main, secondary), content);
+            } else {
+                lang.tokens.push(next);
             }
         }
 
         if let Some(id) = lang
-            .sections
+            .utilities
             .get(&(SnippetMainTokenName::Meta, SnippetSecondaryTokenName::Id))
         {
             lang.id = id.literal_string_value.clone();
         }
         if let Some(name) = lang
-            .sections
+            .utilities
             .get(&(SnippetMainTokenName::Meta, SnippetSecondaryTokenName::Name))
         {
             lang.name = name.literal_string_value.clone();
         }
 
-        dbg!(&lang);
+        dbg!(&lang.tokens);
 
         Ok(lang)
     }

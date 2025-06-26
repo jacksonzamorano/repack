@@ -1,27 +1,25 @@
-${meta id:rust/}
-${meta name:Rust Compiler/}
+{ meta id: rust }
+{ meta name: Rust }
 
-${define int32}i32${/define}
-${define int64}i64${/define}
-${define float64}f64${/define}
-${define string}string${/define}
-${define boolean}bool${/define}
-${define datetime}chrono::DateTime${/define}
+{ define int64: i64 }
+{ define int32: i32 }
+{ define float64: f64 }
+{ define string: String }
+{ define boolean: bool }
+{ define datetime: chrono::DateTime }
 
-${each object:\n}
-#[derive(Debug)]
-pub struct ${name} {
-	${each field:\n}
-	pub ${name}: ${if optional:Option</}${type}${if optional}>${/if}${if sep:, /}
-	${/each}
+[ each object ]
+pub struct {name} {
+[ each field ]
+	pub {name}: {if optional: Optional< }{type}{if optional: >}{if sep:,}
+[ end each ]
 }
-${/each}
+[ end each ]
 
-${each enum:\n}
-#[derive(Debug, Clone)]
-pub enum ${name} {
-	${each case:\n}
-	${name}${if sep:,/}
-	${/each}
+[ each enum ]
+pub enum {name} {
+[ each case ]
+	{ name }{ if sep: , }
+[ end each ]
 }
-${/each}
+[ end each ]

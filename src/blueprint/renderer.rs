@@ -1,17 +1,20 @@
-use std::{collections::HashMap, hash::Hash};
+use std::collections::HashMap;
 
-use crate::syntax::{Enum, Field, FieldType, Object, Output, ParseResult};
+use crate::syntax::{
+    Enum, Field, FieldLocation, FieldReferenceKind, FieldType, Object, Output, ParseResult,
+};
 
 use super::{
     Blueprint, BlueprintError, FlyToken, SnippetMainTokenName, SnippetReference,
     SnippetSecondaryTokenName,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct BlueprintExecutionContext<'a> {
-    variables: HashMap<&'a str, Option<&'a String>>,
+    variables: HashMap<String, Option<&'a String>>,
     flags: HashMap<&'a str, bool>,
     object: Option<&'a Object>,
+    field: Option<&'a Field>,
     enm: Option<&'a Enum>,
 }
 impl<'a> BlueprintExecutionContext<'a> {
@@ -20,14 +23,15 @@ impl<'a> BlueprintExecutionContext<'a> {
             variables: HashMap::new(),
             flags: HashMap::new(),
             object: None,
+            field: None,
             enm: None,
         }
     }
     fn from_object(obj: &'a Object) -> Self {
         let mut variables = HashMap::new();
         let mut flags = HashMap::new();
-        variables.insert("name", Some(&obj.name));
-        variables.insert("table_name", obj.table_name.as_ref());
+        variables.insert("name".to_string(), Some(&obj.name));
+        variables.insert("table_name".to_string(), obj.table_name.as_ref());
         flags.insert(
             "record",
             matches!(obj.object_type, crate::syntax::ObjectType::Record),
@@ -37,10 +41,12 @@ impl<'a> BlueprintExecutionContext<'a> {
             variables,
             flags,
             object: Some(obj),
+            field: None,
             enm: None,
         }
     }
     fn from_field(
+        obj: &'a Object,
         field: &'a Field,
         config: &'a Blueprint,
         is_last: bool,
@@ -51,7 +57,7 @@ impl<'a> BlueprintExecutionContext<'a> {
         let resolved_type = match field.field_type() {
             FieldType::Core(typ) => {
                 &config
-                    .sections
+                    .utilities
                     .get(&(
                         SnippetMainTokenName::TypeDef,
                         SnippetSecondaryTokenName::from_type(typ),
@@ -64,25 +70,27 @@ impl<'a> BlueprintExecutionContext<'a> {
             FieldType::Custom(typ, _) => typ,
         };
 
-        variables.insert("name", Some(&field.name));
-        variables.insert("type", Some(resolved_type));
+        variables.insert("name".to_string(), Some(&field.name));
+        variables.insert("type".to_string(), Some(resolved_type));
         flags.insert("optional", field.optional);
         flags.insert("sep", !is_last);
 
         Ok(Self {
             variables,
             flags,
-            object: None,
+            object: Some(obj),
+            field: Some(field),
             enm: None,
         })
     }
     fn from_enum(enm: &'a Enum) -> Result<Self, BlueprintError> {
         let mut variables = HashMap::new();
-        variables.insert("name", Some(&enm.name));
+        variables.insert("name".to_string(), Some(&enm.name));
         Ok(Self {
             variables,
             flags: HashMap::new(),
             object: None,
+            field: None,
             enm: Some(enm),
         })
     }
@@ -90,14 +98,15 @@ impl<'a> BlueprintExecutionContext<'a> {
         let mut variables = HashMap::new();
         let mut flags = HashMap::new();
 
-        variables.insert("name", Some(val));
-        variables.insert("value", Some(val));
+        variables.insert("name".to_string(), Some(val));
+        variables.insert("value".to_string(), Some(val));
         flags.insert("sep", !is_last);
 
         Ok(Self {
             variables,
             flags,
             object: None,
+            field: None,
             enm: None,
         })
     }
@@ -144,23 +153,23 @@ impl<'a> BlueprintRenderer<'a> {
                         while index < content.len() {
                             let in_block = &content[index];
                             match &in_block {
-                                FlyToken::SnippetEnd(end_name) if *end_name == snip.main_token => {
+                                FlyToken::Snippet(embedded)
+                                    if embedded.main_token == "end"
+                                        && embedded.secondary_token == snip.main_token =>
+                                {
                                     embed_count -= 1;
                                     if embed_count == 0 {
                                         break;
                                     }
-                                    index += 1;
                                 }
                                 FlyToken::Snippet(embedded)
                                     if embedded.main_token == snip.main_token =>
                                 {
                                     embed_count += 1;
-                                    index += 1;
                                 }
-                                _ => {
-                                    index += 1;
-                                }
+                                _ => {}
                             }
+                            index += 1;
                         }
                     }
                     value.push_str(&self.render_snippet(
@@ -176,6 +185,9 @@ impl<'a> BlueprintRenderer<'a> {
                 }
             };
         }
+        while value.starts_with('\n') {
+            value.remove(0);
+        }
         Ok(value)
     }
 
@@ -188,12 +200,18 @@ impl<'a> BlueprintRenderer<'a> {
         match content.main_token() {
             SnippetMainTokenName::Each => {
                 let mut splitter = content.details.contents.to_string();
-                if splitter == "\\n" {
-                    splitter = "\n".to_string()
-                }
+                splitter = splitter.replace("\\n", "\n");
+                value.push_str(&splitter);
                 match content.secondary_token() {
                     SnippetSecondaryTokenName::Object => {
-                        for obj in &self.parse_result.objects {
+                        let objects_included = self.parse_result.objects.iter().filter(|x| {
+                            self.config
+                                .categories
+                                .iter()
+                                .any(|cat| x.categories.contains(cat))
+                                && !self.config.exclude.contains(&x.name)
+                        });
+                        for obj in objects_included {
                             value.push_str(&self.render_tokens(
                                 content.contents,
                                 &BlueprintExecutionContext::from_object(obj),
@@ -211,6 +229,7 @@ impl<'a> BlueprintRenderer<'a> {
                             value.push_str(&self.render_tokens(
                                 content.contents,
                                 &BlueprintExecutionContext::from_field(
+                                    obj,
                                     field,
                                     self.blueprint,
                                     idx + 1 == obj.fields.len(),
@@ -220,7 +239,14 @@ impl<'a> BlueprintRenderer<'a> {
                         }
                     }
                     SnippetSecondaryTokenName::Enum => {
-                        for enm in &self.parse_result.enums {
+                        let enums_included = self.parse_result.enums.iter().filter(|x| {
+                            self.config
+                                .categories
+                                .iter()
+                                .any(|cat| x.categories.contains(cat))
+                                && !self.config.exclude.contains(&x.name)
+                        });
+                        for enm in enums_included {
                             value.push_str(&self.render_tokens(
                                 content.contents,
                                 &BlueprintExecutionContext::from_enum(enm)?,
@@ -256,6 +282,100 @@ impl<'a> BlueprintRenderer<'a> {
                     value.push_str(&self.render_tokens(content.contents, context)?);
                 }
             }
+            SnippetMainTokenName::Ifn => {
+                let token = &content.details.secondary_token;
+
+                if !context.flags.get(token.as_str()).copied().unwrap_or(false) {
+                    value.push_str(&content.details.contents);
+                    value.push_str(&self.render_tokens(content.contents, context)?);
+                }
+            }
+            SnippetMainTokenName::Func => {
+                let mut parts = content.details.secondary_token.split(".");
+                let namespace = parts.next().ok_or(BlueprintError::InvalidFunctionSyntax)?;
+                let name = parts.next().ok_or(BlueprintError::InvalidFunctionSyntax)?;
+                if let Some(field) = context.field {
+                    if let Some(matched_fn) = field
+                        .functions_in_namespace(namespace)
+                        .iter()
+                        .find(|func| func.name == name)
+                    {
+                        let mut updated_context = context.clone();
+                        for (idx, arg) in matched_fn.args.iter().enumerate() {
+                            updated_context.variables.insert(idx.to_string(), Some(arg));
+                        }
+
+                        value.push_str(&self.render_tokens(content.contents, &updated_context)?);
+                    }
+                }
+            }
+            SnippetMainTokenName::Join => {
+                if let Some(field) = context.field {
+                    if let Some(obj) = context.object {
+                        let mut u_context = context.clone();
+                        u_context
+                            .variables
+                            .insert("local_entity".to_string(), obj.table_name.as_ref());
+                        match &field.location.reference {
+                            FieldReferenceKind::Local => {}
+                            FieldReferenceKind::ImplicitJoin(entity_name) => {
+                                u_context
+                                    .variables
+                                    .insert("foreign_entity".to_string(), Some(entity_name));
+                                u_context.variables.insert(
+                                    "foreign_field".to_string(),
+                                    Some(&field.location.name),
+                                );
+
+                                value.push_str(&self.render_tokens(content.contents, &u_context)?);
+                            }
+                            FieldReferenceKind::FieldType(entity_name) => {
+                                u_context
+                                    .variables
+                                    .insert("foreign_entity".to_string(), Some(entity_name));
+                                u_context.variables.insert(
+                                    "foreign_field".to_string(),
+                                    Some(&field.location.name),
+                                );
+                                value.push_str(&self.render_tokens(content.contents, &u_context)?);
+                            }
+                            FieldReferenceKind::ExplicitJoin(join_name) => {
+                                u_context
+                                    .variables
+                                    .insert("foreign_entity".to_string(), Some(join_name));
+                                u_context.variables.insert(
+                                    "foreign_field".to_string(),
+                                    Some(&field.location.name),
+                                );
+                                value.push_str(&self.render_tokens(content.contents, &u_context)?);
+                            }
+                        };
+                    }
+                }
+            }
+            SnippetMainTokenName::Ref => {
+                if let Some(field) = context.field {
+                    if let Some(obj) = context.object {
+                        let mut u_context = context.clone();
+                        u_context
+                            .variables
+                            .insert("local_entity".to_string(), obj.table_name.as_ref());
+                        match &field.location.reference {
+                            FieldReferenceKind::FieldType(entity_name) => {
+                                u_context
+                                    .variables
+                                    .insert("foreign_entity".to_string(), Some(entity_name));
+                                u_context.variables.insert(
+                                    "foreign_field".to_string(),
+                                    Some(&field.location.name),
+                                );
+                                value.push_str(&self.render_tokens(content.contents, &u_context)?);
+                            }
+                            _ => {}
+                        };
+                    }
+                }
+            }
             SnippetMainTokenName::Variable(var) => {
                 if let Some(Some(var_val)) = context.variables.get(var.as_str()) {
                     value.push_str(var_val);
@@ -269,17 +389,11 @@ impl<'a> BlueprintRenderer<'a> {
 
     pub fn build(self) -> Result<(), BlueprintError> {
         let mut output = String::new();
-        for section in &self.blueprint.sections {
-            match section.0.0 {
-                SnippetMainTokenName::Each | SnippetMainTokenName::If => {
-                    output.push_str(&self.render_snippet(
-                        SnippetReference::from_content(section.1),
-                        &BlueprintExecutionContext::new(),
-                    )?);
-                }
-                _ => {}
-            }
-        }
+        output.push_str(
+            &self.render_tokens(&self.blueprint.tokens, &BlueprintExecutionContext::new())?,
+        );
+
+        dbg!(&self.blueprint.tokens);
 
         println!("{}", output);
 
