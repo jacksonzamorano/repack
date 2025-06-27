@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
 use super::{
-    CustomFieldType, Field, FieldType, FileContents, ObjectFunction,
-    RepackError, RepackErrorKind, Token, field::FieldReferenceKind,
+    CustomFieldType, Field, FieldType, FileContents, ObjectFunction, RepackError, RepackErrorKind,
+    Token, field::FieldReferenceKind,
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -11,7 +11,7 @@ pub enum ObjectType {
     Struct,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ObjectJoin {
     pub join_name: String,
     pub local_field: String,

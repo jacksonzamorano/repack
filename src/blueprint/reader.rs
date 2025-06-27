@@ -60,7 +60,10 @@ impl<'a> BlueprintFileReader<'a> {
                             } else {
                                 sd.contents.push_str(&temp);
                             }
-                            if let SnippetMainTokenName::Variable(_) = SnippetMainTokenName::from_string(&sd.main_token) { sd.autoclose = true }
+                            match SnippetMainTokenName::from_string(&sd.main_token) {
+                                SnippetMainTokenName::Variable(_) | SnippetMainTokenName::PlaceImports => sd.autoclose = true,
+                                _ => {}
+                            }
                             if !sd.autoclose {
                                 while let Some(tok) = self.reader.peek() {
                                     match tok {

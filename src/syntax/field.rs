@@ -51,7 +51,7 @@ impl Field {
             ),
             Token::From => {
                 contents.skip(); // Skip (
-                let Some(Token::Literal(entity_name)) = contents.take() else {
+                let Some(Token::Literal(join_field_name)) = contents.take() else {
                     return None;
                 };
                 contents.skip(); // Skip .
@@ -63,7 +63,7 @@ impl Field {
                     None,
                     None,
                     FieldLocation {
-                        reference: FieldReferenceKind::ImplicitJoin(entity_name),
+                        reference: FieldReferenceKind::ImplicitJoin(join_field_name),
                         name: field_name,
                     },
                 )

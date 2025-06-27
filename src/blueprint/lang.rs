@@ -18,6 +18,9 @@ pub enum SnippetMainTokenName {
     Func,
     Join,
     Ref,
+    Link,
+    Import,
+    PlaceImports,
     Variable(String),
 }
 impl SnippetMainTokenName {
@@ -34,6 +37,9 @@ impl SnippetMainTokenName {
             "join" => Self::Join,
             "ref" => Self::Ref,
             "file" => Self::File,
+            "link" => Self::Link,
+            "import" => Self::Import,
+            "imports" => Self::PlaceImports,
             _ => Self::Variable(val.to_string()),
         }
     }
@@ -57,6 +63,8 @@ pub enum SnippetSecondaryTokenName {
     DateTime,
     Boolean,
 
+    Join,
+
     Arbitrary(String),
 }
 impl SnippetSecondaryTokenName {
@@ -71,6 +79,7 @@ impl SnippetSecondaryTokenName {
             "field" => Self::Field,
             "enum" => Self::Enum,
             "case" => Self::Case,
+            "join" => Self::Join,
             _ => Self::Arbitrary(val.to_string()),
         }
     }
@@ -107,6 +116,7 @@ impl<'a> SnippetReference<'a> {
 pub struct Blueprint {
     pub id: String,
     pub name: String,
+    pub links: HashMap<String, String>,
     pub utilities: HashMap<SnippetIdentifier, String>,
     pub tokens: Vec<FlyToken>,
 }
@@ -115,6 +125,7 @@ impl Blueprint {
         let mut lang = Blueprint {
             id: String::new(),
             name: String::new(),
+            links: HashMap::new(),
             utilities: HashMap::new(),
             tokens: Vec::new(),
         };
@@ -154,11 +165,64 @@ impl Blueprint {
                         lang.utilities
                             .insert((main, secondary), literal_string_value);
                     }
+                    SnippetMainTokenName::Link => {
+                        let mut participating_tokens = Vec::new();
+                        if !snip.autoclose {
+                            while let Some(in_block) = reader.next() {
+                                match &in_block {
+                                    FlyToken::Close(det) if *det == snip.main_token => {
+                                        break;
+                                    }
+                                    _ => {
+                                        participating_tokens.push(in_block);
+                                    }
+                                }
+                            }
+                        }
+                        let mut literal_string_value = snip.contents.clone();
+                        for t in &participating_tokens {
+                            if let FlyToken::Literal(val) = t {
+                                literal_string_value.push_str(val);
+                            }
+                        }
+                        lang.links
+                            .insert(snip.secondary_token.to_string(), literal_string_value);
+                    }
                     _ => lang.tokens.push(next),
                 }
             } else {
                 lang.tokens.push(next);
             }
+        }
+
+        // Trim extra chars
+        let mut i = 0;
+        while i + 1 < lang.tokens.len() {
+            match &lang.tokens[i + 1] {
+                FlyToken::Snippet(snip) => {
+                    let autoclose = snip.autoclose;
+                    match &mut lang.tokens[i] {
+                        FlyToken::Literal(lit) => {
+                            if !autoclose {
+                                while lit.ends_with('\n') || lit.ends_with('\t') {
+                                    lit.pop();
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                FlyToken::Close(_) => match &mut lang.tokens[i] {
+                    FlyToken::Literal(lit) => {
+                        while lit.ends_with('\n') || lit.ends_with('\t') {
+                            lit.pop();
+                        }
+                    }
+                    _ => {}
+                },
+                _ => {}
+            }
+            i += 1;
         }
 
         if let Some(id) = lang

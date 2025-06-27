@@ -3,6 +3,7 @@
 
 [define int32]INT4[/define]
 [define int64]INT8[/define]
+[define uuid]UUID[/define]
 [define float64]FLOAT8[/define]
 [define string]TEXT[/define]
 [define boolean]BOOL[/define]
@@ -13,16 +14,39 @@
 BEGIN;
 
 [eachr object]
-DROP TABLE IF EXISTS [name];
+[ifn syn]
+DROP TABLE IF EXISTS [table_name];
+[/ifn]
+[if syn]
+DROP VIEW IF EXISTS [name];
+[/if]
 [/eachr]
 
 
 [each object]
-CREATE TABLE [name] (
+[ifn syn]
+CREATE TABLE [table_name] (
 [each field]
-	[name] [type][ifn optional] NOT NULL[/ifn][func db.default] DEFAULT {0}[/func][ref] FOREIGN KEY REFERENCES [foreign_entity]([foreign_field])[/ref][if sep],[/if]
+	[name] [type][ifn optional] NOT NULL[/ifn][func db.default] DEFAULT {0}[/func][func db.pk] PRIMARY KEY[/func]
+	[ref],
+	FOREIGN KEY ([name]) REFERENCES [foreign_table]([foreign_field])
+	[/ref]
+	[if sep],[/if]
 [/each]
 );
+[/ifn]
+
+[if syn]
+CREATE VIEW [name] AS
+SELECT
+[each field]
+	[ref_entity].[ref_field] AS [name][if sep],[/if]
+[/each]
+FROM [table_name]
+[each join]
+INNER JOIN [ref_entity] [name] ON [local_entity].[local_field] = [name].[ref_field][if sep],[/if][ifn sep];[/ifn]
+[/each]
+[/if]
 [/each]
 
 COMMIT;

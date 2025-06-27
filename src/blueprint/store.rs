@@ -9,6 +9,7 @@ const CORE_BLUEPRINTS: &[&str] = &[
     include_str!("core/rust.blueprint"),
     include_str!("core/postgres.blueprint"),
     include_str!("core/typescript.blueprint"),
+    include_str!("core/go.blueprint"),
 ];
 
 pub struct BlueprintStore {

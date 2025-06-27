@@ -1,112 +1,30 @@
-// blueprint "overview.blueprint"
-
-// Provide a base, with ID and created date.
-// All DB models will inherit.
-snippet base {
-	id int32 db:primary_key db:identity db:unique
-	created_date datetime db:default("NOW()")
+output postgres @test/postgres #model #view;
+output typescript @test/typescript #model #view;
+output rust @test/rust #model #view;
+output go @test/go #model #view {
+	package main
 }
 
-// Provide a reference to Organization
-// and an index for all related objects
-snippet org_linked {
-	org_id ref(Organization.id)
-	db:index("org_id")
-}
-
-// output description @test/description;
-// output postgres @test/postgres #models #views;
-// output typescript_class @test/ts_classes #data {
-	make_index true
-}
-output typescript @test/typescript #data {
-	make_index true
-}
-// output typescript_drizzle @test/ts_drizzle #models;
-output rust @test/rust_vanilla #data #private;
-// output rust_tusk @test/rust_tusk #models #views;
-output postgres @test/postgres #models #views;
-
-record User @users #private #models {
-	!base
-	!org_linked
-	name string
-	email string
-	password string
-	login_count int64 db:default("0")
-	last_login datetime?
-	total_cost float64 db:default("0")
-	permission UserPermission
-}
-
-struct UserCreateDto {
-	email string
-	password string
-	name string
-}
-
-record Organization @organizations #models #data {
-	!base
-	name string
-	email string
-}
-
-record TodoWithList: Todo #data {
-	^ list self.list_id = List.id
-	list_title with(list.title)
-}
-
-record Todo @todos #models #data {
-	!base
-	!org_linked
-	done boolean
-	title string
-	description string
-	creator_user_id ref(User.id)
-	assigned_user_id ref(User.id)?
-	list_id ref(List.id)?
-	db:index("done", "org_id")
-}
-
-record List @lists #models #data {
-	!base
-	!org_linked
-	title string
-	description string
-	creator_user_id ref(User.id)
-}
-
-record Product @products #models #data {
-	!base
-	monthly_price int32
-	yearly_price int32
-	db:check("monthly_price < yearly_price")
-}
-
-record UserPublic: User #data {
-	*
-	- password
-}
-
-record AllUserList: UserPublic #views {
-	*
-	org_name from(org_id.name)
-	- personal_org_id
-	- password
-}
-
-struct OrganizationDirectory #data {
-	organization Organization
-	users UserPublic[]
-}
-
-record TempIdList @id_list #models {
-	id int32 db:pk
-	db:temporary
-}
-
-enum UserPermission #models #data #private {
-	Guest
-	User
+enum UserType #model {
 	Admin
+	User
+	Guest
+}
+
+record User @users #model {
+	id uuid db:pk
+	name string
+	user_type UserType
+	subscription_id string?
+}
+
+record ContactInfo @contacts #model {
+	id uuid db:pk
+	email string
+	user_id ref(User.id)
+}
+
+record FullUser: ContactInfo #view {
+	*
+	name from(user_id.name)
 }

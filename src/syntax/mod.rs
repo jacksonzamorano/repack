@@ -18,7 +18,7 @@ pub use field::*;
 pub use field_function::*;
 pub use language::Output;
 pub use obj_function::*;
-pub use object::{Object, ObjectType};
+pub use object::{Object, ObjectJoin, ObjectType};
 pub use parser::FileContents;
 pub use result::ParseResult;
 pub use snippet::*;

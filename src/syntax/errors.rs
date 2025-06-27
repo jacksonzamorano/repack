@@ -19,8 +19,8 @@ pub enum RepackErrorKind {
     SnippetNotFound,
     DuplicateFieldNames,
     UnknownExplicitJoin,
-    ExplicitJoinObjectNotFound,
-    ExplicitJoinFieldNotFound,
+    JoinObjectNotFound,
+    JoinFieldNotFound,
     CannotCreateContext,
     FunctionInvalidSyntax,
     TypeNotSupported,
@@ -47,11 +47,11 @@ impl RepackErrorKind {
             Self::SnippetNotFound => "Expected to use snippet, but it couldn't be found:",
             Self::DuplicateFieldNames => "A field already exists with this name.",
             Self::UnknownExplicitJoin => "Unknown explicit join:",
-            Self::ExplicitJoinObjectNotFound => {
-                "Tried to explicitly join but the object was not found:"
+            Self::JoinObjectNotFound => {
+                "Tried to join but the object was not found:"
             }
-            Self::ExplicitJoinFieldNotFound => {
-                "Tried to explicitly join but the field was not found:"
+            Self::JoinFieldNotFound => {
+                "Tried to join but the field was not found:"
             }
             Self::CannotCreateContext => "Cannot create a context:",
             Self::FunctionInvalidSyntax => "Function syntax is not vaild:",

@@ -1,13 +1,12 @@
 use std::{
     collections::{HashMap, HashSet},
-    env::current_dir,
-    fmt::Debug,
+    env::{current_dir, var},
     fs::{self},
 };
 
 use crate::syntax::{
-    Enum, Field, FieldReferenceKind, FieldType, Object, Output, ParseResult, RepackError,
-    RepackErrorKind,
+    Enum, Field, FieldReferenceKind, FieldType, Object, ObjectJoin, Output, ParseResult,
+    RepackError, RepackErrorKind,
 };
 
 use super::{
@@ -16,7 +15,7 @@ use super::{
 
 #[derive(Debug, Clone)]
 struct BlueprintExecutionContext<'a> {
-    variables: HashMap<String, Option<&'a String>>,
+    variables: HashMap<String, String>,
     flags: HashMap<&'a str, bool>,
     object: Option<&'a Object>,
     field: Option<&'a Field>,
@@ -35,12 +34,15 @@ impl<'a> BlueprintExecutionContext<'a> {
     fn with_object(&self, obj: &'a Object) -> Self {
         let mut variables = HashMap::new();
         let mut flags = HashMap::new();
-        variables.insert("name".to_string(), Some(&obj.name));
-        variables.insert("table_name".to_string(), obj.table_name.as_ref());
+        variables.insert("name".to_string(), obj.name.to_string());
+        if let Some(tn) = obj.table_name.as_ref() {
+            variables.insert("table_name".to_string(), tn.to_string());
+        }
         flags.insert(
             "record",
             matches!(obj.object_type, crate::syntax::ObjectType::Record),
         );
+        flags.insert("syn", obj.inherits.is_some());
 
         Self {
             variables,
@@ -56,6 +58,7 @@ impl<'a> BlueprintExecutionContext<'a> {
         field: &'a Field,
         blueprint: &'a Blueprint,
         config: &Output,
+        writer: &mut dyn TokenConsumer,
         is_last: bool,
     ) -> Result<Self, RepackError> {
         let mut variables = HashMap::new();
@@ -63,6 +66,10 @@ impl<'a> BlueprintExecutionContext<'a> {
 
         let resolved_type = match field.field_type() {
             FieldType::Core(typ) => {
+                if let Some(link) = blueprint.links.get(&typ.to_string()) {
+                    writer.import(link.to_string());
+                }
+
                 blueprint
                     .utilities
                     .get(&(
@@ -79,11 +86,33 @@ impl<'a> BlueprintExecutionContext<'a> {
                         )
                     })?
             }
-            FieldType::Custom(typ, _) => typ,
+            FieldType::Custom(typ, _) => {
+                if let Some(link) = blueprint.links.get("custom") {
+                    writer.import(link.replace("$", typ))
+                }
+                typ
+            }
         };
 
-        variables.insert("name".to_string(), Some(&field.name));
-        variables.insert("type".to_string(), Some(resolved_type));
+        let (name, loc) = match &field.location.reference {
+            FieldReferenceKind::Local | FieldReferenceKind::FieldType(_) => (
+                field.name.clone(),
+                obj.table_name
+                    .as_ref()
+                    .map(|x| x.to_string())
+                    .unwrap_or_default(),
+            ),
+            FieldReferenceKind::ImplicitJoin(local_field_name) => (
+                field.location.name.clone(),
+                format!("j_{}", local_field_name),
+            ),
+            FieldReferenceKind::ExplicitJoin(jn) => (field.location.name.clone(), jn.to_string()),
+        };
+        variables.insert("ref_entity".to_string(), loc);
+        variables.insert("ref_field".to_string(), name);
+        variables.insert("object_name".to_string(), obj.name.to_string());
+        variables.insert("name".to_string(), field.name.to_string());
+        variables.insert("type".to_string(), resolved_type.to_string());
         flags.insert("optional", field.optional);
         flags.insert("sep", !is_last);
 
@@ -95,9 +124,37 @@ impl<'a> BlueprintExecutionContext<'a> {
             enm: None,
         })
     }
+    fn with_join(
+        &self,
+        obj: &'a Object,
+        join: &'a ObjectJoin,
+        is_last: bool,
+    ) -> Result<Self, RepackError> {
+        let mut variables = HashMap::new();
+        let mut flags = HashMap::new();
+
+        variables.insert("name".to_string(), join.join_name.to_string());
+        if let Some(tn) = obj.table_name.as_ref() {
+            variables.insert("local_entity".to_string(), tn.to_string());
+        }
+        variables.insert("local_field".to_string(), join.local_field.to_string());
+        variables.insert("ref_field".to_string(), join.foreign_field.to_string());
+        variables.insert("ref_entity".to_string(), join.foreign_entity.to_string());
+
+        flags.insert("sep", is_last);
+
+        Ok(Self {
+            variables,
+            flags,
+            object: Some(obj),
+            field: None,
+            enm: None,
+        })
+    }
+
     fn with_enum(&self, enm: &'a Enum) -> Result<Self, RepackError> {
         let mut variables = HashMap::new();
-        variables.insert("name".to_string(), Some(&enm.name));
+        variables.insert("name".to_string(), enm.name.to_string());
         Ok(Self {
             variables,
             flags: HashMap::new(),
@@ -106,12 +163,18 @@ impl<'a> BlueprintExecutionContext<'a> {
             enm: Some(enm),
         })
     }
-    fn with_enum_case(&self, val: &'a String, is_last: bool) -> Result<Self, RepackError> {
+    fn with_enum_case(
+        &self,
+        enm: &'a Enum,
+        val: &'a String,
+        is_last: bool,
+    ) -> Result<Self, RepackError> {
         let mut variables = HashMap::new();
         let mut flags = HashMap::new();
 
-        variables.insert("name".to_string(), Some(val));
-        variables.insert("value".to_string(), Some(val));
+        variables.insert("enum_name".to_string(), enm.name.to_string());
+        variables.insert("name".to_string(), val.to_string());
+        variables.insert("value".to_string(), val.to_string());
         flags.insert("sep", !is_last);
 
         Ok(Self {
@@ -126,11 +189,19 @@ impl<'a> BlueprintExecutionContext<'a> {
 
 trait TokenConsumer {
     fn set_file_name(&mut self, filename: &str);
+    fn import_point(&mut self);
     fn write(&mut self, value: &dyn AsRef<str>);
+    fn import(&mut self, value: String);
 }
+enum DeliveryUnit {
+    Text(String),
+    Imports,
+}
+
 #[derive(Default)]
 struct BlueprintBuildResult {
-    contents: HashMap<String, String>,
+    contents: HashMap<String, Vec<DeliveryUnit>>,
+    imports: HashMap<String, HashSet<String>>,
     current_file_name: Option<String>,
 }
 impl TokenConsumer for BlueprintBuildResult {
@@ -140,10 +211,33 @@ impl TokenConsumer for BlueprintBuildResult {
     fn write(&mut self, value: &dyn AsRef<str>) {
         if let Some(file) = &self.current_file_name {
             if let Some(current) = self.contents.get_mut(file) {
-                current.push_str(value.as_ref());
+                current.push(DeliveryUnit::Text(value.as_ref().to_string()));
+            } else {
+                self.contents.insert(
+                    file.to_string(),
+                    vec![DeliveryUnit::Text(value.as_ref().to_string())],
+                );
+            }
+        }
+    }
+    fn import(&mut self, value: String) {
+        if let Some(file) = &self.current_file_name {
+            if let Some(current) = self.imports.get_mut(file) {
+                current.insert(value);
+            } else {
+                let mut new = HashSet::new();
+                new.insert(value);
+                self.imports.insert(file.to_string(), new);
+            }
+        }
+    }
+    fn import_point(&mut self) {
+        if let Some(file) = &self.current_file_name {
+            if let Some(current) = self.contents.get_mut(file) {
+                current.push(DeliveryUnit::Imports);
             } else {
                 self.contents
-                    .insert(file.to_string(), value.as_ref().to_string());
+                    .insert(file.to_string(), vec![DeliveryUnit::Imports]);
             }
         }
     }
@@ -153,12 +247,16 @@ impl TokenConsumer for HashSet<String> {
         self.insert(filename.to_string());
     }
     fn write(&mut self, _value: &dyn AsRef<str>) {}
+    fn import(&mut self, _value: String) {}
+    fn import_point(&mut self) {}
 }
 impl TokenConsumer for String {
     fn set_file_name(&mut self, _filename: &str) {}
     fn write(&mut self, value: &dyn AsRef<str>) {
         self.push_str(value.as_ref());
     }
+    fn import(&mut self, _value: String) {}
+    fn import_point(&mut self) {}
 }
 
 pub struct BlueprintRenderer<'a> {
@@ -304,15 +402,36 @@ impl<'a> BlueprintRenderer<'a> {
                             fields.reverse();
                         }
                         for (idx, field) in fields.iter().enumerate() {
+                            let ctx = &context.with_field(
+                                obj,
+                                field,
+                                self.blueprint,
+                                self.config,
+                                writer,
+                                idx + 1 == obj.fields.len(),
+                            )?;
+                            self.render_tokens(content.contents, ctx, writer)?;
+                            if !inline {
+                                writer.write(&"\n");
+                            }
+                        }
+                    }
+                    SnippetSecondaryTokenName::Join => {
+                        let Some(obj) = context.object else {
+                            return Err(RepackError::from_lang_with_msg(
+                                RepackErrorKind::CannotCreateContext,
+                                self.config,
+                                "join in non-object context.".to_string(),
+                            ));
+                        };
+                        let mut joins = obj.joins.iter().collect::<Vec<_>>();
+                        if rev {
+                            joins.reverse();
+                        }
+                        for (idx, j) in joins.iter().enumerate() {
                             self.render_tokens(
                                 content.contents,
-                                &context.with_field(
-                                    obj,
-                                    field,
-                                    self.blueprint,
-                                    self.config,
-                                    idx + 1 == obj.fields.len(),
-                                )?,
+                                &context.with_join(obj, j, idx + 1 == obj.fields.len())?,
                                 writer,
                             )?;
                             if !inline {
@@ -358,7 +477,7 @@ impl<'a> BlueprintRenderer<'a> {
                         for (idx, case) in cases.iter().enumerate() {
                             self.render_tokens(
                                 content.contents,
-                                &context.with_enum_case(case, idx + 1 == enm.options.len())?,
+                                &context.with_enum_case(enm, case, idx + 1 == enm.options.len())?,
                                 writer,
                             )?;
                             if !inline {
@@ -409,54 +528,12 @@ impl<'a> BlueprintRenderer<'a> {
                     {
                         let mut updated_context = context.clone();
                         for (idx, arg) in matched_fn.args.iter().enumerate() {
-                            updated_context.variables.insert(idx.to_string(), Some(arg));
+                            updated_context
+                                .variables
+                                .insert(idx.to_string(), arg.to_string());
                         }
 
                         self.render_tokens(content.contents, &updated_context, writer)?;
-                    }
-                }
-            }
-            SnippetMainTokenName::Join => {
-                if let Some(field) = context.field {
-                    if let Some(obj) = context.object {
-                        let mut u_context = context.clone();
-                        u_context
-                            .variables
-                            .insert("local_entity".to_string(), obj.table_name.as_ref());
-                        match &field.location.reference {
-                            FieldReferenceKind::Local => {}
-                            FieldReferenceKind::ImplicitJoin(entity_name) => {
-                                u_context
-                                    .variables
-                                    .insert("foreign_entity".to_string(), Some(entity_name));
-                                u_context.variables.insert(
-                                    "foreign_field".to_string(),
-                                    Some(&field.location.name),
-                                );
-
-                                self.render_tokens(content.contents, &u_context, writer)?;
-                            }
-                            FieldReferenceKind::FieldType(entity_name) => {
-                                u_context
-                                    .variables
-                                    .insert("foreign_entity".to_string(), Some(entity_name));
-                                u_context.variables.insert(
-                                    "foreign_field".to_string(),
-                                    Some(&field.location.name),
-                                );
-                                self.render_tokens(content.contents, &u_context, writer)?;
-                            }
-                            FieldReferenceKind::ExplicitJoin(join_name) => {
-                                u_context
-                                    .variables
-                                    .insert("foreign_entity".to_string(), Some(join_name));
-                                u_context.variables.insert(
-                                    "foreign_field".to_string(),
-                                    Some(&field.location.name),
-                                );
-                                self.render_tokens(content.contents, &u_context, writer)?;
-                            }
-                        };
                     }
                 }
             }
@@ -464,26 +541,95 @@ impl<'a> BlueprintRenderer<'a> {
                 if let Some(field) = context.field {
                     if let Some(obj) = context.object {
                         let mut u_context = context.clone();
-                        u_context
-                            .variables
-                            .insert("local_entity".to_string(), obj.table_name.as_ref());
+                        if let Some(tn) = obj.table_name.as_ref() {
+                            u_context
+                                .variables
+                                .insert("local_entity".to_string(), tn.to_string());
+                        }
                         if let FieldReferenceKind::FieldType(entity_name) =
                             &field.location.reference
                         {
+                            if let Some(entity) = self
+                                .parse_result
+                                .objects
+                                .iter()
+                                .find(|x| x.name == *entity_name)
+                            {
+                                if let Some(e_tn) = entity.table_name.as_ref() {
+                                    u_context
+                                        .variables
+                                        .insert("foreign_table".to_string(), e_tn.to_string());
+                                }
+                            }
                             u_context
                                 .variables
-                                .insert("foreign_entity".to_string(), Some(entity_name));
-                            u_context
-                                .variables
-                                .insert("foreign_field".to_string(), Some(&field.location.name));
+                                .insert("foreign_entity".to_string(), entity_name.to_string());
+                            u_context.variables.insert(
+                                "foreign_field".to_string(),
+                                field.location.name.to_string(),
+                            );
                             self.render_tokens(content.contents, &u_context, writer)?;
                         };
                     }
                 }
             }
+            SnippetMainTokenName::PlaceImports => {
+                writer.import_point();
+            }
+            SnippetMainTokenName::Import => {
+                if let Some(import) = self.blueprint.links.get(&content.details.secondary_token) {
+                    writer.import(import.clone());
+                }
+            }
             SnippetMainTokenName::Variable(var) => {
-                if let Some(Some(var_val)) = context.variables.get(var.as_str()) {
-                    writer.write(&var_val);
+                let mut components = var.split(".");
+                let name = components.next().unwrap();
+                if let Some(mut res) = context.variables.get(name).map(|x| x.to_string()) {
+                    for transform in components {
+                        match transform {
+                            "uppercase" => res = res.to_uppercase(),
+                            "lowercase" => res = res.to_lowercase(),
+                            "titlecase" => {
+                                res = res
+                                    .split('_')
+                                    .map(|x| {
+                                        let mut chars = x.chars();
+                                        match chars.next() {
+                                            None => String::new(),
+                                            Some(first) => {
+                                                first.to_uppercase().collect::<String>()
+                                                    + &chars.as_str().to_lowercase()
+                                            }
+                                        }
+                                    })
+                                    .collect::<Vec<_>>()
+                                    .join("")
+                            }
+                            "camelcase" => {
+                                res = res
+                                    .split('_')
+                                    .enumerate()
+                                    .map(|(i, x)| {
+                                        if i > 0 {
+                                            let mut chars = x.chars();
+                                            match chars.next() {
+                                                None => String::new(),
+                                                Some(first) => {
+                                                    first.to_uppercase().collect::<String>()
+                                                        + &chars.as_str().to_lowercase()
+                                                }
+                                            }
+                                        } else {
+                                            x.to_string()
+                                        }
+                                    })
+                                    .collect::<Vec<_>>()
+                                    .join("")
+                            }
+                            _ => {}
+                        }
+                    }
+                    writer.write(&res);
                 }
             }
             _ => {}
@@ -494,20 +640,40 @@ impl<'a> BlueprintRenderer<'a> {
 
     pub fn build(&mut self) -> Result<(), RepackError> {
         let mut files = BlueprintBuildResult::default();
-        _ = &self.render_tokens(
-            &self.blueprint.tokens,
-            &BlueprintExecutionContext::new(),
-            &mut files,
-        )?;
+        let mut context = BlueprintExecutionContext::new();
+        for opt in &self.config.options {
+            context
+                .variables
+                .insert(opt.0.to_string(), opt.1.to_string());
+        }
+        _ = &self.render_tokens(&self.blueprint.tokens, &mut context, &mut files)?;
         let mut path = current_dir().unwrap();
         if let Some(loc) = &self.config.location {
             path.push(loc);
         }
         _ = fs::create_dir_all(&path);
-        for f in &files.contents {
+        for f in files.contents {
             let mut file = path.clone();
-            file.push(f.0);
-            fs::write(file, f.1).map_err(|_| {
+            file.push(&f.0);
+
+            let mut write_value = String::new();
+            for part in f.1 {
+                match part {
+                    DeliveryUnit::Text(txt) => write_value.push_str(&txt),
+                    DeliveryUnit::Imports => {
+                        if let Some(imports) = files.imports.remove(&f.0) {
+                            write_value.push_str("\n");
+                            for import in imports.into_iter() {
+                                write_value.push_str(&import);
+                                write_value.push_str("\n");
+                            }
+                            write_value.push_str("\n");
+                        }
+                    }
+                }
+            }
+
+            fs::write(file, write_value).map_err(|_| {
                 RepackError::from_lang_with_msg(
                     RepackErrorKind::CannotWrite,
                     self.config,

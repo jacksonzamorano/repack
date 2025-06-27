@@ -1,8 +1,8 @@
 use crate::syntax::FieldReferenceKind;
 
 use super::{
-    CustomFieldType, Enum, FieldType, FileContents, Object, ObjectType, Output, RepackError,
-    RepackErrorKind, Snippet, Token, dependancies::graph_valid, language,
+    CustomFieldType, Enum, FieldType, FileContents, Object, ObjectJoin, ObjectType, Output,
+    RepackError, RepackErrorKind, Snippet, Token, dependancies::graph_valid, language,
 };
 
 #[derive(Debug)]
@@ -10,7 +10,7 @@ pub struct ParseResult {
     pub objects: Vec<Object>,
     pub languages: Vec<Output>,
     pub enums: Vec<Enum>,
-    pub include_blueprints: Vec<String>
+    pub include_blueprints: Vec<String>,
 }
 
 impl ParseResult {
@@ -149,6 +149,8 @@ impl ParseResult {
                         }
                     }
                 }
+                let mut parent_joins = objects[parent_obj_idx].joins.clone();
+                objects[object_idx].joins.append(&mut parent_joins);
                 objects[object_idx].table_name = objects[parent_obj_idx].table_name.clone();
                 objects[object_idx]
                     .fields
@@ -265,8 +267,23 @@ impl ParseResult {
                                 field_idx += 1;
                                 continue;
                             };
+                            let j = ObjectJoin {
+                                join_name: format!(
+                                    "j_{}",
+                                    objects[object_idx].fields[field_idx].name
+                                ),
+                                local_field: objects[object_idx].fields[field_idx].name.to_string(),
+                                condition: "=".to_string(),
+                                foreign_entity: referenced_entity
+                                    .table_name
+                                    .as_ref()
+                                    .unwrap()
+                                    .to_string(),
+                                foreign_field: referenced_foreign_field.name.to_string(),
+                            };
                             objects[object_idx].fields[field_idx].field_type =
                                 referenced_foreign_field.field_type.clone();
+                            objects[object_idx].joins.push(j);
                         }
                         FieldReferenceKind::ExplicitJoin(join_name) => {
                             let Some(join) = objects[object_idx]
@@ -287,7 +304,7 @@ impl ParseResult {
                                 objects.iter().find(|x| x.name == *join.foreign_entity)
                             else {
                                 errors.push(RepackError::from_field_with_msg(
-                                    RepackErrorKind::ExplicitJoinObjectNotFound,
+                                    RepackErrorKind::JoinObjectNotFound,
                                     &objects[object_idx],
                                     &objects[object_idx].fields[field_idx],
                                     join.foreign_entity.to_string(),
@@ -298,10 +315,10 @@ impl ParseResult {
                             let Some(field) = foreign_entity
                                 .fields
                                 .iter()
-                                .find(|x| x.name == *join.foreign_field) else 
-                            {
+                                .find(|x| x.name == *join.foreign_field)
+                            else {
                                 errors.push(RepackError::from_field_with_msg(
-                                    RepackErrorKind::ExplicitJoinFieldNotFound,
+                                    RepackErrorKind::JoinFieldNotFound,
                                     &objects[object_idx],
                                     &objects[object_idx].fields[field_idx],
                                     join.foreign_field.to_string(),
@@ -309,7 +326,8 @@ impl ParseResult {
                                 field_idx += 1;
                                 continue;
                             };
-                            objects[object_idx].fields[field_idx].field_type = field.field_type.clone();
+                            objects[object_idx].fields[field_idx].field_type =
+                                field.field_type.clone();
                         }
                     }
                 }
@@ -353,7 +371,7 @@ impl ParseResult {
                 objects,
                 languages,
                 enums,
-                include_blueprints
+                include_blueprints,
             })
         }
     }

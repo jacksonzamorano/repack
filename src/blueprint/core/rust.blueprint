@@ -7,6 +7,8 @@
 [define string]String[/define]
 [define boolean]bool[/define]
 [define datetime]chrono::DateTime[/define]
+[define uuid]uuid::Uuid[/define]
+[link uuid]use uuid::Uuid;[/link]
 
 [file]model.rs[/file]
 [each object]
@@ -22,5 +24,15 @@ pub enum [name] {
 [each case]
 	[name][if sep],[/if]
 [/each]
+}
+impl [name] {
+	pub fn from_string(val: &str) -> Option<Self> {
+		match val {
+			[each case]
+			"[name]" => Some(Self::[name]),
+			[/each]
+			_ => None
+		}
+	}
 }
 [/each]
