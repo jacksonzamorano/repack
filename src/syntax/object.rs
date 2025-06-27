@@ -283,4 +283,11 @@ impl Object {
         }
         dependencies.into_iter().collect()
     }
+
+    pub fn functions_in_namespace(&self, ns: &str) -> Vec<&ObjectFunction> {
+        self.functions
+            .iter()
+            .filter(|x| x.namespace == *ns)
+            .collect()
+    }
 }

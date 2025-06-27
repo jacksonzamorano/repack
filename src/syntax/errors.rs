@@ -26,6 +26,9 @@ pub enum RepackErrorKind {
     TypeNotSupported,
     CannotRead,
     CannotWrite,
+    SnippetNotClosed,
+    VariableNotInScope,
+    InvalidVariableModifier,
 }
 impl RepackErrorKind {
     pub fn as_string(&self) -> &'static str {
@@ -57,6 +60,9 @@ impl RepackErrorKind {
             Self::FunctionInvalidSyntax => "Function syntax is not vaild:",
             Self::CannotRead => "Cannot read the file:",
             Self::CannotWrite => "Cannot write the file:",
+            Self::SnippetNotClosed => "Block was not closed:",
+            Self::VariableNotInScope => "Variable was not found in scope:",
+            Self::InvalidVariableModifier => "Unknown variable modifier specified:",
         }
     }
 }

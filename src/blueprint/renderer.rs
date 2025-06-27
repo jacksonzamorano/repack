@@ -1,6 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
-    env::{current_dir, var},
+    env::current_dir,
     fs::{self},
 };
 
@@ -140,6 +140,7 @@ impl<'a> BlueprintExecutionContext<'a> {
         variables.insert("local_field".to_string(), join.local_field.to_string());
         variables.insert("ref_field".to_string(), join.foreign_field.to_string());
         variables.insert("ref_entity".to_string(), join.foreign_entity.to_string());
+        variables.insert("condition".to_string(), join.condition.to_string());
 
         flags.insert("sep", is_last);
 
@@ -320,6 +321,14 @@ impl<'a> BlueprintRenderer<'a> {
                                 _ => {}
                             }
                             index += 1;
+                        }
+                        if index == content.len() {
+                            // NOT FOUND!
+                            return Err(RepackError::from_lang_with_msg(
+                                RepackErrorKind::SnippetNotClosed,
+                                self.config,
+                                snip.main_token.to_string(),
+                            ));
                         }
                     }
                     self.render_snippet(
@@ -536,6 +545,22 @@ impl<'a> BlueprintRenderer<'a> {
                         self.render_tokens(content.contents, &updated_context, writer)?;
                     }
                 }
+                if let Some(obj) = context.object {
+                    if let Some(matched_fn) = obj
+                        .functions_in_namespace(namespace)
+                        .iter()
+                        .find(|func| func.name == name)
+                    {
+                        let mut updated_context = context.clone();
+                        for (idx, arg) in matched_fn.args.iter().enumerate() {
+                            updated_context
+                                .variables
+                                .insert(idx.to_string(), arg.to_string());
+                        }
+
+                        self.render_tokens(content.contents, &updated_context, writer)?;
+                    }
+                }
             }
             SnippetMainTokenName::Ref => {
                 if let Some(field) = context.field {
@@ -626,10 +651,22 @@ impl<'a> BlueprintRenderer<'a> {
                                     .collect::<Vec<_>>()
                                     .join("")
                             }
-                            _ => {}
+                            _ => {
+                                return Err(RepackError::from_lang_with_msg(
+                                    RepackErrorKind::InvalidVariableModifier,
+                                    self.config,
+                                    transform.to_string(),
+                                ));
+                            }
                         }
                     }
                     writer.write(&res);
+                } else {
+                    return Err(RepackError::from_lang_with_msg(
+                        RepackErrorKind::VariableNotInScope,
+                        self.config,
+                        name.to_string(),
+                    ));
                 }
             }
             _ => {}
@@ -646,7 +683,7 @@ impl<'a> BlueprintRenderer<'a> {
                 .variables
                 .insert(opt.0.to_string(), opt.1.to_string());
         }
-        _ = &self.render_tokens(&self.blueprint.tokens, &mut context, &mut files)?;
+        _ = &self.render_tokens(&self.blueprint.tokens, &context, &mut files)?;
         let mut path = current_dir().unwrap();
         if let Some(loc) = &self.config.location {
             path.push(loc);
@@ -662,12 +699,12 @@ impl<'a> BlueprintRenderer<'a> {
                     DeliveryUnit::Text(txt) => write_value.push_str(&txt),
                     DeliveryUnit::Imports => {
                         if let Some(imports) = files.imports.remove(&f.0) {
-                            write_value.push_str("\n");
+                            write_value.push('\n');
                             for import in imports.into_iter() {
                                 write_value.push_str(&import);
-                                write_value.push_str("\n");
+                                write_value.push('\n');
                             }
-                            write_value.push_str("\n");
+                            write_value.push('\n');
                         }
                     }
                 }

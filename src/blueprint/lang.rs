@@ -201,24 +201,18 @@ impl Blueprint {
             match &lang.tokens[i + 1] {
                 FlyToken::Snippet(snip) => {
                     let autoclose = snip.autoclose;
-                    match &mut lang.tokens[i] {
-                        FlyToken::Literal(lit) => {
-                            if !autoclose {
-                                while lit.ends_with('\n') || lit.ends_with('\t') {
-                                    lit.pop();
-                                }
+                    if let FlyToken::Literal(lit) = &mut lang.tokens[i] {
+                        if !autoclose {
+                            while lit.ends_with('\n') || lit.ends_with('\t') {
+                                lit.pop();
                             }
                         }
-                        _ => {}
                     }
                 }
-                FlyToken::Close(_) => match &mut lang.tokens[i] {
-                    FlyToken::Literal(lit) => {
-                        while lit.ends_with('\n') || lit.ends_with('\t') {
-                            lit.pop();
-                        }
+                FlyToken::Close(_) => if let FlyToken::Literal(lit) = &mut lang.tokens[i] {
+                    while lit.ends_with('\n') || lit.ends_with('\t') {
+                        lit.pop();
                     }
-                    _ => {}
                 },
                 _ => {}
             }
