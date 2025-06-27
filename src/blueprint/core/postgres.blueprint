@@ -1,21 +1,28 @@
-{ meta id: postgres }
-{ meta name: PostgreSQL create }
+[meta id]postgres[/meta]
+[meta name]PostgreSQL Create Script[/meta]
 
-{ define int32: INT4 }
-{ define int64: INT8 }
-{ define float64: FLOAT8 }
-{ define string: TEXT }
-{ define boolean: BOOL }
-{ define datetime: TIMESTAMPTZ }
+[define int32]INT4[/define]
+[define int64]INT8[/define]
+[define float64]FLOAT8[/define]
+[define string]TEXT[/define]
+[define boolean]BOOL[/define]
+[define datetime]TIMESTAMPTZ[/define]
 
-[ each object ]
-DROP TABLE IF EXISTS {name}
-[ end each ]
+[file]model.sql[/file]
 
-[ each object ]
-CREATE TABLE { name } (
-[ each field ]
-	{ name } { type }{ ifn optional:  NOT NULL }[func db.default] DEFAULT {0}[end func][ref] FOREIGN KEY REFERENCES {foreign_entity}({foreign_field})[end ref]{ if sep: , }
-[ end each ]
-)
-[ end each ]
+BEGIN;
+
+[eachr object]
+DROP TABLE IF EXISTS [name];
+[/eachr]
+
+
+[each object]
+CREATE TABLE [name] (
+[each field]
+	[name] [type][ifn optional] NOT NULL[/ifn][func db.default] DEFAULT {0}[/func][ref] FOREIGN KEY REFERENCES [foreign_entity]([foreign_field])[/ref][if sep],[/if]
+[/each]
+);
+[/each]
+
+COMMIT;

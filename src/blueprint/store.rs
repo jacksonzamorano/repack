@@ -5,6 +5,7 @@ use crate::blueprint::{Blueprint, BlueprintError, BlueprintFileReader};
 const CORE_BLUEPRINTS: &[&str] = &[
     include_str!("core/rust.blueprint"),
     include_str!("core/postgres.blueprint"),
+    include_str!("core/typescript.blueprint"),
 ];
 
 pub struct BlueprintStore {
@@ -47,6 +48,7 @@ impl BlueprintStore {
         };
         let lang = Blueprint::new(reader)?;
         self.languages.insert(lang.id.clone(), lang);
+
 
         Ok(())
     }

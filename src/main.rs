@@ -72,7 +72,7 @@ fn main() {
                     );
                     continue;
                 };
-                let builder = BlueprintRenderer::new(&parse_result, bp, output);
+                let mut builder = BlueprintRenderer::new(&parse_result, bp, output);
                 match builder.build() {
                     Ok(_) => {
                         println!("[{}] Built successfully!", output.profile);
@@ -94,15 +94,15 @@ fn main() {
                     );
                     continue;
                 };
-                // let builder = BlueprintBuilder::from_result(&parse_result, output, bp);
-                // match builder.build() {
-                //     Ok(_) => {
-                //         println!("[{}] Built successfully!", output.profile);
-                //     }
-                //     Err(e) => {
-                //         println!("[{}] Failed to build:\n\t{}", output.profile, e.output());
-                //     }
-                // }
+                let mut builder = BlueprintRenderer::new(&parse_result, bp, output);
+                match builder.clean() {
+                    Ok(_) => {
+                        println!("[{}] Built successfully!", output.profile);
+                    }
+                    Err(e) => {
+                        println!("[{}] Failed to build:\n\t{}", output.profile, e.output());
+                    }
+                }
             }
         }
     }

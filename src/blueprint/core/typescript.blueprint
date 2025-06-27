@@ -1,0 +1,25 @@
+[meta id]typescript[/meta]
+[meta name]Typescript (interfaces)[/meta]
+
+[define int64]number[/define]
+[define int32]number[/define]
+[define float64]number[/define]
+[define string]string[/define]
+[define boolean]boolean[/define]
+[define datetime]Date[/define]
+
+[ each object: \n ]
+
+[file][name].ts[/file]
+export interface [name] {
+[each field]
+	[name][if optional]?[/if]: [type]
+[/each]
+}
+[/each]
+
+[file]index.ts[/file]
+[each object]
+export type { [name] } from '[name].ts'
+[/each]
+

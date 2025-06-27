@@ -3,14 +3,17 @@ use crate::{
     blueprint::{BlueprintFileReader, FlyToken},
     syntax::CoreType,
 };
-use std::collections::HashMap;
+use std::{collections::HashMap, io::Error};
 
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub enum SnippetMainTokenName {
     Meta,
+    File,
     If,
     Ifn,
     Each,
+    Eachr,
+    EachInline,
     TypeDef,
     Func,
     Join,
@@ -18,16 +21,19 @@ pub enum SnippetMainTokenName {
     Variable(String),
 }
 impl SnippetMainTokenName {
-    fn from_string(val: &str) -> SnippetMainTokenName {
+    pub(crate) fn from_string(val: &str) -> SnippetMainTokenName {
         match val {
             "meta" => Self::Meta,
             "if" => Self::If,
             "ifn" => Self::Ifn,
             "each" => Self::Each,
+            "eachr" => Self::Eachr,
+            "eachl" => Self::EachInline,
             "define" => Self::TypeDef,
             "func" => Self::Func,
             "join" => Self::Join,
             "ref" => Self::Ref,
+            "file" => Self::File,
             _ => Self::Variable(val.to_string()),
         }
     }
@@ -86,6 +92,7 @@ type SnippetIdentifier = (SnippetMainTokenName, SnippetSecondaryTokenName);
 #[derive(Debug)]
 pub enum BlueprintError {
     CannotRead,
+    CannotWrite(Error),
     InvalidFile,
     UnknownCommand(String),
     NoSections,
@@ -153,13 +160,10 @@ impl Blueprint {
                 match main {
                     SnippetMainTokenName::TypeDef | SnippetMainTokenName::Meta => {
                         let mut participating_tokens = Vec::new();
-                        if !snip.is_ended {
+                        if !snip.autoclose {
                             while let Some(in_block) = reader.next() {
                                 match &in_block {
-                                    FlyToken::Snippet(det)
-                                        if det.main_token == "end"
-                                            && det.secondary_token == snip.main_token =>
-                                    {
+                                    FlyToken::Close(det) if *det == snip.main_token => {
                                         break;
                                     }
                                     _ => {
@@ -204,8 +208,6 @@ impl Blueprint {
         {
             lang.name = name.literal_string_value.clone();
         }
-
-        dbg!(&lang.tokens);
 
         Ok(lang)
     }
