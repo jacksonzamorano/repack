@@ -21,13 +21,16 @@ pub enum RepackErrorKind {
     UnknownExplicitJoin,
     ExplicitJoinObjectNotFound,
     ExplicitJoinFieldNotFound,
+    CannotCreateContext,
+    FunctionInvalidSyntax,
+    TypeNotSupported,
+    CannotRead,
+    CannotWrite,
 }
 impl RepackErrorKind {
     pub fn as_string(&self) -> &'static str {
         match self {
-            Self::CircularDependancy => {
-                "This definition creates a circular dependancy with:"
-            }
+            Self::CircularDependancy => "This definition creates a circular dependancy with:",
             Self::RefFieldUnresolvable => "Could not resolve the 'ref' reference:",
             Self::JoinFieldUnresolvable => "Could not resolve the 'from' reference:",
             Self::ParentObjectDoesNotExist => "Parent object couldn't be found:",
@@ -37,16 +40,23 @@ impl RepackErrorKind {
             Self::CannotInherit => "Inherit is not available in this context.",
             Self::NoFields => "No fields were found in this object.",
             Self::ManyNotAllowed => "Arrays aren't allowed in this context.",
-            Self::CustomTypeNotAllowed => {
-                "Custom types are not available in this context."
-            }
+            Self::CustomTypeNotAllowed => "Custom types are not available in this context.",
+            Self::TypeNotSupported => "Type is not allowed:",
             Self::CustomTypeNotDefined => "The custom type cannot be resolved:",
             Self::TypeNotResolved => "This type couldn't be resolved.",
             Self::SnippetNotFound => "Expected to use snippet, but it couldn't be found:",
             Self::DuplicateFieldNames => "A field already exists with this name.",
             Self::UnknownExplicitJoin => "Unknown explicit join:",
-            Self::ExplicitJoinObjectNotFound => "Tried to explicitly join but the object was not found:",
-            Self::ExplicitJoinFieldNotFound => "Tried to explicitly join but the field was not found:",
+            Self::ExplicitJoinObjectNotFound => {
+                "Tried to explicitly join but the object was not found:"
+            }
+            Self::ExplicitJoinFieldNotFound => {
+                "Tried to explicitly join but the field was not found:"
+            }
+            Self::CannotCreateContext => "Cannot create a context:",
+            Self::FunctionInvalidSyntax => "Function syntax is not vaild:",
+            Self::CannotRead => "Cannot read the file:",
+            Self::CannotWrite => "Cannot write the file:",
         }
     }
 }
@@ -59,7 +69,9 @@ impl RepackError {
             (None, Some(obj_name), None) => format!(" ({})", obj_name),
             (None, Some(obj_name), Some(field_name)) => format!(" ({}.{})", obj_name, field_name),
             (Some(lang), Some(obj_name), None) => format!(" ({} -> {})", lang, obj_name),
-            (Some(lang), Some(obj_name), Some(field_name)) => format!(" ({} -> {}.{})", lang, obj_name, field_name),
+            (Some(lang), Some(obj_name), Some(field_name)) => {
+                format!(" ({} -> {}.{})", lang, obj_name, field_name)
+            }
             (_, _, _) => String::new(),
         };
 
@@ -79,6 +91,15 @@ pub struct RepackError {
 }
 
 impl RepackError {
+    pub fn global(error: RepackErrorKind, msg: String) -> RepackError {
+        RepackError {
+            error,
+            lang_name: None,
+            obj_name: None,
+            field_name: None,
+            error_details: Some(msg)
+        }
+    }
     pub fn from_obj(error: RepackErrorKind, obj: &Object) -> RepackError {
         RepackError {
             error,
@@ -124,6 +145,7 @@ impl RepackError {
         }
     }
 
+    #[allow(dead_code)]
     pub fn from_lang(error: RepackErrorKind, lang: &Output) -> RepackError {
         RepackError {
             error,
@@ -134,6 +156,7 @@ impl RepackError {
         }
     }
 
+    #[allow(dead_code)]
     pub fn from_lang_with_obj(error: RepackErrorKind, lang: &Output, obj: &Object) -> RepackError {
         RepackError {
             error,
@@ -144,7 +167,13 @@ impl RepackError {
         }
     }
 
-    pub fn from_lang_with_obj_msg(error: RepackErrorKind, lang: &Output, obj: &Object, msg: String) -> RepackError {
+    #[allow(dead_code)]
+    pub fn from_lang_with_obj_msg(
+        error: RepackErrorKind,
+        lang: &Output,
+        obj: &Object,
+        msg: String,
+    ) -> RepackError {
         RepackError {
             error,
             lang_name: Some(lang.profile.clone()),
@@ -154,7 +183,13 @@ impl RepackError {
         }
     }
 
-    pub fn from_lang_with_obj_field_msg(error: RepackErrorKind, lang: &Output, obj: &Object, field: &Field, msg: String) -> RepackError {
+    pub fn from_lang_with_obj_field_msg(
+        error: RepackErrorKind,
+        lang: &Output,
+        obj: &Object,
+        field: &Field,
+        msg: String,
+    ) -> RepackError {
         RepackError {
             error,
             lang_name: Some(lang.profile.clone()),

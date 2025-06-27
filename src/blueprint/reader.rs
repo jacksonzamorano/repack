@@ -23,7 +23,7 @@ impl<'a> BlueprintFileReader<'a> {
 
                 if matches!(self.reader.peek(), Some(b'/')) {
                     self.reader.next();
-                    while let Some(in_block_read) = self.reader.next() {
+                    for in_block_read in self.reader.by_ref() {
                         match *in_block_read as char {
                             ']' => return Some(FlyToken::Close(temp)),
                             ' ' => {}
@@ -60,14 +60,11 @@ impl<'a> BlueprintFileReader<'a> {
                             } else {
                                 sd.contents.push_str(&temp);
                             }
-                            match SnippetMainTokenName::from_string(&sd.main_token) {
-                                SnippetMainTokenName::Variable(_) => sd.autoclose = true,
-                                _ => {}
-                            }
+                            if let SnippetMainTokenName::Variable(_) = SnippetMainTokenName::from_string(&sd.main_token) { sd.autoclose = true }
                             if !sd.autoclose {
-                                loop {
-                                    match self.reader.peek() {
-                                        Some(b'\n') => _ = self.reader.next(),
+                                while let Some(tok) = self.reader.peek() {
+                                    match tok {
+                                        b'\n' => _ = self.reader.next(),
                                         _ => break,
                                     }
                                 }

@@ -1,9 +1,9 @@
 use super::SnippetDetails;
 use crate::{
     blueprint::{BlueprintFileReader, FlyToken},
-    syntax::CoreType,
+    syntax::{CoreType, RepackError},
 };
-use std::{collections::HashMap, io::Error};
+use std::collections::HashMap;
 
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub enum SnippetMainTokenName {
@@ -88,34 +88,6 @@ impl SnippetSecondaryTokenName {
 }
 type SnippetIdentifier = (SnippetMainTokenName, SnippetSecondaryTokenName);
 
-#[allow(dead_code)]
-#[derive(Debug)]
-pub enum BlueprintError {
-    CannotRead,
-    CannotWrite(Error),
-    InvalidFile,
-    UnknownCommand(String),
-    NoSections,
-    InconsistentContexts,
-    CouldNotCreateContext(&'static str),
-    TypeNotSupported(String),
-    VariableNotFound(String),
-    InvalidFunctionSyntax,
-    FunctionMissingArgument(String, String),
-}
-impl BlueprintError {
-    pub fn output(&self) -> String {
-        format!("{:?}", self)
-    }
-}
-
-#[derive(Debug)]
-pub struct SectionContent {
-    pub details: SnippetDetails,
-    pub contents: Vec<FlyToken>,
-    pub literal_string_value: String,
-}
-
 #[derive(Debug)]
 pub struct SnippetReference<'a> {
     pub details: &'a SnippetDetails,
@@ -135,11 +107,11 @@ impl<'a> SnippetReference<'a> {
 pub struct Blueprint {
     pub id: String,
     pub name: String,
-    pub utilities: HashMap<SnippetIdentifier, SectionContent>,
+    pub utilities: HashMap<SnippetIdentifier, String>,
     pub tokens: Vec<FlyToken>,
 }
 impl Blueprint {
-    pub fn new(mut reader: BlueprintFileReader) -> Result<Blueprint, BlueprintError> {
+    pub fn new(mut reader: BlueprintFileReader) -> Result<Blueprint, RepackError> {
         let mut lang = Blueprint {
             id: String::new(),
             name: String::new(),
@@ -174,20 +146,13 @@ impl Blueprint {
                         }
                         let mut literal_string_value = snip.contents.clone();
                         for t in &participating_tokens {
-                            match t {
-                                FlyToken::Literal(val) => {
-                                    literal_string_value.push_str(val);
-                                }
-                                _ => {}
+                            if let FlyToken::Literal(val) = t {
+                                literal_string_value.push_str(val);
                             }
                         }
 
-                        let contents = SectionContent {
-                            contents: participating_tokens,
-                            details: snip.clone(),
-                            literal_string_value,
-                        };
-                        lang.utilities.insert((main, secondary), contents);
+                        lang.utilities
+                            .insert((main, secondary), literal_string_value);
                     }
                     _ => lang.tokens.push(next),
                 }
@@ -200,13 +165,13 @@ impl Blueprint {
             .utilities
             .get(&(SnippetMainTokenName::Meta, SnippetSecondaryTokenName::Id))
         {
-            lang.id = id.literal_string_value.clone();
+            lang.id = id.clone();
         }
         if let Some(name) = lang
             .utilities
             .get(&(SnippetMainTokenName::Meta, SnippetSecondaryTokenName::Name))
         {
-            lang.name = name.literal_string_value.clone();
+            lang.name = name.clone();
         }
 
         Ok(lang)

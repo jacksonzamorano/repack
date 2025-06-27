@@ -1,24 +1,21 @@
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{HashMap, HashSet},
     env::current_dir,
     fmt::Debug,
     fs::{self},
-    slice::Iter,
-    sync::Arc,
 };
 
-use crate::syntax::{Enum, Field, FieldReferenceKind, FieldType, Object, Output, ParseResult};
+use crate::syntax::{
+    Enum, Field, FieldReferenceKind, FieldType, Object, Output, ParseResult, RepackError,
+    RepackErrorKind,
+};
 
 use super::{
-    Blueprint, BlueprintError, FlyToken, SnippetMainTokenName, SnippetReference,
-    SnippetSecondaryTokenName,
+    Blueprint, FlyToken, SnippetMainTokenName, SnippetReference, SnippetSecondaryTokenName,
 };
-
-trait BlueprintWriter: TokenConsumer + Debug {}
 
 #[derive(Debug, Clone)]
 struct BlueprintExecutionContext<'a> {
-    current_file: Option<&'a String>,
     variables: HashMap<String, Option<&'a String>>,
     flags: HashMap<&'a str, bool>,
     object: Option<&'a Object>,
@@ -28,7 +25,6 @@ struct BlueprintExecutionContext<'a> {
 impl<'a> BlueprintExecutionContext<'a> {
     fn new() -> BlueprintExecutionContext<'a> {
         BlueprintExecutionContext {
-            current_file: None,
             variables: HashMap::new(),
             flags: HashMap::new(),
             object: None,
@@ -36,13 +32,7 @@ impl<'a> BlueprintExecutionContext<'a> {
             enm: None,
         }
     }
-    fn file(&self, name: &'a String) -> Self {
-        Self {
-            current_file: Some(name),
-            ..self.clone()
-        }
-    }
-    fn from_object(&self, obj: &'a Object) -> Self {
+    fn with_object(&self, obj: &'a Object) -> Self {
         let mut variables = HashMap::new();
         let mut flags = HashMap::new();
         variables.insert("name".to_string(), Some(&obj.name));
@@ -58,31 +48,36 @@ impl<'a> BlueprintExecutionContext<'a> {
             object: Some(obj),
             field: None,
             enm: None,
-            ..self.clone()
         }
     }
-    fn from_field(
+    fn with_field(
         &self,
         obj: &'a Object,
         field: &'a Field,
-        config: &'a Blueprint,
+        blueprint: &'a Blueprint,
+        config: &Output,
         is_last: bool,
-    ) -> Result<Self, BlueprintError> {
+    ) -> Result<Self, RepackError> {
         let mut variables = HashMap::new();
         let mut flags = HashMap::new();
 
         let resolved_type = match field.field_type() {
             FieldType::Core(typ) => {
-                &config
+                blueprint
                     .utilities
                     .get(&(
                         SnippetMainTokenName::TypeDef,
                         SnippetSecondaryTokenName::from_type(typ),
                     ))
                     .ok_or_else(|| {
-                        BlueprintError::TypeNotSupported(field.field_type().to_string())
+                        RepackError::from_lang_with_obj_field_msg(
+                            RepackErrorKind::TypeNotSupported,
+                            config,
+                            obj,
+                            field,
+                            typ.to_string(),
+                        )
                     })?
-                    .literal_string_value
             }
             FieldType::Custom(typ, _) => typ,
         };
@@ -98,10 +93,9 @@ impl<'a> BlueprintExecutionContext<'a> {
             object: Some(obj),
             field: Some(field),
             enm: None,
-            ..self.clone()
         })
     }
-    fn from_enum(&self, enm: &'a Enum) -> Result<Self, BlueprintError> {
+    fn with_enum(&self, enm: &'a Enum) -> Result<Self, RepackError> {
         let mut variables = HashMap::new();
         variables.insert("name".to_string(), Some(&enm.name));
         Ok(Self {
@@ -110,10 +104,9 @@ impl<'a> BlueprintExecutionContext<'a> {
             object: None,
             field: None,
             enm: Some(enm),
-            ..self.clone()
         })
     }
-    fn from_enum_case(&self, val: &'a String, is_last: bool) -> Result<Self, BlueprintError> {
+    fn with_enum_case(&self, val: &'a String, is_last: bool) -> Result<Self, RepackError> {
         let mut variables = HashMap::new();
         let mut flags = HashMap::new();
 
@@ -127,14 +120,13 @@ impl<'a> BlueprintExecutionContext<'a> {
             object: None,
             field: None,
             enm: None,
-            ..self.clone()
         })
     }
 }
 
 trait TokenConsumer {
-    fn set_file_name(&mut self, filename: &String);
-    fn write<'b>(&mut self, value: &dyn AsRef<str>);
+    fn set_file_name(&mut self, filename: &str);
+    fn write(&mut self, value: &dyn AsRef<str>);
 }
 #[derive(Default)]
 struct BlueprintBuildResult {
@@ -142,10 +134,10 @@ struct BlueprintBuildResult {
     current_file_name: Option<String>,
 }
 impl TokenConsumer for BlueprintBuildResult {
-    fn set_file_name(&mut self, filename: &String) {
+    fn set_file_name(&mut self, filename: &str) {
         self.current_file_name = Some(filename.to_string());
     }
-    fn write<'b>(&mut self, value: &dyn AsRef<str>) {
+    fn write(&mut self, value: &dyn AsRef<str>) {
         if let Some(file) = &self.current_file_name {
             if let Some(current) = self.contents.get_mut(file) {
                 current.push_str(value.as_ref());
@@ -157,14 +149,14 @@ impl TokenConsumer for BlueprintBuildResult {
     }
 }
 impl TokenConsumer for HashSet<String> {
-    fn set_file_name(&mut self, filename: &String) {
+    fn set_file_name(&mut self, filename: &str) {
         self.insert(filename.to_string());
     }
-    fn write<'b>(&mut self, _value: &dyn AsRef<str>) {}
+    fn write(&mut self, _value: &dyn AsRef<str>) {}
 }
 impl TokenConsumer for String {
-    fn set_file_name(&mut self, _filename: &String) {}
-    fn write<'b>(&mut self, value: &dyn AsRef<str>) {
+    fn set_file_name(&mut self, _filename: &str) {}
+    fn write(&mut self, value: &dyn AsRef<str>) {
         self.push_str(value.as_ref());
     }
 }
@@ -192,13 +184,13 @@ impl<'a> BlueprintRenderer<'a> {
         content: &'b [FlyToken],
         context: &'b BlueprintExecutionContext<'b>,
         writer: &'b mut dyn TokenConsumer,
-    ) -> Result<(), BlueprintError> {
+    ) -> Result<(), RepackError> {
         let mut index = 0;
         while index < content.len() {
             let c = &content[index];
             match c {
                 FlyToken::Literal(lit_val) => {
-                    let mut val = lit_val.to_string();
+                    let val = lit_val.to_string();
                     // while val.starts_with('\n') {
                     //     val.remove(0);
                     // }
@@ -254,16 +246,12 @@ impl<'a> BlueprintRenderer<'a> {
         content: SnippetReference<'b>,
         context: &'b BlueprintExecutionContext<'b>,
         writer: &'b mut dyn TokenConsumer,
-    ) -> Result<(), BlueprintError> {
+    ) -> Result<(), RepackError> {
         match content.main_token() {
             SnippetMainTokenName::File => {
                 let mut file_name = content.details.contents.clone();
                 if file_name.is_empty() {
-                    self.render_tokens(
-                        content.contents,
-                        &context.file(&content.details.secondary_token),
-                        &mut file_name,
-                    )?;
+                    self.render_tokens(content.contents, context, &mut file_name)?;
                 }
                 writer.set_file_name(&file_name);
             }
@@ -295,7 +283,7 @@ impl<'a> BlueprintRenderer<'a> {
                         for obj in objects_included {
                             self.render_tokens(
                                 content.contents,
-                                &context.from_object(obj),
+                                &context.with_object(obj),
                                 writer,
                             )?;
                             if !inline {
@@ -305,8 +293,10 @@ impl<'a> BlueprintRenderer<'a> {
                     }
                     SnippetSecondaryTokenName::Field => {
                         let Some(obj) = context.object else {
-                            return Err(BlueprintError::CouldNotCreateContext(
-                                "tried to create a field in a non-object context",
+                            return Err(RepackError::from_lang_with_msg(
+                                RepackErrorKind::CannotCreateContext,
+                                self.config,
+                                "field in non-object context.".to_string(),
                             ));
                         };
                         let mut fields = obj.fields.iter().collect::<Vec<_>>();
@@ -316,10 +306,11 @@ impl<'a> BlueprintRenderer<'a> {
                         for (idx, field) in fields.iter().enumerate() {
                             self.render_tokens(
                                 content.contents,
-                                &context.from_field(
+                                &context.with_field(
                                     obj,
                                     field,
                                     self.blueprint,
+                                    self.config,
                                     idx + 1 == obj.fields.len(),
                                 )?,
                                 writer,
@@ -346,7 +337,7 @@ impl<'a> BlueprintRenderer<'a> {
                             enums_included.reverse();
                         }
                         for enm in enums_included {
-                            self.render_tokens(content.contents, &context.from_enum(enm)?, writer)?;
+                            self.render_tokens(content.contents, &context.with_enum(enm)?, writer)?;
                             if !inline {
                                 writer.write(&"\n");
                             }
@@ -354,8 +345,10 @@ impl<'a> BlueprintRenderer<'a> {
                     }
                     SnippetSecondaryTokenName::Case => {
                         let Some(enm) = context.enm else {
-                            return Err(BlueprintError::CouldNotCreateContext(
-                                "tried to create a case in a non-enum context",
+                            return Err(RepackError::from_lang_with_msg(
+                                RepackErrorKind::CannotCreateContext,
+                                self.config,
+                                "case in non-enum context.".to_string(),
                             ));
                         };
                         let mut cases = enm.options.iter().collect::<Vec<_>>();
@@ -365,7 +358,7 @@ impl<'a> BlueprintRenderer<'a> {
                         for (idx, case) in cases.iter().enumerate() {
                             self.render_tokens(
                                 content.contents,
-                                &context.from_enum_case(case, idx + 1 == enm.options.len())?,
+                                &context.with_enum_case(case, idx + 1 == enm.options.len())?,
                                 writer,
                             )?;
                             if !inline {
@@ -394,8 +387,20 @@ impl<'a> BlueprintRenderer<'a> {
             }
             SnippetMainTokenName::Func => {
                 let mut parts = content.details.secondary_token.split(".");
-                let namespace = parts.next().ok_or(BlueprintError::InvalidFunctionSyntax)?;
-                let name = parts.next().ok_or(BlueprintError::InvalidFunctionSyntax)?;
+                let namespace = parts.next().ok_or_else(|| {
+                    RepackError::from_lang_with_msg(
+                        RepackErrorKind::FunctionInvalidSyntax,
+                        self.config,
+                        content.details.secondary_token.clone(),
+                    )
+                })?;
+                let name = parts.next().ok_or_else(|| {
+                    RepackError::from_lang_with_msg(
+                        RepackErrorKind::FunctionInvalidSyntax,
+                        self.config,
+                        content.details.secondary_token.clone(),
+                    )
+                })?;
                 if let Some(field) = context.field {
                     if let Some(matched_fn) = field
                         .functions_in_namespace(namespace)
@@ -462,18 +467,16 @@ impl<'a> BlueprintRenderer<'a> {
                         u_context
                             .variables
                             .insert("local_entity".to_string(), obj.table_name.as_ref());
-                        match &field.location.reference {
-                            FieldReferenceKind::FieldType(entity_name) => {
-                                u_context
-                                    .variables
-                                    .insert("foreign_entity".to_string(), Some(entity_name));
-                                u_context.variables.insert(
-                                    "foreign_field".to_string(),
-                                    Some(&field.location.name),
-                                );
-                                self.render_tokens(content.contents, &u_context, writer)?;
-                            }
-                            _ => {}
+                        if let FieldReferenceKind::FieldType(entity_name) =
+                            &field.location.reference
+                        {
+                            u_context
+                                .variables
+                                .insert("foreign_entity".to_string(), Some(entity_name));
+                            u_context
+                                .variables
+                                .insert("foreign_field".to_string(), Some(&field.location.name));
+                            self.render_tokens(content.contents, &u_context, writer)?;
                         };
                     }
                 }
@@ -489,7 +492,7 @@ impl<'a> BlueprintRenderer<'a> {
         Ok(())
     }
 
-    pub fn build(&mut self) -> Result<(), BlueprintError> {
+    pub fn build(&mut self) -> Result<(), RepackError> {
         let mut files = BlueprintBuildResult::default();
         _ = &self.render_tokens(
             &self.blueprint.tokens,
@@ -504,12 +507,18 @@ impl<'a> BlueprintRenderer<'a> {
         for f in &files.contents {
             let mut file = path.clone();
             file.push(f.0);
-            fs::write(file, f.1).map_err(|x| BlueprintError::CannotWrite(x))?;
+            fs::write(file, f.1).map_err(|_| {
+                RepackError::from_lang_with_msg(
+                    RepackErrorKind::CannotWrite,
+                    self.config,
+                    f.0.to_string(),
+                )
+            })?;
         }
         Ok(())
     }
 
-    pub fn clean(&mut self) -> Result<(), BlueprintError> {
+    pub fn clean(&mut self) -> Result<(), RepackError> {
         let mut files = HashSet::<String>::new();
         self.render_tokens(
             &self.blueprint.tokens,
@@ -524,7 +533,13 @@ impl<'a> BlueprintRenderer<'a> {
         for f in &files {
             let mut file = path.clone();
             file.push(f);
-            fs::remove_file(file).map_err(|x| BlueprintError::CannotWrite(x))?;
+            fs::remove_file(file).map_err(|_| {
+                RepackError::from_lang_with_msg(
+                    RepackErrorKind::CannotWrite,
+                    self.config,
+                    f.to_string(),
+                )
+            })?;
         }
 
         // Will not delete if dir is not empty.

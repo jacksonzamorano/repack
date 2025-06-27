@@ -44,7 +44,13 @@ fn main() {
         }
     };
 
-    let mut store = BlueprintStore::new();
+    let mut store = match BlueprintStore::new() {
+        Ok(res) => res,
+        Err(e) => {
+            println!("{}", e.into_string());
+            exit(1);
+        }
+    };
     for add in &parse_result.include_blueprints {
         let mut path = PathBuf::from(&input_file);
         path.pop();
@@ -78,7 +84,7 @@ fn main() {
                         println!("[{}] Built successfully!", output.profile);
                     }
                     Err(e) => {
-                        println!("[{}] Failed to build:\n\t{}", output.profile, e.output());
+                        println!("{}", e.into_string());
                     }
                 }
             }
@@ -100,7 +106,7 @@ fn main() {
                         println!("[{}] Built successfully!", output.profile);
                     }
                     Err(e) => {
-                        println!("[{}] Failed to build:\n\t{}", output.profile, e.output());
+                        println!("{}", e.into_string());
                     }
                 }
             }

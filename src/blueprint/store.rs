@@ -1,6 +1,9 @@
-use std::{collections::HashMap, fs::File, io::Read, path::PathBuf, process::exit};
+use std::{collections::HashMap, fs::File, io::Read, path::PathBuf};
 
-use crate::blueprint::{Blueprint, BlueprintError, BlueprintFileReader};
+use crate::{
+    blueprint::{Blueprint, BlueprintFileReader},
+    syntax::{RepackError, RepackErrorKind},
+};
 
 const CORE_BLUEPRINTS: &[&str] = &[
     include_str!("core/rust.blueprint"),
@@ -12,23 +15,25 @@ pub struct BlueprintStore {
     languages: HashMap<String, Blueprint>,
 }
 impl BlueprintStore {
-    pub fn new() -> BlueprintStore {
+    pub fn new() -> Result<BlueprintStore, RepackError> {
         let mut store = BlueprintStore {
             languages: HashMap::new(),
         };
 
         for core in CORE_BLUEPRINTS {
-            if let Err(err) = store.load_string(core) {
-                println!("[CORE] Could not load core blueprints: {}", err.output());
-                exit(1);
-            }
+            store.load_string(core)?
         }
 
-        store
+        Ok(store)
     }
 
-    pub fn load_file(&mut self, path: &PathBuf) -> Result<(), BlueprintError> {
-        let mut file = File::open(path).map_err(|_| BlueprintError::CannotRead)?;
+    pub fn load_file(&mut self, path: &PathBuf) -> Result<(), RepackError> {
+        let mut file = File::open(path).map_err(|_| {
+            RepackError::global(
+                RepackErrorKind::CannotRead,
+                path.to_str().unwrap().to_string(),
+            )
+        })?;
         let mut contents = vec![];
         _ = file.read_to_end(&mut contents);
 
@@ -42,13 +47,12 @@ impl BlueprintStore {
         Ok(())
     }
 
-    pub fn load_string(&mut self, contents: &str) -> Result<(), BlueprintError> {
+    pub fn load_string(&mut self, contents: &str) -> Result<(), RepackError> {
         let reader = BlueprintFileReader {
             reader: contents.as_bytes().iter().peekable(),
         };
         let lang = Blueprint::new(reader)?;
         self.languages.insert(lang.id.clone(), lang);
-
 
         Ok(())
     }
