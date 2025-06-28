@@ -53,9 +53,9 @@ impl Enum {
 
     pub fn cases(&self, reverse: bool) -> Vec<&String> {
         if reverse {
-            self.categories.iter().rev().collect()
+            self.options.iter().rev().collect()
         } else {
-            self.categories.iter().collect()
+            self.options.iter().collect()
         }
     }
 }

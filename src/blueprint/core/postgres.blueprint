@@ -22,6 +22,13 @@ DROP VIEW IF EXISTS [name];
 [/if]
 [/eachr]
 
+[each enum]
+DROP TYPE IF EXISTS [name];
+[/each]
+
+[each enum]
+CREATE TYPE [name] AS ENUM([eachl case]'[name]'[if sep],[/if][/eachl]);
+[/each]
 
 [each object]
 [ifn syn]
