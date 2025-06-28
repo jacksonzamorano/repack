@@ -10,51 +10,54 @@
 [define datetime]TIMESTAMPTZ[/define]
 
 [file]model.sql[/file]
-
-BEGIN;
+BEGIN;[br]
 
 [eachr object]
-[if record]
+[if record][br]
 DROP TABLE IF EXISTS [table_name];
-[/ifn]
-[if syn]
+[/if]
+[if syn][br]
 DROP VIEW IF EXISTS [name];
 [/if]
 [/eachr]
 
-[each enum]
+[each enum][br]
 DROP TYPE IF EXISTS [name];
 [/each]
 
-[each enum]
-CREATE TYPE [name] AS ENUM([eachl case]'[name]'[if sep], [/if][/eachl]);
+[each enum][br]
+CREATE TYPE [name] AS ENUM([each case]'[name]'[if sep], [/if][/each]);
 [/each]
 
 [each object]
-[if record]
+[if record][br][br]
 CREATE TABLE [table_name] (
-[each field]
-	[name] [type][ifn optional] NOT NULL[/ifn][func db.default] DEFAULT [0][/func][func db.pk] PRIMARY KEY[/func]
+[each field][br]
+	[name] [type][ifn optional] NOT NULL[/ifn][func db.default] DEFAULT [0][/func]
+	[func db.pk] PRIMARY KEY[/func]
+	[func db.generated] GENERATED ALWAYS AS [0][/func]
+	[func db.identity] GENERATED ALWAYS AS IDENTITY[/func]
+	[func db.unique] UNIQUE[/func]
 	[ref],
 	FOREIGN KEY ([name]) REFERENCES [foreign_table]([foreign_field])
 	[/ref]
 	[if sep],[/if]
-[/each]
+[/each][br]
 );
-[func db.index][br]CREATE INDEX ON [name] ([eachl arg][arg][if sep], [/if][/eachl]);[/func]
+[func db.index][br]CREATE INDEX ON [name] ([each arg][arg][if sep], [/if][/each]);[/func]
 [/if]
 
-[if syn]
+[if syn][br][br]
 CREATE VIEW [name] AS
 SELECT
-[each field]
+[each field][br]
 	[ref_table].[ref_field] AS [name][if sep],[/if]
-[/each]
+[/each][br]
 FROM [table_name]
-[each join]
+[each join][br]
 INNER JOIN [ref_entity] [name] ON [local_entity].[local_field] = [name].[ref_field][if sep],[/if][ifn sep];[/ifn]
 [/each]
 [/if]
 [/each]
 
-COMMIT;
+[br][br]COMMIT;

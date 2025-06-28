@@ -132,14 +132,20 @@ impl<'a> BlueprintRenderer<'a> {
                             ));
                         }
                     }
-                    self.render_snippet(
+                    match self.render_snippet(
                         SnippetReference {
                             details: snip,
                             contents: &content[starting_at..index],
                         },
                         context,
                         writer,
-                    )?;
+                    ) {
+                        Err(mut e) => {
+                            e.add_to_stack(&snip);
+                            return Err(e);
+                        }
+                        _ => {}
+                    }
                 }
                 _ => {
                     index += 1;
@@ -164,13 +170,8 @@ impl<'a> BlueprintRenderer<'a> {
                 writer.set_file_name(&file_name);
             }
             SnippetMainTokenName::Each
-            | SnippetMainTokenName::Eachr
-            | SnippetMainTokenName::EachInline => {
+            | SnippetMainTokenName::Eachr => {
                 let rev = matches!(content.main_token(), SnippetMainTokenName::Eachr);
-                let inline = matches!(content.main_token(), SnippetMainTokenName::EachInline);
-                if !inline {
-                    writer.write(&"\n");
-                }
                 let iter_options: Vec<_> = match content.secondary_token() {
                     SnippetSecondaryTokenName::Object => self
                         .parse_result
@@ -267,18 +268,12 @@ impl<'a> BlueprintRenderer<'a> {
                         let mut ctx = ctx?;
                         ctx.flags.insert("sep", idx + 1 < len);
                         self.render_tokens(content.contents, &ctx, writer)?;
-                        if !inline {
-                            writer.write(&"\n");
-                        }
                     }
                 } else {
                     for (idx, ctx) in iter_options.into_iter().rev().enumerate() {
                         let mut ctx = ctx?;
                         ctx.flags.insert("sep", idx + 1 < len);
                         self.render_tokens(content.contents, &ctx, writer)?;
-                        if !inline {
-                            writer.write(&"\n");
-                        }
                     }
                 }
             }
@@ -427,6 +422,12 @@ impl<'a> BlueprintRenderer<'a> {
                                     .collect::<Vec<_>>()
                                     .join("")
                             }
+                            "split_period_first" => {
+                                res = res.split(".").next().unwrap().to_string()
+                            }
+                            "split_period_last" => res = res.split(".").last().unwrap().to_string(),
+                            "split_dash_first" => res = res.split("-").next().unwrap().to_string(),
+                            "split_dash_last" => res = res.split("-").last().unwrap().to_string(),
                             _ => {
                                 return Err(RepackError::from_lang_with_msg(
                                     RepackErrorKind::InvalidVariableModifier,
@@ -438,11 +439,10 @@ impl<'a> BlueprintRenderer<'a> {
                     }
                     writer.write(&res);
                 } else {
-                    dbg!(&self.blueprint.tokens);
                     return Err(RepackError::from_lang_with_msg(
                         RepackErrorKind::VariableNotInScope,
                         self.config,
-                        format!("{} in context {} {}", name.to_string(), content.details.main_token, content.details.secondary_token),
+                        name.to_string(),
                     ));
                 }
             }

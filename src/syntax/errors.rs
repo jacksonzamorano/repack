@@ -1,3 +1,5 @@
+use crate::blueprint::SnippetDetails;
+
 use super::{Field, Object, Output};
 
 #[derive(Debug)]
@@ -50,12 +52,8 @@ impl RepackErrorKind {
             Self::SnippetNotFound => "Expected to use snippet, but it couldn't be found:",
             Self::DuplicateFieldNames => "A field already exists with this name.",
             Self::UnknownExplicitJoin => "Unknown explicit join:",
-            Self::JoinObjectNotFound => {
-                "Tried to join but the object was not found:"
-            }
-            Self::JoinFieldNotFound => {
-                "Tried to join but the field was not found:"
-            }
+            Self::JoinObjectNotFound => "Tried to join but the object was not found:",
+            Self::JoinFieldNotFound => "Tried to join but the field was not found:",
             Self::CannotCreateContext => "Cannot create a context:",
             Self::FunctionInvalidSyntax => "Function syntax is not vaild:",
             Self::CannotRead => "Cannot read the file:",
@@ -82,8 +80,12 @@ impl RepackError {
         };
 
         let details = self.error_details.unwrap_or_default();
-
-        format!("[E{:04}]{} {} {}", self.error as u32, loc, msg, details)
+        let stack = if self.stack.is_empty() {
+            String::new()
+        } else {
+            format!("\n\n--- Context: ---\n{}", self.stack.join("\n"))
+        };
+        format!("[E{:04}]{} {} {}{}", self.error as u32, loc, msg, details, stack)
     }
 }
 
@@ -94,6 +96,7 @@ pub struct RepackError {
     pub obj_name: Option<String>,
     pub field_name: Option<String>,
     pub error_details: Option<String>,
+    pub stack: Vec<String>,
 }
 
 impl RepackError {
@@ -103,7 +106,8 @@ impl RepackError {
             lang_name: None,
             obj_name: None,
             field_name: None,
-            error_details: Some(msg)
+            error_details: Some(msg),
+            stack: Vec::new(),
         }
     }
     pub fn from_obj(error: RepackErrorKind, obj: &Object) -> RepackError {
@@ -113,6 +117,7 @@ impl RepackError {
             obj_name: Some(obj.name.to_string()),
             field_name: None,
             error_details: None,
+            stack: Vec::new(),
         }
     }
 
@@ -123,6 +128,7 @@ impl RepackError {
             obj_name: Some(obj.name.to_string()),
             field_name: None,
             error_details: Some(msg),
+            stack: Vec::new(),
         }
     }
 
@@ -133,6 +139,7 @@ impl RepackError {
             obj_name: Some(obj.name.to_string()),
             field_name: Some(field.name.to_string()),
             error_details: None,
+            stack: Vec::new(),
         }
     }
 
@@ -148,6 +155,7 @@ impl RepackError {
             obj_name: Some(obj.name.to_string()),
             field_name: Some(field.name.to_string()),
             error_details: Some(msg),
+            stack: Vec::new(),
         }
     }
 
@@ -159,6 +167,7 @@ impl RepackError {
             obj_name: None,
             field_name: None,
             error_details: None,
+            stack: Vec::new(),
         }
     }
 
@@ -170,6 +179,7 @@ impl RepackError {
             obj_name: Some(obj.name.to_string()),
             field_name: None,
             error_details: None,
+            stack: Vec::new(),
         }
     }
 
@@ -186,6 +196,7 @@ impl RepackError {
             obj_name: Some(obj.name.to_string()),
             field_name: None,
             error_details: Some(msg),
+            stack: Vec::new(),
         }
     }
 
@@ -202,6 +213,7 @@ impl RepackError {
             obj_name: Some(obj.name.to_string()),
             field_name: Some(field.name.to_string()),
             error_details: Some(msg),
+            stack: Vec::new(),
         }
     }
 
@@ -212,6 +224,12 @@ impl RepackError {
             obj_name: None,
             field_name: None,
             error_details: Some(msg),
+            stack: Vec::new(),
         }
+    }
+
+    pub fn add_to_stack(&mut self, snip: &SnippetDetails) {
+        self.stack
+            .push(format!("\t- {} {}", snip.main_token, snip.secondary_token));
     }
 }

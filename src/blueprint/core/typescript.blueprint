@@ -15,25 +15,29 @@
 [imports]
 
 export interface [name] {
-[each field]
+[each field][br]
 	[name.camelcase][if optional]?[/if]: [type]
-[/each]
+[/each][br]
 }
 [/each]
 
 [each enum]
 [file][name].ts[/file]
+
 export type [name] = 
-[eachl case]
+
+[each case]
 '[name]'[if sep] | [/if]
-[/eachl]
+[/each]
+
 [/each]
 
 [file]index.ts[/file]
+
 [each object]
-export type { [name] } from '[name].ts'
+export type { [name] } from '[name].ts'[br]
 [/each]
 [each enum]
-export type { [name] } from '[name].ts'
+export type { [name] } from '[name].ts'[br]
 [/each]
 

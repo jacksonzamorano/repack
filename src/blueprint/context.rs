@@ -133,6 +133,8 @@ impl<'a> BlueprintExecutionContext<'a> {
         variables.insert("type".to_string(), resolved_type.to_string());
         flags.insert("optional", field.optional);
         flags.insert("array", field.array);
+        flags.insert("custom", matches!(field.field_type(), FieldType::Custom(_,_)));
+        flags.insert("local", matches!(field.location.reference, FieldReferenceKind::Local));
 
         Ok(Self {
             variables,

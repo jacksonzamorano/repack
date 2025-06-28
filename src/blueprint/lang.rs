@@ -13,7 +13,6 @@ pub enum SnippetMainTokenName {
     Ifn,
     Each,
     Eachr,
-    EachInline,
     TypeDef,
     Func,
     Join,
@@ -32,7 +31,6 @@ impl SnippetMainTokenName {
             "ifn" => Self::Ifn,
             "each" => Self::Each,
             "eachr" => Self::Eachr,
-            "eachl" => Self::EachInline,
             "define" => Self::TypeDef,
             "func" => Self::Func,
             "join" => Self::Join,
@@ -55,6 +53,7 @@ pub enum SnippetSecondaryTokenName {
     Field,
     Enum,
     Case,
+    Debug,
 
     // TypeDef
     String,
@@ -84,6 +83,7 @@ impl SnippetSecondaryTokenName {
             "case" => Self::Case,
             "join" => Self::Join,
             "arg" => Self::Arg,
+            "debug" => Self::Debug,
             _ => Self::Arbitrary(val.to_string()),
         }
     }
@@ -213,11 +213,13 @@ impl Blueprint {
                         }
                     }
                 }
-                FlyToken::Close(_) => if let FlyToken::Literal(lit) = &mut lang.tokens[i] {
-                    while lit.ends_with('\n') || lit.ends_with('\t') {
-                        lit.pop();
+                FlyToken::Close(_) => {
+                    if let FlyToken::Literal(lit) = &mut lang.tokens[i] {
+                        while lit.ends_with('\n') || lit.ends_with('\t') {
+                            lit.pop();
+                        }
                     }
-                },
+                }
                 _ => {}
             }
             i += 1;
@@ -234,6 +236,13 @@ impl Blueprint {
             .get(&(SnippetMainTokenName::Meta, SnippetSecondaryTokenName::Name))
         {
             lang.name = name.clone();
+        }
+
+        if lang
+            .utilities
+            .contains_key(&(SnippetMainTokenName::Meta, SnippetSecondaryTokenName::Debug))
+        {
+            dbg!(&lang.tokens);
         }
 
         Ok(lang)
