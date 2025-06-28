@@ -4,196 +4,13 @@ use std::{
     fs::{self},
 };
 
-use crate::syntax::{
-    Enum, Field, FieldReferenceKind, FieldType, Object, ObjectJoin, Output, ParseResult,
-    RepackError, RepackErrorKind,
-};
+use crate::syntax::{FieldReferenceKind, Output, ParseResult, RepackError, RepackErrorKind};
 
 use super::{
-    Blueprint, FlyToken, SnippetMainTokenName, SnippetReference, SnippetSecondaryTokenName,
+    Blueprint, BlueprintExecutionContext, FlyToken, SnippetMainTokenName, SnippetReference,
+    SnippetSecondaryTokenName, TokenConsumer,
 };
 
-#[derive(Debug, Clone)]
-struct BlueprintExecutionContext<'a> {
-    variables: HashMap<String, String>,
-    flags: HashMap<&'a str, bool>,
-    object: Option<&'a Object>,
-    field: Option<&'a Field>,
-    enm: Option<&'a Enum>,
-}
-impl<'a> BlueprintExecutionContext<'a> {
-    fn new() -> BlueprintExecutionContext<'a> {
-        BlueprintExecutionContext {
-            variables: HashMap::new(),
-            flags: HashMap::new(),
-            object: None,
-            field: None,
-            enm: None,
-        }
-    }
-    fn with_object(&self, obj: &'a Object) -> Self {
-        let mut variables = HashMap::new();
-        let mut flags = HashMap::new();
-        variables.insert("name".to_string(), obj.name.to_string());
-        if let Some(tn) = obj.table_name.as_ref() {
-            variables.insert("table_name".to_string(), tn.to_string());
-        }
-        flags.insert(
-            "record",
-            matches!(obj.object_type, crate::syntax::ObjectType::Record),
-        );
-        flags.insert("syn", obj.inherits.is_some());
-
-        Self {
-            variables,
-            flags,
-            object: Some(obj),
-            field: None,
-            enm: None,
-        }
-    }
-    fn with_field(
-        &self,
-        obj: &'a Object,
-        field: &'a Field,
-        blueprint: &'a Blueprint,
-        config: &Output,
-        writer: &mut dyn TokenConsumer,
-        is_last: bool,
-    ) -> Result<Self, RepackError> {
-        let mut variables = HashMap::new();
-        let mut flags = HashMap::new();
-
-        let resolved_type = match field.field_type() {
-            FieldType::Core(typ) => {
-                if let Some(link) = blueprint.links.get(&typ.to_string()) {
-                    writer.import(link.to_string());
-                }
-
-                blueprint
-                    .utilities
-                    .get(&(
-                        SnippetMainTokenName::TypeDef,
-                        SnippetSecondaryTokenName::from_type(typ),
-                    ))
-                    .ok_or_else(|| {
-                        RepackError::from_lang_with_obj_field_msg(
-                            RepackErrorKind::TypeNotSupported,
-                            config,
-                            obj,
-                            field,
-                            typ.to_string(),
-                        )
-                    })?
-            }
-            FieldType::Custom(typ, _) => {
-                if let Some(link) = blueprint.links.get("custom") {
-                    writer.import(link.replace("$", typ))
-                }
-                typ
-            }
-        };
-
-        let (name, loc) = match &field.location.reference {
-            FieldReferenceKind::Local | FieldReferenceKind::FieldType(_) => (
-                field.name.clone(),
-                obj.table_name
-                    .as_ref()
-                    .map(|x| x.to_string())
-                    .unwrap_or_default(),
-            ),
-            FieldReferenceKind::ImplicitJoin(local_field_name) => (
-                field.location.name.clone(),
-                format!("j_{}", local_field_name),
-            ),
-            FieldReferenceKind::ExplicitJoin(jn) => (field.location.name.clone(), jn.to_string()),
-        };
-        variables.insert("ref_entity".to_string(), loc);
-        variables.insert("ref_field".to_string(), name);
-        variables.insert("object_name".to_string(), obj.name.to_string());
-        variables.insert("name".to_string(), field.name.to_string());
-        variables.insert("type".to_string(), resolved_type.to_string());
-        flags.insert("optional", field.optional);
-        flags.insert("sep", !is_last);
-
-        Ok(Self {
-            variables,
-            flags,
-            object: Some(obj),
-            field: Some(field),
-            enm: None,
-        })
-    }
-    fn with_join(
-        &self,
-        obj: &'a Object,
-        join: &'a ObjectJoin,
-        is_last: bool,
-    ) -> Result<Self, RepackError> {
-        let mut variables = HashMap::new();
-        let mut flags = HashMap::new();
-
-        variables.insert("name".to_string(), join.join_name.to_string());
-        if let Some(tn) = obj.table_name.as_ref() {
-            variables.insert("local_entity".to_string(), tn.to_string());
-        }
-        variables.insert("local_field".to_string(), join.local_field.to_string());
-        variables.insert("ref_field".to_string(), join.foreign_field.to_string());
-        variables.insert("ref_entity".to_string(), join.foreign_entity.to_string());
-        variables.insert("condition".to_string(), join.condition.to_string());
-
-        flags.insert("sep", is_last);
-
-        Ok(Self {
-            variables,
-            flags,
-            object: Some(obj),
-            field: None,
-            enm: None,
-        })
-    }
-
-    fn with_enum(&self, enm: &'a Enum) -> Result<Self, RepackError> {
-        let mut variables = HashMap::new();
-        variables.insert("name".to_string(), enm.name.to_string());
-        Ok(Self {
-            variables,
-            flags: HashMap::new(),
-            object: None,
-            field: None,
-            enm: Some(enm),
-        })
-    }
-    fn with_enum_case(
-        &self,
-        enm: &'a Enum,
-        val: &'a String,
-        is_last: bool,
-    ) -> Result<Self, RepackError> {
-        let mut variables = HashMap::new();
-        let mut flags = HashMap::new();
-
-        variables.insert("enum_name".to_string(), enm.name.to_string());
-        variables.insert("name".to_string(), val.to_string());
-        variables.insert("value".to_string(), val.to_string());
-        flags.insert("sep", !is_last);
-
-        Ok(Self {
-            variables,
-            flags,
-            object: None,
-            field: None,
-            enm: None,
-        })
-    }
-}
-
-trait TokenConsumer {
-    fn set_file_name(&mut self, filename: &str);
-    fn import_point(&mut self);
-    fn write(&mut self, value: &dyn AsRef<str>);
-    fn import(&mut self, value: String);
-}
 enum DeliveryUnit {
     Text(String),
     Imports,
@@ -242,22 +59,6 @@ impl TokenConsumer for BlueprintBuildResult {
             }
         }
     }
-}
-impl TokenConsumer for HashSet<String> {
-    fn set_file_name(&mut self, filename: &str) {
-        self.insert(filename.to_string());
-    }
-    fn write(&mut self, _value: &dyn AsRef<str>) {}
-    fn import(&mut self, _value: String) {}
-    fn import_point(&mut self) {}
-}
-impl TokenConsumer for String {
-    fn set_file_name(&mut self, _filename: &str) {}
-    fn write(&mut self, value: &dyn AsRef<str>) {
-        self.push_str(value.as_ref());
-    }
-    fn import(&mut self, _value: String) {}
-    fn import_point(&mut self) {}
 }
 
 pub struct BlueprintRenderer<'a> {
@@ -370,34 +171,13 @@ impl<'a> BlueprintRenderer<'a> {
                 if !inline {
                     writer.write(&"\n");
                 }
-                match content.secondary_token() {
-                    SnippetSecondaryTokenName::Object => {
-                        let mut objects_included: Vec<_> = self
-                            .parse_result
-                            .objects
-                            .iter()
-                            .filter(|x| {
-                                self.config
-                                    .categories
-                                    .iter()
-                                    .any(|cat| x.categories.contains(cat))
-                                    && !self.config.exclude.contains(&x.name)
-                            })
-                            .collect();
-                        if rev {
-                            objects_included.reverse();
-                        }
-                        for obj in objects_included {
-                            self.render_tokens(
-                                content.contents,
-                                &context.with_object(obj),
-                                writer,
-                            )?;
-                            if !inline {
-                                writer.write(&"\n");
-                            }
-                        }
-                    }
+                let iter_options: Vec<_> = match content.secondary_token() {
+                    SnippetSecondaryTokenName::Object => self
+                        .parse_result
+                        .included_objects(&self.config.categories, &self.config.exclude, rev)
+                        .into_iter()
+                        .map(|x| Ok(context.with_object(x)))
+                        .collect(),
                     SnippetSecondaryTokenName::Field => {
                         let Some(obj) = context.object else {
                             return Err(RepackError::from_lang_with_msg(
@@ -406,24 +186,20 @@ impl<'a> BlueprintRenderer<'a> {
                                 "field in non-object context.".to_string(),
                             ));
                         };
-                        let mut fields = obj.fields.iter().collect::<Vec<_>>();
-                        if rev {
-                            fields.reverse();
-                        }
-                        for (idx, field) in fields.iter().enumerate() {
-                            let ctx = &context.with_field(
-                                obj,
-                                field,
-                                self.blueprint,
-                                self.config,
-                                writer,
-                                idx + 1 == obj.fields.len(),
-                            )?;
-                            self.render_tokens(content.contents, ctx, writer)?;
-                            if !inline {
-                                writer.write(&"\n");
-                            }
-                        }
+                        obj.fields(rev)
+                            .iter()
+                            .enumerate()
+                            .map(|(idx, field)| {
+                                context.with_field(
+                                    obj,
+                                    field,
+                                    self.blueprint,
+                                    self.config,
+                                    writer,
+                                    idx + 1 == obj.fields.len(),
+                                )
+                            })
+                            .collect()
                     }
                     SnippetSecondaryTokenName::Join => {
                         let Some(obj) = context.object else {
@@ -433,44 +209,18 @@ impl<'a> BlueprintRenderer<'a> {
                                 "join in non-object context.".to_string(),
                             ));
                         };
-                        let mut joins = obj.joins.iter().collect::<Vec<_>>();
-                        if rev {
-                            joins.reverse();
-                        }
-                        for (idx, j) in joins.iter().enumerate() {
-                            self.render_tokens(
-                                content.contents,
-                                &context.with_join(obj, j, idx + 1 == obj.fields.len())?,
-                                writer,
-                            )?;
-                            if !inline {
-                                writer.write(&"\n");
-                            }
-                        }
-                    }
-                    SnippetSecondaryTokenName::Enum => {
-                        let mut enums_included = self
-                            .parse_result
-                            .enums
+                        obj.joins(rev)
                             .iter()
-                            .filter(|x| {
-                                self.config
-                                    .categories
-                                    .iter()
-                                    .any(|cat| x.categories.contains(cat))
-                                    && !self.config.exclude.contains(&x.name)
-                            })
-                            .collect::<Vec<_>>();
-                        if rev {
-                            enums_included.reverse();
-                        }
-                        for enm in enums_included {
-                            self.render_tokens(content.contents, &context.with_enum(enm)?, writer)?;
-                            if !inline {
-                                writer.write(&"\n");
-                            }
-                        }
+                            .enumerate()
+                            .map(|(idx, j)| context.with_join(obj, j, idx + 1 == obj.fields.len()))
+                            .collect()
                     }
+                    SnippetSecondaryTokenName::Enum => self
+                        .parse_result
+                        .included_enums(&self.config.categories, &self.config.exclude, rev)
+                        .iter()
+                        .map(|enm| context.with_enum(enm))
+                        .collect(),
                     SnippetSecondaryTokenName::Case => {
                         let Some(enm) = context.enm else {
                             return Err(RepackError::from_lang_with_msg(
@@ -479,22 +229,27 @@ impl<'a> BlueprintRenderer<'a> {
                                 "case in non-enum context.".to_string(),
                             ));
                         };
-                        let mut cases = enm.options.iter().collect::<Vec<_>>();
-                        if rev {
-                            cases.reverse();
-                        }
-                        for (idx, case) in cases.iter().enumerate() {
-                            self.render_tokens(
-                                content.contents,
-                                &context.with_enum_case(enm, case, idx + 1 == enm.options.len())?,
-                                writer,
-                            )?;
-                            if !inline {
-                                writer.write(&"\n");
-                            }
-                        }
+                        enm.cases(rev)
+                            .iter()
+                            .enumerate()
+                            .map(|(idx, case)| {
+                                context.with_enum_case(enm, case, idx + 1 == enm.options.len())
+                            })
+                            .collect()
                     }
-                    _ => {}
+                    _ => {
+                        return Err(RepackError::from_lang_with_msg(
+                            RepackErrorKind::VariableNotInScope,
+                            self.config,
+                            content.details.secondary_token.to_string(),
+                        ));
+                    }
+                };
+                for ctx in iter_options {
+                    self.render_tokens(content.contents, &ctx?, writer)?;
+                    if !inline {
+                        writer.write(&"\n");
+                    }
                 }
             }
             SnippetMainTokenName::If => {

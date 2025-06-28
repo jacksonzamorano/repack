@@ -1,7 +1,4 @@
-
-use super::{
-    FileContents, Token,
-};
+use super::{FileContents, Token};
 
 #[derive(Debug)]
 pub struct Enum {
@@ -51,6 +48,14 @@ impl Enum {
             name,
             categories,
             options,
+        }
+    }
+
+    pub fn cases(&self, reverse: bool) -> Vec<&String> {
+        if reverse {
+            self.categories.iter().rev().collect()
+        } else {
+            self.categories.iter().collect()
         }
     }
 }

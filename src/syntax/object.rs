@@ -290,4 +290,19 @@ impl Object {
             .filter(|x| x.namespace == *ns)
             .collect()
     }
+
+    pub fn fields(&self, reverse: bool) -> Vec<&Field> {
+        if reverse {
+            self.fields.iter().rev().collect()
+        } else {
+            self.fields.iter().collect()
+        }
+    }   
+    pub fn joins(&self, reverse: bool) -> Vec<&ObjectJoin> {
+        if reverse {
+            self.joins.iter().rev().collect()
+        } else {
+            self.joins.iter().collect()
+        }
+    }
 }
