@@ -59,6 +59,7 @@ impl<'a> BlueprintExecutionContext<'a> {
         }
         flags.insert("record", matches!(obj.object_type, ObjectType::Record));
         flags.insert("syn", matches!(obj.object_type, ObjectType::Synthetic));
+        flags.insert("synthetic", matches!(obj.object_type, ObjectType::Synthetic));
         flags.insert("struct", matches!(obj.object_type, ObjectType::Struct));
         flags.insert("has_joins", !obj.joins.is_empty());
 

@@ -6,7 +6,7 @@ use super::{
 };
 
 /// Defines the different categories of objects that can be defined in a schema.
-/// 
+///
 /// Each object type has different capabilities, constraints, and code generation
 /// behaviors. The type determines how the object can be used and what features
 /// are available during code generation.
@@ -27,7 +27,7 @@ pub enum ObjectType {
 }
 
 /// Represents a relationship join between two objects in the schema.
-/// 
+///
 /// ObjectJoin defines how objects are related to each other, specifying
 /// the local and foreign fields that establish the relationship. This is
 /// used for generating proper foreign key relationships and join queries
@@ -48,7 +48,7 @@ pub struct ObjectJoin {
 }
 
 /// Represents a complete object definition in the schema system.
-/// 
+///
 /// Object is the core building block of the schema, containing all the metadata
 /// needed to generate code for entities, data structures, and their relationships.
 /// Each object can have fields, functions, inheritance relationships, and database
@@ -91,23 +91,22 @@ pub struct Object {
 }
 impl Object {
     /// Parses an Object definition from the input file contents.
-    /// 
+    ///
     /// This method reads the schema definition syntax and constructs a complete
     /// Object instance with all its metadata, fields, and relationships.
     /// The parsing handles various tokens like @table_name, :inheritance,
     /// #categories, and field definitions within braces.
-    /// 
+    ///
     /// # Arguments
     /// * `typ` - The initial object type (Record, Synthetic, or Struct)
     /// * `contents` - Mutable reference to the file contents being parsed
-    /// 
+    ///
     /// # Returns
     /// A fully constructed Object with all parsed metadata and fields
-    /// 
+    ///
     /// # Panics
     /// Panics if the expected object name is missing or malformed
     pub fn read_from_contents(typ: ObjectType, contents: &mut FileContents) -> Object {
-        let mut object_type = typ;
         let Some(name_opt) = contents.next() else {
             panic!("Read record type, expected a name but got end of file.");
         };
@@ -135,12 +134,10 @@ impl Object {
                     };
                 }
                 Token::Colon => {
-                    if matches!(object_type, ObjectType::Record) {
-                        inherits = match contents.next() {
-                            Some(Token::Literal(lit)) => Some(lit.to_string()),
-                            _ => None,
-                        };
-                    }
+                    inherits = match contents.next() {
+                        Some(Token::Literal(lit)) => Some(lit.to_string()),
+                        _ => None,
+                    };
                 }
                 Token::Pound => {
                     if let Some(Token::Literal(lit)) = contents.next() {
@@ -152,10 +149,6 @@ impl Object {
                 }
                 _ => {}
             }
-        }
-
-        if inherits.is_some() {
-            object_type = ObjectType::Synthetic;
         }
 
         'cmd: while let Some(token) = contents.take() {
@@ -238,7 +231,7 @@ impl Object {
         }
 
         Object {
-            object_type,
+            object_type: typ,
             name,
             fields,
             inherits,
@@ -254,12 +247,12 @@ impl Object {
     }
 
     /// Validates the object definition and returns any semantic errors.
-    /// 
+    ///
     /// This method performs comprehensive validation of the object based on its type:
     /// - Records must have table names and cannot have custom object field types
     /// - Structs cannot inherit, reuse fields, or have table names
     /// - All objects must have unique field names and resolved field types
-    /// 
+    ///
     /// # Returns
     /// * `Some(Vec<RepackError>)` if validation errors are found
     /// * `None` if the object is valid
@@ -343,11 +336,11 @@ impl Object {
     }
 
     /// Determines the dependency relationships for this object.
-    /// 
+    ///
     /// Analyzes the object's inheritance and field references to identify
     /// which other objects this object depends on. This is crucial for
     /// proper dependency ordering during code generation.
-    /// 
+    ///
     /// # Returns
     /// A vector of object names that this object depends on, including:
     /// - Parent objects (via inheritance)
@@ -383,14 +376,14 @@ impl Object {
     }
 
     /// Filters object functions by their namespace.
-    /// 
+    ///
     /// Returns all functions defined on this object that belong to the
     /// specified namespace. Namespaces are used to organize functions
     /// by their target language or usage context.
-    /// 
+    ///
     /// # Arguments
     /// * `ns` - The namespace identifier to filter by
-    /// 
+    ///
     /// # Returns
     /// A vector of references to functions in the specified namespace
     pub fn functions_in_namespace(&self, ns: &str) -> Vec<&ObjectFunction> {

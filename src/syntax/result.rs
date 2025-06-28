@@ -61,6 +61,12 @@ impl ParseResult {
                         &mut contents,
                     ));
                 }
+                Token::SyntheticType => {
+                    objects.push(Object::read_from_contents(
+                        ObjectType::Synthetic,
+                        &mut contents,
+                    ));
+                }
                 Token::EnumType => {
                     enums.push(Enum::read_from_contents(&mut contents));
                 }
@@ -147,6 +153,14 @@ impl ParseResult {
             let mut field_idx: usize = 0;
 
             if let Some(parent_obj_name) = &objects[object_idx].inherits {
+                if !matches!(&objects[object_idx].object_type, ObjectType::Synthetic) {
+                    errors.push(RepackError::from_obj(
+                        RepackErrorKind::CannotInherit,
+                        &objects[object_idx],
+                    ));
+                    object_idx += 1;
+                    continue;
+                }
                 let Some(parent_obj_idx) =
                     objects.iter().position(|obj| obj.name == *parent_obj_name)
                 else {

@@ -36,7 +36,7 @@ record ContactInfo @contacts #model {
 	db:index("user_id", "id")
 }
 
-record FullUser: ContactInfo #view {
+synthetic FullUser: ContactInfo #model {
 	*
 	name from(user_id.name)
 }

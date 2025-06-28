@@ -30,6 +30,7 @@ pub enum Token {
     Literal(String),
     OutputType,
     RecordType,
+    SyntheticType,
     StructType,
     SnippetType,
     EnumType,
@@ -95,6 +96,7 @@ impl Token {
         match string.trim() {
             "output" => Token::OutputType,
             "record" => Token::RecordType,
+            "synthetic" => Token::SyntheticType,
             "struct" => Token::StructType,
             "from" => Token::From,
             "ref" => Token::Ref,

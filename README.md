@@ -425,9 +425,425 @@ record Project @projects #core {
 }
 ```
 
-### Blueprint Development
+## Blueprint Development
 
-To create custom blueprints, see the existing blueprints in [`src/blueprint/core/`](src/blueprint/core/) as examples. Blueprints use a template syntax with variables, loops, and conditionals to generate target code.
+Blueprints are template files that define how to generate code for specific target languages or frameworks. They use a powerful template syntax with variables, loops, conditionals, and type mappings to produce consistent, type-safe output.
+
+### Blueprint File Structure
+
+Every blueprint must follow this basic structure:
+
+```blueprint
+[meta id]unique_identifier[/meta]
+[meta name]Human Readable Name[/meta]
+
+[define core_type]target_type[/define]
+[link dependency]import_statement[/link]
+
+[file]output_filename[/file]
+template content here...
+```
+
+### Required Meta Tags
+
+Every blueprint **must** start with these meta tags:
+
+| Meta Tag | Description | Required | Example |
+|----------|-------------|----------|---------|
+| `[meta id]` | Unique identifier used in `output` statements | ✅ Yes | `[meta id]rust[/meta]` |
+| `[meta name]` | Human-readable name for documentation | ✅ Yes | `[meta name]Rust Structs[/meta]` |
+
+**Example:**
+```blueprint
+[meta id]rust[/meta]
+[meta name]Rust[/meta]
+```
+
+### Type Definitions
+
+Map Repack's core types to target language types using `[define]`:
+
+```blueprint
+[define repack_type]target_language_type[/define]
+```
+
+**Available Core Types:**
+
+| Repack Type | Description | Example Mappings |
+|-------------|-------------|------------------|
+| `string` | UTF-8 text | `String` (Rust), `string` (Go/TS), `TEXT` (SQL) |
+| `int32` | 32-bit integer | `i32` (Rust), `int32` (Go), `number` (TS), `INTEGER` (SQL) |
+| `int64` | 64-bit integer | `i64` (Rust), `int64` (Go), `bigint` (TS), `BIGINT` (SQL) |
+| `float64` | 64-bit float | `f64` (Rust), `float64` (Go), `number` (TS), `DOUBLE` (SQL) |
+| `boolean` | True/false | `bool` (Rust), `bool` (Go), `boolean` (TS), `BOOLEAN` (SQL) |
+| `datetime` | Timestamp | `DateTime<Utc>` (Rust), `time.Time` (Go), `Date` (TS), `TIMESTAMPTZ` (SQL) |
+| `uuid` | UUID v4 | `Uuid` (Rust), `uuid.UUID` (Go), `string` (TS), `UUID` (SQL) |
+
+**Example Type Definitions:**
+```blueprint
+// Rust types
+[define string]String[/define]
+[define int32]i32[/define]
+[define boolean]bool[/define]
+[define datetime]DateTime<Utc>[/define]
+[define uuid]Uuid[/define]
+
+// TypeScript types  
+[define string]string[/define]
+[define int32]number[/define]
+[define boolean]boolean[/define]
+[define datetime]Date[/define]
+[define uuid]string[/define]
+
+// PostgreSQL types
+[define string]TEXT[/define]
+[define int32]INTEGER[/define]
+[define boolean]BOOLEAN[/define]
+[define datetime]TIMESTAMPTZ[/define]
+[define uuid]UUID[/define]
+```
+
+### Import Links
+
+Define import statements for types that require external dependencies:
+
+```blueprint
+[link dependency_key]import_statement[/link]
+```
+
+**Special Variables:**
+- `$` - Replaced with custom type name (e.g., `custom::$` becomes `custom::UserType`)
+
+**Examples:**
+```blueprint
+// Rust imports
+[link uuid]use uuid::Uuid;[/link]
+[link datetime]use chrono::{DateTime, Utc};[/link]
+[link custom]use crate::types::$;[/link]
+
+// Go imports  
+[link uuid]import "github.com/google/uuid"[/link]
+[link datetime]import "time"[/link]
+
+// TypeScript imports
+[link custom]import { $ } from './types';[/link]
+```
+
+### File Output
+
+Specify output files and their content. Files inherit the current iteration context:
+
+```blueprint
+[file]filename[/file]
+content goes here...
+```
+
+**Dynamic Filenames:**
+Files can use any variable from the current context:
+```blueprint
+[file]models.rs[/file]           // Single file for all models
+[file][name].ts[/file]           // Separate file per object (uses current object name)
+[file]schema/[name].sql[/file]   // Files in subdirectories
+[file][enum_name]_types.rs[/file] // In enum context, uses enum name
+```
+
+**Context Inheritance:**
+Files inherit all variables and flags from their surrounding context:
+```blueprint
+[each object]
+[file][name]_model.rs[/file]     // Has access to object variables: [name], [table_name], etc.
+pub struct [name] {
+[each field]
+    [name]: [type],              // Has access to field variables: [name], [type], etc.
+[/each]
+}
+[/each]
+```
+
+### Template Syntax
+
+#### Iteration Constructs
+
+**Standard Iteration:**
+```blueprint
+[each object]
+  // Content repeated for each object (record/struct/synthetic)
+[/each]
+
+[each enum]
+  // Content repeated for each enum
+[/each]
+
+[each field] 
+  // Content repeated for each field in current object
+[/each]
+
+[each case]
+  // Content repeated for each enum value
+[/each]
+
+[each join]
+  // Content repeated for each join relationship
+[/each]
+```
+
+**Reverse Iteration:**
+```blueprint
+[eachr object]
+  // Process objects in reverse order
+[/eachr]
+```
+
+#### Conditional Logic
+
+**Basic Conditionals:**
+```blueprint
+[if condition]content when true[/if]
+[ifn condition]content when false[/ifn]
+```
+
+**Available Flags:**
+
+| Context | Flag | Description | Example |
+|---------|------|-------------|---------|
+| Object | `record` | Object is a database record | `[if record]CREATE TABLE...[/if]` |
+| Object | `struct` | Object is in-memory struct | `[if struct]pub struct...[/if]` |
+| Object | `syn` | Object is synthetic view | `[if syn]-- View definition[/if]` |
+| Object | `has_joins` | Object has join relationships | `[if has_joins]-- With joins[/if]` |
+| Field | `optional` | Field is optional (nullable) | `[if optional]Option<[/if]` |
+| Field | `array` | Field is array type | `[if array]Vec<[/if]` |
+| Field | `custom` | Field uses custom enum type | `[if custom]// Enum field[/if]` |
+| Field | `local` | Field is local (not a reference) | `[if local]// Local field[/if]` |
+| Iteration | `sep` | Not the last item in loop | `[if sep],[/if]` |
+| Function | `has_args` | Function has arguments | `[if has_args]([0])[/if]` |
+
+#### Variable Access
+
+**Object Context Variables:**
+```blueprint
+[each object]
+  [name]         // Object name: "User"
+  [table_name]   // Database table: "users" 
+[/each]
+```
+
+**Field Context Variables:**
+```blueprint
+[each field]
+  [name]            // Field name: "user_id"
+  [type]            // Resolved type: "Uuid" 
+  [object_name]     // Parent object: "User"
+  [ref_table]       // Referenced table: "users"
+  [ref_field]       // Referenced field: "id"
+[/each]
+```
+
+**Enum Context Variables:**
+```blueprint
+[each enum]
+  [name]         // Enum name: "UserType"
+[/each]
+
+[each case]
+  [name]         // Case name: "Admin"
+  [value]        // Case value: "Admin" 
+  [enum_name]    // Parent enum: "UserType"
+[/each]
+```
+
+**Join Context Variables:**
+```blueprint
+[each join]
+  [name]          // Join name: "user_posts"
+  [local_field]   // Local field: "user_id"
+  [ref_field]     // Referenced field: "id"
+  [ref_table]     // Referenced table: "users"
+  [ref_entity]    // Referenced entity: "User"
+  [condition]     // Join condition: "="
+[/each]
+```
+
+**Variable Transformations:**
+All variables support case transformations:
+```blueprint
+[variable]              // Original: "user_name"
+[variable.camelcase]    // camelCase: "userName" 
+[variable.titlecase]    // TitleCase: "UserName"
+[variable.snakecase]    // snake_case: "user_name"
+[variable.uppercase]    // UPPERCASE: "USER_NAME"
+[variable.lowercase]    // lowercase: "user_name"
+```
+
+### Function Context
+
+Handle field and object functions using the `[func]` construct:
+
+```blueprint
+[func namespace.function_name]
+  content when function is present
+[/func]
+```
+
+**Function Arguments:**
+Access function arguments using numeric indices:
+```blueprint
+[func db.default]
+  DEFAULT [0]     // First argument: db:default("NOW()") -> "NOW()"
+[/func]
+
+[func db.index]
+  INDEX ([0][if 1], [1][/if])  // Multiple arguments: db:index("field1", "field2")
+[/func]
+```
+
+See the [Functions](#functions) section above for the complete list of available functions and their syntax.
+
+### Reference Context
+
+Handle field references and relationships:
+
+```blueprint
+[ref]
+  // Content when field references another object
+  REFERENCES [foreign_table]([foreign_field])
+[/ref]
+```
+
+### Special Constructs
+
+**Line Breaks:**
+```blueprint
+[br]  // Insert line break/newline
+```
+
+**Import Processing:**
+```blueprint
+[imports]  // Process and insert all import statements
+```
+
+**Import Tags:**
+Add imports conditionally when specific content is generated:
+```blueprint
+[import]use serde::{Serialize, Deserialize};[/import]
+```
+Import tags are collected and inserted at `[imports]` locations if the surrounding block is evaluated.
+
+**Separators:**
+```blueprint
+[if sep],[/if]      // Comma separator (not on last item)
+[if sep] | [/if]    // Pipe separator  
+[if sep][br][/if]   // Line break separator
+```
+
+### Complete Blueprint Example
+
+Here's a complete blueprint that generates Rust structs:
+
+```blueprint
+[meta id]custom_rust[/meta]
+[meta name]Custom Rust Generator[/meta]
+
+[define string]String[/define]
+[define int32]i32[/define]
+[define int64]i64[/define]
+[define float64]f64[/define]
+[define boolean]bool[/define]
+[define datetime]DateTime<Utc>[/define]
+[define uuid]Uuid[/define]
+
+[link uuid]use uuid::Uuid;[/link]
+[link datetime]use chrono::{DateTime, Utc};[/link]
+[link custom]use crate::types::$;[/link]
+
+[file]models.rs[/file]
+//! Generated models - do not edit manually
+[imports]
+
+[each enum]
+#[derive(Debug, Clone, PartialEq)]
+pub enum [name] {
+[each case]
+    [name][if sep],[/if]
+[/each]
+}
+
+[/each]
+[each object]
+[if struct]
+#[derive(Debug, Clone)]
+pub struct [name] {
+[each field]
+    pub [name]: [if optional]Option<[/if][if array]Vec<[/if][type][if array]>[/if][if optional]>[/if][if sep],[/if]
+[/each]
+}
+
+[/if]
+[if record]
+#[derive(Debug, Clone)]
+pub struct [name] {
+[each field]
+    pub [name]: [if optional]Option<[/if][type][if optional]>[/if][if sep],[/if]
+[func db.pk]
+    // Primary key field
+[/func]
+[func db.unique]
+    // Unique constraint
+[/func]
+[/each]
+}
+
+[/if]
+[/each]
+```
+
+### Advanced Blueprint Features
+
+**Multiple Files:**
+```blueprint
+[each object]
+[file][name].rs[/file]
+use super::*;
+
+pub struct [name] {
+    // fields here...
+}
+[/each]
+```
+
+**Conditional File Generation:**
+```blueprint  
+[each object]
+[if record]
+[file]records/[name].sql[/file]
+CREATE TABLE [table_name] (
+[each field]
+    [name] [type][func db.pk] PRIMARY KEY[/func][if sep],[/if]
+[/each]
+);
+[/if]
+[/each]
+```
+
+**Complex Conditionals:**
+```blueprint
+[if record]
+[if has_joins]
+-- Table with relationships
+[/if]
+CREATE TABLE [table_name] (
+[each field]
+    [name] [type][func db.pk] PRIMARY KEY[/func][if optional] NULL[/if][if sep],[/if]
+[/each]
+);
+[/if]
+```
+
+For more examples, see the built-in blueprints in [`src/blueprint/core/`](src/blueprint/core/) including:
+- **[`rust.blueprint`](src/blueprint/core/rust.blueprint)** - Rust structs with serde
+- **[`typescript.blueprint`](src/blueprint/core/typescript.blueprint)** - TypeScript interfaces  
+- **[`postgres.blueprint`](src/blueprint/core/postgres.blueprint)** - PostgreSQL DDL
+- **[`go.blueprint`](src/blueprint/core/go.blueprint)** - Go structs with JSON tags
+- **[`test/markdown.blueprint`](test/markdown.blueprint)** - Documentation generator
 
 ### Building from Source
 
