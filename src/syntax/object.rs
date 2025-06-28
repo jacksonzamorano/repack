@@ -5,38 +5,107 @@ use super::{
     Token, field::FieldReferenceKind,
 };
 
+/// Defines the different categories of objects that can be defined in a schema.
+/// 
+/// Each object type has different capabilities, constraints, and code generation
+/// behaviors. The type determines how the object can be used and what features
+/// are available during code generation.
 #[derive(Debug, PartialEq, Clone)]
 pub enum ObjectType {
+    /// A database-backed entity that represents a table or collection.
+    /// Records support database operations, table mapping, and persistence features.
+    /// They typically map to database tables and support CRUD operations.
     Record,
+    /// A derived object that inherits from a Record but adds additional computed fields.
+    /// Synthetic objects extend existing Records with additional functionality
+    /// while maintaining the relationship to the parent Record.
     Synthetic,
+    /// A simple data structure without database backing.
+    /// Structs are used for data transfer objects, API models, and in-memory
+    /// data structures that don't require persistence.
     Struct,
 }
 
+/// Represents a relationship join between two objects in the schema.
+/// 
+/// ObjectJoin defines how objects are related to each other, specifying
+/// the local and foreign fields that establish the relationship. This is
+/// used for generating proper foreign key relationships and join queries
+/// in the target code.
 #[derive(Debug, Clone)]
 pub struct ObjectJoin {
+    /// The name identifier for this join relationship.
+    /// Used in code generation to create meaningful method and variable names.
     pub join_name: String,
+    /// The field name in the current object that participates in the join.
     pub local_field: String,
+    /// The join condition operator (typically "=" for equality joins).
     pub condition: String,
+    /// The name of the target object/entity being joined to.
     pub foreign_entity: String,
+    /// The field name in the foreign entity that participates in the join.
     pub foreign_field: String,
 }
 
+/// Represents a complete object definition in the schema system.
+/// 
+/// Object is the core building block of the schema, containing all the metadata
+/// needed to generate code for entities, data structures, and their relationships.
+/// Each object can have fields, functions, inheritance relationships, and database
+/// mappings depending on its type.
 #[derive(Debug)]
 pub struct Object {
+    /// The category/type of this object (Record, Synthetic, or Struct).
     pub object_type: ObjectType,
+    /// The unique name identifier for this object used in code generation.
     pub name: String,
+    /// The list of fields/properties that belong to this object.
     pub fields: Vec<Field>,
+    /// Optional parent object name for inheritance relationships.
+    /// Only available for Synthetic objects that extend Records.
     pub inherits: Option<String>,
+    /// Tags/categories for organizing and filtering objects during generation.
+    /// Used by blueprints to selectively process certain object types.
     pub categories: Vec<String>,
+    /// Database table name override for Record objects.
+    /// If None, the object name is used as the table name.
     pub table_name: Option<String>,
+    /// When true, inherits all fields from the parent object.
+    /// Used in combination with reuse_exclude to selectively inherit fields.
     pub reuse_all: bool,
+    /// List of field names to exclude when reuse_all is true.
+    /// Allows fine-grained control over inheritance.
     pub reuse_exclude: Vec<String>,
+    /// List of specific field names to include from the parent object.
+    /// Alternative to reuse_all for selective inheritance.
     pub reuse_include: Vec<String>,
+    /// Names of code snippets to include in the generated code.
+    /// Snippets provide custom code injection points for specialized logic.
     pub use_snippets: Vec<String>,
+    /// Custom functions/methods defined for this object.
+    /// These generate additional methods in the target language classes.
     pub functions: Vec<ObjectFunction>,
+    /// Database join relationships to other objects.
+    /// Defines how this object relates to other entities in queries.
     pub joins: Vec<ObjectJoin>,
 }
 impl Object {
+    /// Parses an Object definition from the input file contents.
+    /// 
+    /// This method reads the schema definition syntax and constructs a complete
+    /// Object instance with all its metadata, fields, and relationships.
+    /// The parsing handles various tokens like @table_name, :inheritance,
+    /// #categories, and field definitions within braces.
+    /// 
+    /// # Arguments
+    /// * `typ` - The initial object type (Record, Synthetic, or Struct)
+    /// * `contents` - Mutable reference to the file contents being parsed
+    /// 
+    /// # Returns
+    /// A fully constructed Object with all parsed metadata and fields
+    /// 
+    /// # Panics
+    /// Panics if the expected object name is missing or malformed
     pub fn read_from_contents(typ: ObjectType, contents: &mut FileContents) -> Object {
         let mut object_type = typ;
         let Some(name_opt) = contents.next() else {
@@ -184,6 +253,16 @@ impl Object {
         }
     }
 
+    /// Validates the object definition and returns any semantic errors.
+    /// 
+    /// This method performs comprehensive validation of the object based on its type:
+    /// - Records must have table names and cannot have custom object field types
+    /// - Structs cannot inherit, reuse fields, or have table names
+    /// - All objects must have unique field names and resolved field types
+    /// 
+    /// # Returns
+    /// * `Some(Vec<RepackError>)` if validation errors are found
+    /// * `None` if the object is valid
     pub fn errors(&self) -> Option<Vec<RepackError>> {
         let mut errors = Vec::new();
         if self.object_type == ObjectType::Record {
@@ -263,6 +342,17 @@ impl Object {
         }
     }
 
+    /// Determines the dependency relationships for this object.
+    /// 
+    /// Analyzes the object's inheritance and field references to identify
+    /// which other objects this object depends on. This is crucial for
+    /// proper dependency ordering during code generation.
+    /// 
+    /// # Returns
+    /// A vector of object names that this object depends on, including:
+    /// - Parent objects (via inheritance)
+    /// - Referenced objects (via field types)
+    /// - Join target objects (via implicit joins)
     pub fn depends_on(&self) -> Vec<String> {
         let mut dependencies = HashSet::new();
         if let Some(inherit) = &self.inherits {
@@ -292,6 +382,17 @@ impl Object {
         dependencies.into_iter().collect()
     }
 
+    /// Filters object functions by their namespace.
+    /// 
+    /// Returns all functions defined on this object that belong to the
+    /// specified namespace. Namespaces are used to organize functions
+    /// by their target language or usage context.
+    /// 
+    /// # Arguments
+    /// * `ns` - The namespace identifier to filter by
+    /// 
+    /// # Returns
+    /// A vector of references to functions in the specified namespace
     pub fn functions_in_namespace(&self, ns: &str) -> Vec<&ObjectFunction> {
         self.functions
             .iter()

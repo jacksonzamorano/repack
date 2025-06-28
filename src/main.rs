@@ -10,11 +10,30 @@ mod blueprint;
 // mod outputs;
 mod syntax;
 
+/// Defines the operational mode for the repack code generator.
+/// 
+/// This enum determines what action the tool will take when executed.
+/// The behavior is determined by command-line flags passed to the application.
 enum Behavior {
+    /// Generate code files from the schema using the configured blueprints.
+    /// This is the default mode that creates output files in target languages.
     Build,
+    /// Remove previously generated code files, cleaning up the output directories.
+    /// Useful for starting fresh or removing outdated generated code.
     Clean,
 }
 
+/// Entry point for the repack code generation tool.
+/// 
+/// This function orchestrates the complete code generation process:
+/// 1. Parses command-line arguments to determine input file and behavior
+/// 2. Loads and parses the schema file with all its dependencies
+/// 3. Loads required blueprints (both core and external)
+/// 4. Generates code for each configured output target
+/// 5. Handles both build and clean operations based on flags
+/// 
+/// The tool expects at least one argument (the input schema file) and supports
+/// the --clean flag to remove previously generated files instead of building.
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 2 {

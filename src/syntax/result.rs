@@ -5,15 +5,39 @@ use super::{
     RepackError, RepackErrorKind, Snippet, Token, dependancies::graph_valid, language,
 };
 
+/// Represents the complete parsed schema with all defined entities and configurations.
+/// 
+/// ParseResult contains all the parsed elements from a schema file, including objects,
+/// enums, output configurations, and blueprint dependencies. This structure serves as
+/// the primary input for code generation and validation processes.
 #[derive(Debug)]
 pub struct ParseResult {
+    /// All parsed object definitions (records, structs, synthetics)
     pub objects: Vec<Object>,
+    /// Output configuration definitions specifying target languages and settings
     pub languages: Vec<Output>,
+    /// All parsed enumeration definitions
     pub enums: Vec<Enum>,
+    /// List of external blueprint files to be loaded for code generation
     pub include_blueprints: Vec<String>,
 }
 
 impl ParseResult {
+    /// Parses the complete schema from tokenized file contents.
+    /// 
+    /// This method performs the complete parsing pipeline:
+    /// 1. Parses all top-level definitions (objects, enums, outputs, imports)
+    /// 2. Expands snippet inclusions into objects
+    /// 3. Resolves dependency ordering for objects
+    /// 4. Resolves all field type references and relationships
+    /// 5. Validates the complete schema for consistency
+    /// 
+    /// # Arguments
+    /// * `contents` - The tokenized file contents to parse
+    /// 
+    /// # Returns
+    /// * `Ok(ParseResult)` if parsing succeeds with a valid schema
+    /// * `Err(Vec<RepackError>)` if any validation or parsing errors occur
     pub fn from_contents(mut contents: FileContents) -> Result<ParseResult, Vec<RepackError>> {
         let mut errors = Vec::<RepackError>::new();
 
@@ -376,6 +400,18 @@ impl ParseResult {
         }
     }
 
+    /// Filters objects based on category inclusion and explicit exclusions.
+    /// 
+    /// This method selects objects for code generation based on the target
+    /// configuration's category filters and exclusion lists. Objects without
+    /// categories are included by default when no category filter is specified.
+    /// 
+    /// # Arguments
+    /// * `categories` - List of categories to include (empty means include all)
+    /// * `excludes` - List of object names to explicitly exclude
+    /// 
+    /// # Returns
+    /// A vector of object references that match the filtering criteria
     pub fn included_objects(&self, categories: &[String], excludes: &[String]) -> Vec<&Object> {
         self.objects
             .iter()
@@ -391,6 +427,17 @@ impl ParseResult {
             .collect()
     }
 
+    /// Filters enums based on category inclusion and explicit exclusions.
+    /// 
+    /// Similar to included_objects, this method selects enums for code generation
+    /// based on category matching and exclusion rules.
+    /// 
+    /// # Arguments
+    /// * `categories` - List of categories to include (empty means include all)
+    /// * `excludes` - List of enum names to explicitly exclude
+    /// 
+    /// # Returns
+    /// A vector of enum references that match the filtering criteria
     pub fn included_enums(&self, categories: &[String], excludes: &[String]) -> Vec<&Enum> {
         self.enums
             .iter()

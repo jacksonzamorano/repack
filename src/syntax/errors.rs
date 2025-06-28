@@ -2,6 +2,11 @@ use crate::blueprint::SnippetDetails;
 
 use super::{Field, Object, Output};
 
+/// Enumeration of all possible error types that can occur during schema processing.
+/// 
+/// Each error kind represents a specific category of validation, parsing, or generation
+/// error. The u32 representation provides unique error codes for debugging and logging.
+/// Error codes are used in formatted error messages as E0001, E0002, etc.
 #[derive(Debug)]
 #[repr(u32)]
 pub enum RepackErrorKind {
@@ -66,6 +71,16 @@ impl RepackErrorKind {
 }
 
 impl RepackError {
+    /// Converts the error into a formatted string message for display.
+    /// 
+    /// This method creates a comprehensive error message that includes:
+    /// - Error code (E0001 format)
+    /// - Context location (language -> object.field)
+    /// - Error description and details
+    /// - Stack trace for nested errors
+    /// 
+    /// # Returns
+    /// A formatted string suitable for console output or logging
     pub fn into_string(self) -> String {
         let msg = self.error.as_string();
         let loc = match (self.lang_name, self.obj_name, self.field_name) {
@@ -89,17 +104,35 @@ impl RepackError {
     }
 }
 
+/// Represents a complete error with context information for debugging.
+/// 
+/// RepackError combines an error type with contextual information about where
+/// the error occurred (language, object, field) and provides detailed error
+/// messages with stack traces for complex nested errors.
 #[derive(Debug)]
 pub struct RepackError {
+    /// The specific type/category of error that occurred
     pub error: RepackErrorKind,
+    /// The target language/profile being processed when the error occurred
     pub lang_name: Option<String>,
+    /// The object name where the error occurred
     pub obj_name: Option<String>,
+    /// The field name where the error occurred (if applicable)
     pub field_name: Option<String>,
+    /// Additional details or context about the error
     pub error_details: Option<String>,
+    /// Stack trace for nested processing contexts (e.g., snippet processing)
     pub stack: Vec<String>,
 }
 
 impl RepackError {
+    /// Creates a global error without specific object or field context.
+    /// 
+    /// Used for system-level errors like file I/O issues or blueprint loading problems.
+    /// 
+    /// # Arguments
+    /// * `error` - The type of error that occurred
+    /// * `msg` - Detailed error message
     pub fn global(error: RepackErrorKind, msg: String) -> RepackError {
         RepackError {
             error,
@@ -110,6 +143,14 @@ impl RepackError {
             stack: Vec::new(),
         }
     }
+    /// Creates an error associated with a specific object.
+    /// 
+    /// Used for object-level validation errors like missing table names
+    /// or inheritance issues.
+    /// 
+    /// # Arguments
+    /// * `error` - The type of error that occurred
+    /// * `obj` - The object where the error was found
     pub fn from_obj(error: RepackErrorKind, obj: &Object) -> RepackError {
         RepackError {
             error,
@@ -132,6 +173,15 @@ impl RepackError {
         }
     }
 
+    /// Creates an error associated with a specific field in an object.
+    /// 
+    /// Used for field-level validation errors like type resolution failures
+    /// or invalid field configurations.
+    /// 
+    /// # Arguments
+    /// * `error` - The type of error that occurred
+    /// * `obj` - The object containing the problematic field
+    /// * `field` - The field where the error was found
     pub fn from_field(error: RepackErrorKind, obj: &Object, field: &Field) -> RepackError {
         RepackError {
             error,
