@@ -1,84 +1,447 @@
-# REPACK
+# Repack
 
-`repack` is a tool to define data models and generate corresponding code in various languages and formats. You define your models in `.repack` files using a simple syntax.
+**Powerful model code generation for multiple target languages**
 
-* Note: Repack is not an ORM. Repack is a codegen tool. *
+Repack is a schema-first code generation tool that allows you to define your data models once and generate consistent, type-safe code across multiple programming languages and platforms. Define your objects, enums, and relationships in a simple schema language, then generate database schemas, API models, and data structures for Rust, TypeScript, Go, PostgreSQL, and more.
 
-* Another note: documentation below is AI generated and has only been lightly reviewed. While this will change in the near future, to learn more now, check out the example files in test/test.repack *
+## Project Overview
 
-## Key Concepts
+Repack solves the problem of maintaining consistent data models across different parts of your application stack. Instead of manually writing and synchronizing model definitions across your database, backend API, frontend client, and other services, you define your schema once in a `.repack` file and automatically generate all the necessary code.
 
-*   **Snippets:** Reusable blocks of fields. Include them in records using `!snippet_name`.
-    Example: `base` snippet for `id` and `created_date`.
-*   **Records:** Define your data models (e.g., `User`, `Organization`). Similar to classes or tables.
-*   **Structs:** Define data structures not necessarily database models but useful for your application (e.g., `OrganizationDirectory`).
-*   **Outputs:** Specify desired output formats and locations. Currently supported outputs (more to come):
-    *   `description`: Text description of models.
-    *   `postgres`: SQL for PostgreSQL.
-    *   `typescript_class`: TypeScript classes.
-    *   `typescript_interface`: TypeScript interfaces.
-    *   `typescript_drizzle`: TypeScript code for Drizzle ORM.
-    *   `rust`: Rust structs.
-*   **Tags:** Categorize models using `#tag_name` (e.g., `#models`, `#data`, `#private`). Used by output generators.
-*   **Fields:** Define fields with types (e.g., `name string`, `id int32`).
-*   **Functions** Add functions like `db:primary_key`, `db:default("NOW()")`, `db:index("org_id")`.
-*   **References:** Define relationships using `ref(OtherRecord.field)`.
-*   **Joins** Define views and join data using `from(local_ref_field.field)`.
-*   **Inheritance/Composition:** Create record variations by including all fields (`*`) and adding/removing specific fields (`- field_name`).
-*   **Imports:** Import definitions from other `.repack` files using `import "filename.repack"`.
+**Key Benefits:**
+- **Single Source of Truth**: Define your data models once, use everywhere
+- **Type Safety**: Generated code is fully typed for each target language
+- **Relationship Management**: Automatic handling of foreign keys, joins, and references
+- **Extensible**: Custom blueprints for any target language or framework
+- **Database Integration**: Generate SQL schemas with indexes, constraints, and relationships
 
-## How to Create Your Own Models
+**What Repack Generates:**
+- Database schemas (PostgreSQL, MySQL, etc.)
+- API models (Rust structs, TypeScript interfaces, Go structs)
+- Serialization/deserialization code
+- Database query helpers
+- Documentation (Markdown, etc.)
 
-1.  **Create a `.repack` file:** This is where you'll define your models.
-2.  **Define Snippets (Optional but Recommended):**
-    ```repack
-    snippet base {
-        id int32 db:primary_key db:identity db:unique
-        created_date datetime db:default("NOW()")
-    }
-    ```
-3.  **Define Records:**
-    ```repack
-    record User @users #private #models {
-        !base // Includes id and created_date
-        name string
-        email string
-        // ... other fields
-    }
+## Quick Start
 
-    record Post @posts #models {
-        !base
-        title string
-        content string
-        author_id ref(User.id) // Foreign key to User table
-        db:index("author_id")
-    }
-    ```
-4.  **Define Structs (Optional):**
-    ```repack
-    struct UserProfile #data {
-        user User
-        posts Post[]
-    }
-    ```
-5.  **Specify Outputs:**
-    ```repack
-    // Output all records tagged with #models to a PostgreSQL schema file
-    output postgres @./output/postgres_schema #models;
+### 1. Create Your First Schema
 
-    // Output all records and structs tagged with #data as TypeScript interfaces
-    output typescript_interface @./output/ts_interfaces #data {
-        make_index true // Option to create an index.ts file
-    }
+Create a file called `example.repack`:
 
-    // Output Rust structs for items tagged #data
-    output rust @./output/rust_structs #data;
-    ```
-6.  **Run the `repack` CLI:**
-    ```bash
-    repack your_definitions.repack
-    ```
-    This will process your definitions and generate files in the specified output directories.
+```repack
+// Define output targets
+output postgres @database;
+output rust @models;
+output typescript @frontend/types;
 
+// Define an enum
+enum UserType #model {
+    Admin
+    User
+    Guest
+}
 
-By combining these features, you can create a rich and well-structured definition of your data model that can then be translated into various code artifacts, saving time and ensuring consistency.
+// Define a record (database table)
+record User @users #model {
+    id uuid db:pk
+    created_date datetime db:default("NOW()")
+    name string
+    email string db:unique
+    user_type UserType
+    is_active boolean
+}
+
+// Define a struct (in-memory only)
+struct UserList #model {
+    users User[]
+    total_count int32
+}
+```
+
+### 2. Generate Code
+
+```bash
+# Build all configured outputs
+repack example.repack
+
+# Clean generated files
+repack example.repack --clean
+```
+
+This will generate:
+- `database/model.sql` - PostgreSQL schema
+- `models/model.rs` - Rust structs  
+- `frontend/types/User.ts`, `frontend/types/UserType.ts`, etc. - TypeScript interfaces
+
+### 3. Create a Custom Blueprint
+
+Create `custom.blueprint` for a simple documentation generator:
+
+```blueprint
+[meta id]docs[/meta]
+[meta name]Documentation Generator[/meta]
+
+[define string]Text[/define]
+[define int32]Integer[/define]
+[define boolean]True/False[/define]
+[define uuid]Unique ID[/define]
+
+[file]models.md[/file]
+# Data Models
+
+[each object]
+## [name]
+[if record]**Database Table**: `[table_name]`[/if]
+[if struct]**In-Memory Structure**[/if]
+
+[each field]
+- **[name]**: [type][if optional] (optional)[/if][if array] (array)[/if]
+[func db.pk]  - Primary Key[/func]
+[func db.unique]  - Must be unique[/func]
+[/each]
+
+[/each]
+```
+
+Then use it in your schema:
+
+```repack
+blueprint "custom.blueprint"
+output docs @documentation;
+
+// ... your model definitions
+```
+
+## Detailed Reference
+
+### Schema Syntax
+
+#### Basic Structure
+
+```repack
+// Comments start with //
+// Import external schema files
+import "other_schema.repack"
+
+// Load external blueprint
+blueprint "path/to/custom.blueprint"
+
+// Configure output targets
+output <blueprint_id> @<output_path> #<category> #<category> {
+    option_key option_value
+}
+
+// Define snippets (reusable field groups)
+snippet <name> {
+    field_name field_type
+}
+
+// Define enums
+enum <name> #<category> {
+    OptionOne
+    OptionTwo
+}
+
+// Define objects
+<object_type> <name> @<table_name> : <parent> #<category> {
+    // Fields and functions
+}
+```
+
+#### Object Types
+
+Repack supports three types of objects, each with different capabilities:
+
+| Object Type | Purpose | Database Table | Inheritance | Custom Types | Arrays |
+|-------------|---------|----------------|-------------|--------------|--------|
+| **`record`** | Database entities | ✅ Required (`@table_name`) | ❌ No | ✅ Enums only | ❌ No |
+| **`struct`** | In-memory data | ❌ Not allowed | ❌ No | ✅ All types | ✅ Yes |
+| **`synthetic`** | Computed views | ✅ Inherited from parent | ✅ Yes | ✅ All types | ✅ Yes |
+
+**Examples:**
+
+```repack
+// Record: Maps to database table
+record User @users #model {
+    id uuid db:pk
+    name string
+}
+
+// Struct: In-memory data structure
+struct UserResponse #api {
+    user User
+    permissions string[]
+}
+
+// Synthetic: Extends a record with computed fields
+record ContactInfo @contacts #model {
+    user_id ref(User.id)
+    email string
+}
+
+synthetic FullUser: ContactInfo #view {
+    *  // Include all fields from ContactInfo
+    name from(user_id.name)  // Add computed field via join
+}
+```
+
+### Field Types
+
+#### Core Types
+
+| Type | Description | Example |
+|------|-------------|---------|
+| `string` | UTF-8 text | `name string` |
+| `int32` | 32-bit integer | `count int32` |
+| `int64` | 64-bit integer | `big_number int64` |
+| `float64` | 64-bit float | `price float64` |
+| `boolean` | True/false | `is_active boolean` |
+| `datetime` | Timestamp | `created_at datetime` |
+| `uuid` | UUID v4 | `id uuid` |
+
+#### Field Modifiers
+
+```repack
+field_name type           // Required field
+field_name type?          // Optional field  
+field_name type[]         // Array of values (structs only)
+field_name type[]?        // Optional array
+```
+
+#### Field References
+
+```repack
+// Direct type reference
+user_id UserType
+
+// Reference field from another object
+user_name ref(User.name)
+
+// Join via foreign key relationship
+user_name from(user_id.name)
+
+// Explicit join reference
+user_name with(user_join.name)
+```
+
+### Functions
+
+Functions provide additional metadata and behavior for fields and objects. They follow the pattern `namespace:function_name(arguments)`.
+
+#### Database Functions (`db:` namespace)
+
+**Field-Level Functions:**
+
+| Function | Description | Example |
+|----------|-------------|---------|
+| `db:pk` | Primary key | `id uuid db:pk` |
+| `db:unique` | Unique constraint | `email string db:unique` |
+| `db:default("value")` | Default value | `created_at datetime db:default("NOW()")` |
+| `db:generated` | Generated column | `full_name string db:generated` |
+| `db:identity` | Auto-increment | `id int32 db:identity` |
+
+**Object-Level Functions:**
+
+| Function | Description | Example |
+|----------|-------------|---------|
+| `db:index("field")` | Single field index | `db:index("email")` |
+| `db:index("f1", "f2")` | Composite index | `db:index("user_id", "created_at")` |
+
+**Example Usage:**
+
+```repack
+record User @users #model {
+    id uuid db:pk
+    email string db:unique
+    created_at datetime db:default("NOW()")
+    updated_at datetime
+    
+    // Object-level functions
+    db:index("email")
+    db:index("created_at", "updated_at")
+}
+```
+
+### Inheritance and Reuse
+
+#### Snippets (Field Groups)
+
+```repack
+snippet timestamps {
+    created_at datetime db:default("NOW()")
+    updated_at datetime?
+}
+
+snippet base {
+    id uuid db:pk
+    !timestamps  // Include snippet
+}
+
+record User @users {
+    !base  // Include base snippet
+    name string
+}
+```
+
+#### Object Inheritance (Synthetic Objects)
+
+```repack
+record User @users #model {
+    id uuid db:pk
+    name string
+}
+
+synthetic ExtendedUser: User #view {
+    *                    // Include all fields from User
+    - password          // Exclude specific fields
+    + email             // Include only specific fields
+    display_name string // Add new fields
+}
+```
+
+### Categories and Filtering
+
+Use categories to control which objects are generated for each output:
+
+```repack
+// Only generate objects tagged with #api
+output typescript @frontend #api;
+
+// Generate objects tagged with #model or #view  
+output rust @backend #model #view;
+
+enum Status #api #model {
+    Active
+    Inactive
+}
+
+record User @users #model {
+    // Will be generated for rust output only
+}
+
+struct UserResponse #api {
+    // Will be generated for typescript output only
+}
+```
+
+### Output Configuration
+
+```repack
+output <blueprint_id> @<path> #<categories> <exclusions> {
+    option_name option_value
+}
+```
+
+**Example:**
+
+```repack
+output postgres @database/schema #model !User !internal_table;
+output rust @src/models #model #api {
+    derive_debug true
+    serde_support true
+}
+```
+
+### Example Files
+
+See the `test/` directory for complete examples:
+
+- **[`test/test.repack`](test/test.repack)** - Complete schema example with all features
+- **[`test/markdown.blueprint`](test/markdown.blueprint)** - Custom blueprint for documentation
+- **[`test/rust/model.rs`](test/rust/model.rs)** - Generated Rust code
+- **[`test/postgres/model.sql`](test/postgres/model.sql)** - Generated SQL schema
+- **[`test/typescript/`](test/typescript/)** - Generated TypeScript interfaces
+
+### Built-in Blueprints
+
+Repack includes built-in blueprints for common targets:
+
+- **`rust`** - Rust structs with serde support
+- **`typescript`** - TypeScript interfaces
+- **`postgres`** - PostgreSQL DDL schemas
+- **`go`** - Go structs with JSON tags
+
+See [`src/blueprint/core/`](src/blueprint/core/) for the blueprint source code.
+
+### Advanced Features
+
+#### Joins and Relationships
+
+```repack
+record User @users {
+    id uuid db:pk
+    name string
+}
+
+record Post @posts {
+    id uuid db:pk
+    user_id ref(User.id)
+    title string
+    
+    // Explicit join definition
+    ^ author_posts self.user_id = User.id
+}
+
+synthetic PostWithAuthor: Post {
+    *
+    author_name with(author_posts.name)
+}
+```
+
+#### Complex Schemas
+
+```repack
+import "common/*.repack"  // Import all .repack files from directory
+blueprint "blueprints/custom.blueprint"
+
+output postgres @database #core #audit;
+output rust @models #core {
+    package_name my_models
+}
+
+snippet auditable {
+    created_by uuid
+    created_at datetime db:default("NOW()")
+    updated_by uuid?
+    updated_at datetime?
+}
+
+enum Priority #core {
+    Low
+    Medium  
+    High
+    Critical
+}
+
+record Project @projects #core {
+    !auditable
+    name string db:unique
+    description string?
+    priority Priority
+    is_active boolean db:default("true")
+    
+    db:index("name")
+    db:index("priority", "is_active")
+}
+```
+
+### Blueprint Development
+
+To create custom blueprints, see the existing blueprints in [`src/blueprint/core/`](src/blueprint/core/) as examples. Blueprints use a template syntax with variables, loops, and conditionals to generate target code.
+
+### Building from Source
+
+```bash
+# Clone the repository
+git clone https://github.com/jacksonzamorano/repack
+cd repack
+
+# Build the project
+cargo build --release
+
+# Run tests
+cargo test
+
+# Install locally
+cargo install --path .
+```
