@@ -50,12 +50,4 @@ impl Enum {
             options,
         }
     }
-
-    pub fn cases(&self, reverse: bool) -> Vec<&String> {
-        if reverse {
-            self.options.iter().rev().collect()
-        } else {
-            self.options.iter().collect()
-        }
-    }
 }

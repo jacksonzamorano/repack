@@ -29,7 +29,7 @@ const (
 [each object]
 type [name] struct {
 	[each field]
-	[name.titlecase] [if optional]*[/if][type] `json:"[name]"`
+	[name.titlecase] [if optional]*[/if][if array]\[][/if][type] `json:"[name]"`
 	[/each]
 }
 [/each]

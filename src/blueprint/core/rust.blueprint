@@ -6,15 +6,18 @@
 [define float64]f64[/define]
 [define string]String[/define]
 [define boolean]bool[/define]
-[define datetime]chrono::DateTime[/define]
-[define uuid]uuid::Uuid[/define]
+[define datetime]DateTime<Utc>[/define]
+[define uuid]Uuid[/define]
 [link uuid]use uuid::Uuid;[/link]
+[link datetime]use chrono::{DateTime,Utc}[/link]
 
 [file]model.rs[/file]
+[imports]
+
 [each object]
 pub struct [name] {
 [each field]
-	pub [name]: [if optional]Optional<[/if][type][if optional]>[/if][if sep],[/if]
+	pub [name]: [if optional]Optional<[/if][if array]Vec<[/if][type][if array]>[/if][if optional]>[/if][if sep],[/if]
 [/each]
 }
 [/each]

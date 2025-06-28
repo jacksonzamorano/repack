@@ -1,8 +1,16 @@
+blueprint "markdown.blueprint"
+
+output markdown @test;
 output postgres @test/postgres #model #view;
 output typescript @test/typescript #model #view;
 output rust @test/rust #model #view;
 output go @test/go #model #view {
 	package main
+}
+
+snippet base {
+	id uuid db:pk
+	created_date datetime db:default("NOW()")
 }
 
 enum UserType #model {
@@ -12,19 +20,27 @@ enum UserType #model {
 }
 
 record User @users #model {
-	id uuid db:pk
+	!base
+	last_login datetime?
 	name string
 	user_type UserType
 	subscription_id string?
 }
 
 record ContactInfo @contacts #model {
-	id uuid db:pk
+	!base
 	email string
 	user_id ref(User.id)
+	db:index("email")
+	db:index("user_id")
+	db:index("user_id", "id")
 }
 
 record FullUser: ContactInfo #view {
 	*
 	name from(user_id.name)
+}
+
+struct UserList {
+	users User[]
 }

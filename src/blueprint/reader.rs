@@ -10,12 +10,17 @@ pub struct BlueprintFileReader<'a> {
 impl<'a> BlueprintFileReader<'a> {
     pub fn next(&mut self) -> Option<FlyToken> {
         let mut temp = String::new();
-
+        let mut last_ignore: bool = false;
         while let Some(next) = self.reader.next() {
             if temp.is_empty() && *next == b'\n' {
-                continue
+                continue;
             }
             if *next == b'[' {
+                if last_ignore {
+                    temp.pop();
+                    temp.push('[');
+                    continue;
+                }
                 let mut sd = SnippetDetails::default();
                 if matches!(self.reader.peek(), Some(b' ')) {
                     self.reader.next();
@@ -61,7 +66,9 @@ impl<'a> BlueprintFileReader<'a> {
                                 sd.contents.push_str(&temp);
                             }
                             match SnippetMainTokenName::from_string(&sd.main_token) {
-                                SnippetMainTokenName::Variable(_) | SnippetMainTokenName::PlaceImports => sd.autoclose = true,
+                                SnippetMainTokenName::Variable(_)
+                                | SnippetMainTokenName::PlaceImports
+                                | SnippetMainTokenName::Break => sd.autoclose = true,
                                 _ => {}
                             }
                             if !sd.autoclose {
@@ -88,13 +95,23 @@ impl<'a> BlueprintFileReader<'a> {
                 }
                 return Some(FlyToken::Snippet(sd));
             }
-            temp.push(*next as char);
-            if matches!(self.reader.peek(), Some(b'[')) {
-                while temp.ends_with('\n') {
-                    temp.pop();
+            if *next == b'\\' {
+                last_ignore = true;
+            } else {
+                last_ignore = false;
+            }
+            match self.reader.peek() {
+                Some(b'[') if !last_ignore => {
+                    temp.push(*next as char);
+                    while temp.ends_with('\n') {
+                        temp.pop();
+                    }
+                    // End of a token, just before a block specifier.
+                    return Some(FlyToken::Literal(temp));
                 }
-                // End of a token, just before a block specifier.
-                return Some(FlyToken::Literal(temp));
+                _ => {
+                    temp.push(*next as char);
+                }
             }
         }
 

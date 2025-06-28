@@ -123,7 +123,7 @@ impl<'a> BlueprintRenderer<'a> {
                             }
                             index += 1;
                         }
-                        if index == content.len() {
+                        if index > content.len() {
                             // NOT FOUND!
                             return Err(RepackError::from_lang_with_msg(
                                 RepackErrorKind::SnippetNotClosed,
@@ -174,7 +174,7 @@ impl<'a> BlueprintRenderer<'a> {
                 let iter_options: Vec<_> = match content.secondary_token() {
                     SnippetSecondaryTokenName::Object => self
                         .parse_result
-                        .included_objects(&self.config.categories, &self.config.exclude, rev)
+                        .included_objects(&self.config.categories, &self.config.exclude)
                         .into_iter()
                         .map(|x| Ok(context.with_object(x)))
                         .collect(),
@@ -186,18 +186,10 @@ impl<'a> BlueprintRenderer<'a> {
                                 "field in non-object context.".to_string(),
                             ));
                         };
-                        obj.fields(rev)
+                        obj.fields
                             .iter()
-                            .enumerate()
-                            .map(|(idx, field)| {
-                                context.with_field(
-                                    obj,
-                                    field,
-                                    self.blueprint,
-                                    self.config,
-                                    writer,
-                                    idx + 1 == obj.fields.len(),
-                                )
+                            .map(|field| {
+                                context.with_field(obj, field, self.blueprint, self.config, writer)
                             })
                             .collect()
                     }
@@ -209,15 +201,32 @@ impl<'a> BlueprintRenderer<'a> {
                                 "join in non-object context.".to_string(),
                             ));
                         };
-                        obj.joins(rev)
+                        obj.joins
                             .iter()
-                            .enumerate()
-                            .map(|(idx, j)| context.with_join(obj, j, idx + 1 == obj.fields.len()))
+                            .map(|j| {
+                                let foreign_entity = self
+                                    .parse_result
+                                    .objects
+                                    .iter()
+                                    .find(|x| match &x.table_name {
+                                        Some(val) if *val == j.foreign_entity => true,
+                                        _ => false,
+                                    })
+                                    .ok_or_else(|| {
+                                        RepackError::from_lang_with_msg(
+                                            RepackErrorKind::CannotCreateContext,
+                                            self.config,
+                                            "join where foreign entity can't be resolved."
+                                                .to_string(),
+                                        )
+                                    })?;
+                                context.with_join(obj, j, foreign_entity)
+                            })
                             .collect()
                     }
                     SnippetSecondaryTokenName::Enum => self
                         .parse_result
-                        .included_enums(&self.config.categories, &self.config.exclude, rev)
+                        .included_enums(&self.config.categories, &self.config.exclude)
                         .iter()
                         .map(|enm| context.with_enum(enm))
                         .collect(),
@@ -229,13 +238,20 @@ impl<'a> BlueprintRenderer<'a> {
                                 "case in non-enum context.".to_string(),
                             ));
                         };
-                        enm.cases(rev)
+                        enm.options
                             .iter()
-                            .enumerate()
-                            .map(|(idx, case)| {
-                                context.with_enum_case(enm, case, idx + 1 == enm.options.len())
-                            })
+                            .map(|case| context.with_enum_case(enm, case))
                             .collect()
+                    }
+                    SnippetSecondaryTokenName::Arg => {
+                        let Some(args) = context.func_args else {
+                            return Err(RepackError::from_lang_with_msg(
+                                RepackErrorKind::CannotCreateContext,
+                                self.config,
+                                "args in non-func context".to_string(),
+                            ));
+                        };
+                        args.iter().map(|x| context.with_func_arg(&x)).collect()
                     }
                     _ => {
                         return Err(RepackError::from_lang_with_msg(
@@ -245,10 +261,24 @@ impl<'a> BlueprintRenderer<'a> {
                         ));
                     }
                 };
-                for ctx in iter_options {
-                    self.render_tokens(content.contents, &ctx?, writer)?;
-                    if !inline {
-                        writer.write(&"\n");
+                let len = iter_options.len();
+                if !rev {
+                    for (idx, ctx) in iter_options.into_iter().enumerate() {
+                        let mut ctx = ctx?;
+                        ctx.flags.insert("sep", idx + 1 < len);
+                        self.render_tokens(content.contents, &ctx, writer)?;
+                        if !inline {
+                            writer.write(&"\n");
+                        }
+                    }
+                } else {
+                    for (idx, ctx) in iter_options.into_iter().rev().enumerate() {
+                        let mut ctx = ctx?;
+                        ctx.flags.insert("sep", idx + 1 < len);
+                        self.render_tokens(content.contents, &ctx, writer)?;
+                        if !inline {
+                            writer.write(&"\n");
+                        }
                     }
                 }
             }
@@ -285,34 +315,22 @@ impl<'a> BlueprintRenderer<'a> {
                     )
                 })?;
                 if let Some(field) = context.field {
-                    if let Some(matched_fn) = field
+                    for matched_fn in field
                         .functions_in_namespace(namespace)
                         .iter()
-                        .find(|func| func.name == name)
+                        .filter(|func| func.name == name)
                     {
-                        let mut updated_context = context.clone();
-                        for (idx, arg) in matched_fn.args.iter().enumerate() {
-                            updated_context
-                                .variables
-                                .insert(idx.to_string(), arg.to_string());
-                        }
-
+                        let updated_context = context.with_func_args(&matched_fn.args)?;
                         self.render_tokens(content.contents, &updated_context, writer)?;
                     }
                 }
                 if let Some(obj) = context.object {
-                    if let Some(matched_fn) = obj
+                    for matched_fn in obj
                         .functions_in_namespace(namespace)
                         .iter()
-                        .find(|func| func.name == name)
+                        .filter(|func| func.name == name)
                     {
-                        let mut updated_context = context.clone();
-                        for (idx, arg) in matched_fn.args.iter().enumerate() {
-                            updated_context
-                                .variables
-                                .insert(idx.to_string(), arg.to_string());
-                        }
-
+                        let updated_context = context.with_func_args(&matched_fn.args)?;
                         self.render_tokens(content.contents, &updated_context, writer)?;
                     }
                 }
@@ -360,6 +378,9 @@ impl<'a> BlueprintRenderer<'a> {
                 if let Some(import) = self.blueprint.links.get(&content.details.secondary_token) {
                     writer.import(import.clone());
                 }
+            }
+            SnippetMainTokenName::Break => {
+                writer.write(&"\n");
             }
             SnippetMainTokenName::Variable(var) => {
                 let mut components = var.split(".");
@@ -417,10 +438,11 @@ impl<'a> BlueprintRenderer<'a> {
                     }
                     writer.write(&res);
                 } else {
+                    dbg!(&self.blueprint.tokens);
                     return Err(RepackError::from_lang_with_msg(
                         RepackErrorKind::VariableNotInScope,
                         self.config,
-                        name.to_string(),
+                        format!("{} in context {} {}", name.to_string(), content.details.main_token, content.details.secondary_token),
                     ));
                 }
             }

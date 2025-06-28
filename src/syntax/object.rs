@@ -8,6 +8,7 @@ use super::{
 #[derive(Debug, PartialEq, Clone)]
 pub enum ObjectType {
     Record,
+    Synthetic,
     Struct,
 }
 
@@ -37,6 +38,7 @@ pub struct Object {
 }
 impl Object {
     pub fn read_from_contents(typ: ObjectType, contents: &mut FileContents) -> Object {
+        let mut object_type = typ;
         let Some(name_opt) = contents.next() else {
             panic!("Read record type, expected a name but got end of file.");
         };
@@ -64,10 +66,12 @@ impl Object {
                     };
                 }
                 Token::Colon => {
-                    inherits = match contents.next() {
-                        Some(Token::Literal(lit)) => Some(lit.to_string()),
-                        _ => None,
-                    };
+                    if matches!(object_type, ObjectType::Record) {
+                        inherits = match contents.next() {
+                            Some(Token::Literal(lit)) => Some(lit.to_string()),
+                            _ => None,
+                        };
+                    }
                 }
                 Token::Pound => {
                     if let Some(Token::Literal(lit)) = contents.next() {
@@ -79,6 +83,10 @@ impl Object {
                 }
                 _ => {}
             }
+        }
+
+        if inherits.is_some() {
+            object_type = ObjectType::Synthetic;
         }
 
         'cmd: while let Some(token) = contents.take() {
@@ -161,7 +169,7 @@ impl Object {
         }
 
         Object {
-            object_type: typ,
+            object_type,
             name,
             fields,
             inherits,
@@ -289,20 +297,5 @@ impl Object {
             .iter()
             .filter(|x| x.namespace == *ns)
             .collect()
-    }
-
-    pub fn fields(&self, reverse: bool) -> Vec<&Field> {
-        if reverse {
-            self.fields.iter().rev().collect()
-        } else {
-            self.fields.iter().collect()
-        }
-    }   
-    pub fn joins(&self, reverse: bool) -> Vec<&ObjectJoin> {
-        if reverse {
-            self.joins.iter().rev().collect()
-        } else {
-            self.joins.iter().collect()
-        }
     }
 }

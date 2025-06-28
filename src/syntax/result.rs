@@ -376,64 +376,33 @@ impl ParseResult {
         }
     }
 
-    pub fn included_objects(&self, categories: &[String], excludes: &[String], reverse: bool) -> Vec<&Object> {
-        if reverse {
-            self.objects
-                .iter()
-                .filter(|obj| {
-                    if obj.categories.is_empty() || categories.is_empty() {
-                        return true;
-                    }
-                    obj.categories.iter().any(|cat| categories.contains(cat))
-                })
-                .rev()
-                .collect()
-        } else {
-            self.objects
-                .iter()
-                .filter(|obj| {
-                    if obj.categories.is_empty() || categories.is_empty() {
-                        return true;
-                    }
-                    if excludes.contains(&obj.name) {
-                        return false;
-                    }
-                    obj.categories.iter().any(|cat| categories.contains(cat))
-                })
-                .collect()
-        }
+    pub fn included_objects(&self, categories: &[String], excludes: &[String]) -> Vec<&Object> {
+        self.objects
+            .iter()
+            .filter(|obj| {
+                if obj.categories.is_empty() || categories.is_empty() {
+                    return true;
+                }
+                if excludes.contains(&obj.name) {
+                    return false;
+                }
+                obj.categories.iter().any(|cat| categories.contains(cat))
+            })
+            .collect()
     }
 
-    pub fn included_enums(
-        &self,
-        categories: &[String],
-        excludes: &[String],
-        reverse: bool,
-    ) -> Vec<&Enum> {
-        if reverse {
-            self.enums
-                .iter()
-                .filter(|enm| {
-                    if enm.categories.is_empty() || categories.is_empty() {
-                        return true;
-                    }
-                    if excludes.contains(&enm.name) {
-                        return false;
-                    }
-                    enm.categories.iter().any(|cat| categories.contains(cat))
-                })
-                .rev()
-                .collect()
-        } else {
-            self.enums
-                .iter()
-                .filter(|enm| {
-                    if enm.categories.is_empty() || categories.is_empty() {
-                        return true;
-                    }
-                    enm.categories.iter().any(|cat| categories.contains(cat))
-                })
-                .collect()
-        }
+    pub fn included_enums(&self, categories: &[String], excludes: &[String]) -> Vec<&Enum> {
+        self.enums
+            .iter()
+            .filter(|enm| {
+                if enm.categories.is_empty() || categories.is_empty() {
+                    return true;
+                }
+                if excludes.contains(&enm.name) {
+                    return false;
+                }
+                enm.categories.iter().any(|cat| categories.contains(cat))
+            })
+            .collect()
     }
 }

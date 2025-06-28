@@ -21,6 +21,7 @@ pub enum SnippetMainTokenName {
     Link,
     Import,
     PlaceImports,
+    Break,
     Variable(String),
 }
 impl SnippetMainTokenName {
@@ -40,6 +41,7 @@ impl SnippetMainTokenName {
             "link" => Self::Link,
             "import" => Self::Import,
             "imports" => Self::PlaceImports,
+            "br" => Self::Break,
             _ => Self::Variable(val.to_string()),
         }
     }
@@ -64,6 +66,7 @@ pub enum SnippetSecondaryTokenName {
     Boolean,
 
     Join,
+    Arg,
 
     Arbitrary(String),
 }
@@ -80,6 +83,7 @@ impl SnippetSecondaryTokenName {
             "enum" => Self::Enum,
             "case" => Self::Case,
             "join" => Self::Join,
+            "arg" => Self::Arg,
             _ => Self::Arbitrary(val.to_string()),
         }
     }

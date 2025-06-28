@@ -14,7 +14,7 @@
 BEGIN;
 
 [eachr object]
-[ifn syn]
+[if record]
 DROP TABLE IF EXISTS [table_name];
 [/ifn]
 [if syn]
@@ -27,27 +27,28 @@ DROP TYPE IF EXISTS [name];
 [/each]
 
 [each enum]
-CREATE TYPE [name] AS ENUM([eachl case]'[name]'[if sep],[/if][/eachl]);
+CREATE TYPE [name] AS ENUM([eachl case]'[name]'[if sep], [/if][/eachl]);
 [/each]
 
 [each object]
-[ifn syn]
+[if record]
 CREATE TABLE [table_name] (
 [each field]
-	[name] [type][ifn optional] NOT NULL[/ifn][func db.default] DEFAULT {0}[/func][func db.pk] PRIMARY KEY[/func]
+	[name] [type][ifn optional] NOT NULL[/ifn][func db.default] DEFAULT [0][/func][func db.pk] PRIMARY KEY[/func]
 	[ref],
 	FOREIGN KEY ([name]) REFERENCES [foreign_table]([foreign_field])
 	[/ref]
 	[if sep],[/if]
 [/each]
 );
-[/ifn]
+[func db.index][br]CREATE INDEX ON [name] ([eachl arg][arg][if sep], [/if][/eachl]);[/func]
+[/if]
 
 [if syn]
 CREATE VIEW [name] AS
 SELECT
 [each field]
-	[ref_entity].[ref_field] AS [name][if sep],[/if]
+	[ref_table].[ref_field] AS [name][if sep],[/if]
 [/each]
 FROM [table_name]
 [each join]

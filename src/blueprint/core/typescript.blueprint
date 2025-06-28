@@ -12,6 +12,8 @@
 
 [ each object ]
 [file][name].ts[/file]
+[imports]
+
 export interface [name] {
 [each field]
 	[name.camelcase][if optional]?[/if]: [type]
