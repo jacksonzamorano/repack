@@ -265,7 +265,7 @@ impl Object {
     /// * `None` if the object is valid
     pub fn errors(&self) -> Option<Vec<RepackError>> {
         let mut errors = Vec::new();
-        if self.object_type == ObjectType::Record {
+        if self.object_type == ObjectType::Record || self.object_type == ObjectType::Synthetic {
             for field in &self.fields {
                 let Some(field_type) = &field.field_type else {
                     errors.push(RepackError::from_field(

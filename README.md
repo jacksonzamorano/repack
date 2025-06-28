@@ -156,7 +156,7 @@ Repack supports three types of objects, each with different capabilities:
 |-------------|---------|----------------|-------------|--------------|--------|
 | **`record`** | Database entities | ✅ Required (`@table_name`) | ❌ No | ✅ Enums only | ❌ No |
 | **`struct`** | In-memory data | ❌ Not allowed | ❌ No | ✅ All types | ✅ Yes |
-| **`synthetic`** | Computed views | ✅ Inherited from parent | ✅ Yes | ✅ All types | ✅ Yes |
+| **`synthetic`** | Computed views | ✅ Inherited from parent | ✅ Yes | ✅ Enums only | ❌ No |
 
 **Examples:**
 
