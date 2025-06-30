@@ -68,6 +68,7 @@ impl<'a> BlueprintFileReader<'a> {
                                 match SnippetMainTokenName::from_string(&sd.main_token) {
                                     SnippetMainTokenName::Variable(_)
                                     | SnippetMainTokenName::PlaceImports
+                                    | SnippetMainTokenName::Import
                                     | SnippetMainTokenName::Break => sd.autoclose = true,
                                     _ => {}
                                 }

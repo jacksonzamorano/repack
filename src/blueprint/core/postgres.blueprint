@@ -44,7 +44,7 @@ CREATE TABLE [table_name] (
 	[if sep],[/if]
 [/each][br]
 );
-[func db.index][br]CREATE INDEX ON [name] ([each arg][arg][if sep], [/if][/each]);[/func]
+[func db.index][br]CREATE INDEX ON [table_name] ([each arg][arg][if sep], [/if][/each]);[/func]
 [/if]
 
 [if syn][br][br]

@@ -36,6 +36,7 @@ pub enum RepackErrorKind {
     SnippetNotClosed,
     VariableNotInScope,
     InvalidVariableModifier,
+    UnknownLink,
 }
 impl RepackErrorKind {
     pub fn as_string(&self) -> &'static str {
@@ -66,6 +67,7 @@ impl RepackErrorKind {
             Self::SnippetNotClosed => "Block was not closed:",
             Self::VariableNotInScope => "Variable was not found in scope:",
             Self::InvalidVariableModifier => "Unknown variable modifier specified:",
+            Self::UnknownLink => "Requested import but no link was defined for ",
         }
     }
 }

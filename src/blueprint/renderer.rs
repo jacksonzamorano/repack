@@ -12,7 +12,7 @@ use super::{
 };
 
 /// Represents different types of content that can be written to output files.
-/// 
+///
 /// DeliveryUnit allows the rendering system to handle both regular text content
 /// and special placeholders like import statements that need to be processed
 /// and positioned correctly in the final output.
@@ -24,7 +24,7 @@ enum DeliveryUnit {
 }
 
 /// Accumulates the results of blueprint rendering for multiple output files.
-/// 
+///
 /// BlueprintBuildResult collects all content generated during the rendering process,
 /// organizing it by filename and managing imports separately so they can be
 /// properly positioned in the final output files.
@@ -77,7 +77,7 @@ impl TokenConsumer for BlueprintBuildResult {
 }
 
 /// Orchestrates the code generation process using a blueprint and parsed schema.
-/// 
+///
 /// BlueprintRenderer takes a parsed schema, a target language blueprint, and output
 /// configuration to generate source code files. It processes blueprint templates,
 /// handles variable substitution, manages file output, and coordinates the entire
@@ -92,12 +92,12 @@ pub struct BlueprintRenderer<'a> {
 }
 impl<'a> BlueprintRenderer<'a> {
     /// Creates a new BlueprintRenderer with the necessary components for code generation.
-    /// 
+    ///
     /// # Arguments
     /// * `parse_result` - The parsed schema data containing objects and enums
     /// * `blueprint` - The blueprint defining how to generate code for the target language
     /// * `config` - Output configuration specifying target settings and options
-    /// 
+    ///
     /// # Returns
     /// A new BlueprintRenderer ready to generate code
     pub fn new(
@@ -202,8 +202,7 @@ impl<'a> BlueprintRenderer<'a> {
                 }
                 writer.set_file_name(&file_name);
             }
-            SnippetMainTokenName::Each
-            | SnippetMainTokenName::Eachr => {
+            SnippetMainTokenName::Each | SnippetMainTokenName::Eachr => {
                 let rev = matches!(content.main_token(), SnippetMainTokenName::Eachr);
                 let iter_options: Vec<_> = match content.secondary_token() {
                     SnippetSecondaryTokenName::Object => self
@@ -363,6 +362,41 @@ impl<'a> BlueprintRenderer<'a> {
                     }
                 }
             }
+            SnippetMainTokenName::Nfunc => {
+                let mut parts = content.details.secondary_token.split(".");
+                let namespace = parts.next().ok_or_else(|| {
+                    RepackError::from_lang_with_msg(
+                        RepackErrorKind::FunctionInvalidSyntax,
+                        self.config,
+                        content.details.secondary_token.clone(),
+                    )
+                })?;
+                let name = parts.next().ok_or_else(|| {
+                    RepackError::from_lang_with_msg(
+                        RepackErrorKind::FunctionInvalidSyntax,
+                        self.config,
+                        content.details.secondary_token.clone(),
+                    )
+                })?;
+                if let Some(field) = context.field {
+                    if !field
+                        .functions_in_namespace(namespace)
+                        .iter()
+                        .any(|func| func.name == name)
+                    {
+                        self.render_tokens(content.contents, context, writer)?;
+                    }
+                }
+                if let Some(obj) = context.object {
+                    if !obj
+                        .functions_in_namespace(namespace)
+                        .iter()
+                        .any(|func| func.name == name)
+                    {
+                        self.render_tokens(content.contents, context, writer)?;
+                    }
+                }
+            }
             SnippetMainTokenName::Ref => {
                 if let Some(field) = context.field {
                     if let Some(obj) = context.object {
@@ -405,6 +439,12 @@ impl<'a> BlueprintRenderer<'a> {
             SnippetMainTokenName::Import => {
                 if let Some(import) = self.blueprint.links.get(&content.details.secondary_token) {
                     writer.import(import.clone());
+                } else {
+                    return Err(RepackError::from_lang_with_msg(
+                        RepackErrorKind::UnknownLink,
+                        &self.config,
+                        content.details.secondary_token.to_string(),
+                    ));
                 }
             }
             SnippetMainTokenName::Break => {
@@ -486,11 +526,11 @@ impl<'a> BlueprintRenderer<'a> {
     }
 
     /// Executes the complete code generation process and writes output files.
-    /// 
+    ///
     /// This method processes the blueprint templates with the parsed schema data,
     /// generates all target source code files, handles import management, and
     /// writes the final files to the configured output location.
-    /// 
+    ///
     /// # Returns
     /// * `Ok(())` if code generation completes successfully
     /// * `Err(RepackError)` if any step in the generation process fails
@@ -541,11 +581,11 @@ impl<'a> BlueprintRenderer<'a> {
     }
 
     /// Removes all previously generated files from the output directory.
-    /// 
+    ///
     /// This method identifies which files would be generated by the current
     /// configuration and removes them from the output directory. Useful for
     /// cleaning up before regeneration or removing outdated generated code.
-    /// 
+    ///
     /// # Returns
     /// * `Ok(())` if cleanup completes successfully
     /// * `Err(RepackError)` if files cannot be removed
