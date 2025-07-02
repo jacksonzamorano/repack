@@ -148,10 +148,10 @@ impl<'a> BlueprintExecutionContext<'a> {
             "custom",
             matches!(field.field_type(), FieldType::Custom(_, _)),
         );
-        flags.insert(
-            "local",
-            matches!(field.location.reference, FieldReferenceKind::Local),
-        );
+        flags.insert("local", match &field.location.reference {
+            FieldReferenceKind::Local | FieldReferenceKind::FieldType(_) => true,
+            _ => false
+        });
 
         Ok(Self {
             variables,

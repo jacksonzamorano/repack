@@ -55,8 +55,8 @@ SELECT
 [/each][br]
 FROM [table_name]
 [each join][br]
-INNER JOIN [ref_entity] [name] ON [local_entity].[local_field] = [name].[ref_field][if sep],[/if][ifn sep];[/ifn]
-[/each]
+INNER JOIN [ref_table] [name] ON [local_entity].[local_field] = [name].[ref_field]
+[/each];
 [/if]
 [/each]
 

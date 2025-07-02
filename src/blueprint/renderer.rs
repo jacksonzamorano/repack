@@ -123,11 +123,7 @@ impl<'a> BlueprintRenderer<'a> {
             let c = &content[index];
             match c {
                 FlyToken::Literal(lit_val) => {
-                    let val = lit_val.to_string();
-                    // while val.starts_with('\n') {
-                    //     val.remove(0);
-                    // }
-                    writer.write(&val);
+                    writer.write(&lit_val);
                     index += 1;
                 }
                 FlyToken::Snippet(snip) => {
@@ -379,6 +375,8 @@ impl<'a> BlueprintRenderer<'a> {
                     )
                 })?;
                 if let Some(field) = context.field {
+                    if field.name == "id" {
+                    }
                     if !field
                         .functions_in_namespace(namespace)
                         .iter()
@@ -386,6 +384,7 @@ impl<'a> BlueprintRenderer<'a> {
                     {
                         self.render_tokens(content.contents, context, writer)?;
                     }
+                    return Ok(())
                 }
                 if let Some(obj) = context.object {
                     if !obj
@@ -395,6 +394,7 @@ impl<'a> BlueprintRenderer<'a> {
                     {
                         self.render_tokens(content.contents, context, writer)?;
                     }
+                    return Ok(())
                 }
             }
             SnippetMainTokenName::Ref => {

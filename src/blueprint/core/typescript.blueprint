@@ -35,9 +35,9 @@ export type [name] =
 [file]index.ts[/file]
 
 [each object]
-export type { [name] } from '[name].ts'[br]
+export type { [name] } from './[name]'[br]
 [/each]
 [each enum]
-export type { [name] } from '[name].ts'[br]
+export type { [name] } from './[name]'[br]
 [/each]
 
