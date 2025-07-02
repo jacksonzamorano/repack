@@ -302,8 +302,27 @@ impl ParseResult {
                                 field_idx += 1;
                                 continue;
                             };
-                            objects[object_idx].fields[field_idx].field_type =
-                                referenced_foreign_field.field_type.clone();
+                            let field_type = referenced_foreign_field.field_type.clone();
+                            if matches!(objects[object_idx].object_type, ObjectType::Synthetic) {
+                                let join_name =
+                                    format!("j_{}", referenced_field.name);
+                                if !objects[object_idx]
+                                    .joins
+                                    .iter()
+                                    .any(|x| x.join_name == *join_name)
+                                {
+                                    let j = ObjectJoin {
+                                        join_name,
+                                        local_field: referenced_field.name.to_string(),
+                                        condition: "=".to_string(),
+                                        foreign_entity: referenced_entity.name.clone(),
+                                        foreign_table: referenced_entity.table_name.clone(),
+                                        foreign_field: referenced_field.location.name.to_string(),
+                                    };
+                                    objects[object_idx].joins.push(j);
+                                }
+                            }
+                            objects[object_idx].fields[field_idx].field_type = field_type
                         }
                         FieldReferenceKind::FieldType(joining_entity) => {
                             let Some(referenced_entity) =
@@ -334,22 +353,7 @@ impl ParseResult {
                                 continue;
                             };
                             let typ = referenced_foreign_field.field_type.clone();
-                            if matches!(objects[object_idx].object_type, ObjectType::Synthetic) {
-                                let j = ObjectJoin {
-                                    join_name: format!(
-                                        "j_{}",
-                                        objects[object_idx].fields[field_idx].name
-                                    ),
-                                    local_field: objects[object_idx].fields[field_idx]
-                                        .name
-                                        .to_string(),
-                                    condition: "=".to_string(),
-                                    foreign_entity: referenced_entity.name.clone(),
-                                    foreign_table: referenced_entity.table_name.clone(),
-                                    foreign_field: referenced_foreign_field.name.to_string(),
-                                };
-                                objects[object_idx].joins.push(j);
-                            }
+
                             objects[object_idx].fields[field_idx].field_type = typ;
                         }
                         FieldReferenceKind::ExplicitJoin(join_name) => {
@@ -379,11 +383,9 @@ impl ParseResult {
                                 field_idx += 1;
                                 continue;
                             };
-                            let Some(field) = foreign_entity
-                                .fields
-                                .iter()
-                                .find(|x| x.name == objects[object_idx].fields[field_idx].location.name)
-                            else {
+                            let Some(field) = foreign_entity.fields.iter().find(|x| {
+                                x.name == objects[object_idx].fields[field_idx].location.name
+                            }) else {
                                 errors.push(RepackError::from_field_with_msg(
                                     RepackErrorKind::JoinFieldNotFound,
                                     &objects[object_idx],
