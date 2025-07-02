@@ -232,25 +232,7 @@ impl<'a> BlueprintRenderer<'a> {
                         };
                         obj.joins
                             .iter()
-                            .map(|j| {
-                                let foreign_entity = self
-                                    .parse_result
-                                    .objects
-                                    .iter()
-                                    .find(|x| match &x.table_name {
-                                        Some(val) if *val == j.foreign_entity => true,
-                                        _ => false,
-                                    })
-                                    .ok_or_else(|| {
-                                        RepackError::from_lang_with_msg(
-                                            RepackErrorKind::CannotCreateContext,
-                                            self.config,
-                                            "join where foreign entity can't be resolved."
-                                                .to_string(),
-                                        )
-                                    })?;
-                                context.with_join(obj, j, foreign_entity)
-                            })
+                            .map(|j| context.with_join(obj, j))
                             .collect()
                     }
                     SnippetSecondaryTokenName::Enum => self
@@ -375,8 +357,7 @@ impl<'a> BlueprintRenderer<'a> {
                     )
                 })?;
                 if let Some(field) = context.field {
-                    if field.name == "id" {
-                    }
+                    if field.name == "id" {}
                     if !field
                         .functions_in_namespace(namespace)
                         .iter()
@@ -384,7 +365,7 @@ impl<'a> BlueprintRenderer<'a> {
                     {
                         self.render_tokens(content.contents, context, writer)?;
                     }
-                    return Ok(())
+                    return Ok(());
                 }
                 if let Some(obj) = context.object {
                     if !obj
@@ -394,7 +375,7 @@ impl<'a> BlueprintRenderer<'a> {
                     {
                         self.render_tokens(content.contents, context, writer)?;
                     }
-                    return Ok(())
+                    return Ok(());
                 }
             }
             SnippetMainTokenName::Ref => {

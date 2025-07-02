@@ -43,6 +43,8 @@ pub struct ObjectJoin {
     pub condition: String,
     /// The name of the target object/entity being joined to.
     pub foreign_entity: String,
+    /// The name of the target table being joined to.
+    pub foreign_table: Option<String>,
     /// The field name in the foreign entity that participates in the join.
     pub foreign_field: String,
 }
@@ -200,6 +202,7 @@ impl Object {
                             condition: "=".to_string(),
                             foreign_entity: obj_2_name,
                             foreign_field: obj_2_field,
+                            foreign_table: None,
                         });
                     } else if obj_2_name == "self" {
                         joins.push(ObjectJoin {
@@ -208,6 +211,7 @@ impl Object {
                             condition: "=".to_string(),
                             foreign_entity: obj_1_name,
                             foreign_field: obj_1_field,
+                            foreign_table: None,
                         });
                     }
                 }
@@ -366,6 +370,12 @@ impl Object {
                         continue;
                     };
                     dependencies.insert(foreign_obj.to_string());
+                }
+                FieldReferenceKind::ExplicitJoin(join_name) => {
+                    let Some(entity) = self.joins.iter().find(|x| x.join_name == *join_name) else {
+                        continue;
+                    };
+                    dependencies.insert(entity.foreign_entity.to_string());
                 }
                 _ => {
                     continue;

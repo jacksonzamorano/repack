@@ -148,10 +148,13 @@ impl<'a> BlueprintExecutionContext<'a> {
             "custom",
             matches!(field.field_type(), FieldType::Custom(_, _)),
         );
-        flags.insert("local", match &field.location.reference {
-            FieldReferenceKind::Local | FieldReferenceKind::FieldType(_) => true,
-            _ => false
-        });
+        flags.insert(
+            "local",
+            match &field.location.reference {
+                FieldReferenceKind::Local | FieldReferenceKind::FieldType(_) => true,
+                _ => false,
+            },
+        );
 
         Ok(Self {
             variables,
@@ -166,7 +169,6 @@ impl<'a> BlueprintExecutionContext<'a> {
         &self,
         obj: &'a Object,
         join: &'a ObjectJoin,
-        ref_entity: &'a Object,
     ) -> Result<Self, RepackError> {
         let mut variables = HashMap::new();
         let flags = HashMap::new();
@@ -175,10 +177,13 @@ impl<'a> BlueprintExecutionContext<'a> {
         if let Some(tn) = obj.table_name.as_ref() {
             variables.insert("local_entity".to_string(), tn.to_string());
         }
-        variables.insert("ref_entity".to_string(), ref_entity.name.to_string());
+        variables.insert("ref_entity".to_string(), join.foreign_entity.to_string());
         variables.insert("local_field".to_string(), join.local_field.to_string());
         variables.insert("ref_field".to_string(), join.foreign_field.to_string());
-        variables.insert("ref_table".to_string(), join.foreign_entity.to_string());
+        variables.insert(
+            "ref_table".to_string(),
+            join.foreign_table.as_ref().unwrap().to_string(),
+        );
         variables.insert("condition".to_string(), join.condition.to_string());
 
         Ok(Self {

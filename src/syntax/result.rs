@@ -6,7 +6,7 @@ use super::{
 };
 
 /// Represents the complete parsed schema with all defined entities and configurations.
-/// 
+///
 /// ParseResult contains all the parsed elements from a schema file, including objects,
 /// enums, output configurations, and blueprint dependencies. This structure serves as
 /// the primary input for code generation and validation processes.
@@ -24,17 +24,17 @@ pub struct ParseResult {
 
 impl ParseResult {
     /// Parses the complete schema from tokenized file contents.
-    /// 
+    ///
     /// This method performs the complete parsing pipeline:
     /// 1. Parses all top-level definitions (objects, enums, outputs, imports)
     /// 2. Expands snippet inclusions into objects
     /// 3. Resolves dependency ordering for objects
     /// 4. Resolves all field type references and relationships
     /// 5. Validates the complete schema for consistency
-    /// 
+    ///
     /// # Arguments
     /// * `contents` - The tokenized file contents to parse
-    /// 
+    ///
     /// # Returns
     /// * `Ok(ParseResult)` if parsing succeeds with a valid schema
     /// * `Err(Vec<RepackError>)` if any validation or parsing errors occur
@@ -151,6 +151,34 @@ impl ParseResult {
         let mut object_idx: usize = 0;
         while object_idx < objects.len() {
             let mut field_idx: usize = 0;
+
+            let mut join_idx: usize = 0;
+            while join_idx < objects[object_idx].joins.len() {
+                if objects[object_idx].joins[join_idx].foreign_table.is_some() {
+                    continue;
+                }
+                let Some(entity) = objects
+                    .iter()
+                    .find(|x| x.name == objects[object_idx].joins[join_idx].foreign_entity)
+                else {
+                    errors.push(RepackError::from_obj(
+                        RepackErrorKind::JoinFieldUnresolvable,
+                        &objects[object_idx],
+                    ));
+                    join_idx += 1;
+                    continue;
+                };
+                let Some(table_name) = entity.table_name.as_ref() else {
+                    errors.push(RepackError::from_obj(
+                        RepackErrorKind::JoinNoTableName,
+                        &objects[object_idx],
+                    ));
+                    join_idx += 1;
+                    continue;
+                };
+                objects[object_idx].joins[join_idx].foreign_table = Some(table_name.to_string());
+                join_idx += 1;
+            }
 
             if let Some(parent_obj_name) = &objects[object_idx].inherits {
                 if !matches!(&objects[object_idx].object_type, ObjectType::Synthetic) {
@@ -305,23 +333,24 @@ impl ParseResult {
                                 field_idx += 1;
                                 continue;
                             };
-                            let j = ObjectJoin {
-                                join_name: format!(
-                                    "j_{}",
-                                    objects[object_idx].fields[field_idx].name
-                                ),
-                                local_field: objects[object_idx].fields[field_idx].name.to_string(),
-                                condition: "=".to_string(),
-                                foreign_entity: referenced_entity
-                                    .table_name
-                                    .as_ref()
-                                    .unwrap()
-                                    .to_string(),
-                                foreign_field: referenced_foreign_field.name.to_string(),
-                            };
-                            objects[object_idx].fields[field_idx].field_type =
-                                referenced_foreign_field.field_type.clone();
-                            objects[object_idx].joins.push(j);
+                            let typ = referenced_foreign_field.field_type.clone();
+                            if matches!(objects[object_idx].object_type, ObjectType::Synthetic) {
+                                let j = ObjectJoin {
+                                    join_name: format!(
+                                        "j_{}",
+                                        objects[object_idx].fields[field_idx].name
+                                    ),
+                                    local_field: objects[object_idx].fields[field_idx]
+                                        .name
+                                        .to_string(),
+                                    condition: "=".to_string(),
+                                    foreign_entity: referenced_entity.name.clone(),
+                                    foreign_table: referenced_entity.table_name.clone(),
+                                    foreign_field: referenced_foreign_field.name.to_string(),
+                                };
+                                objects[object_idx].joins.push(j);
+                            }
+                            objects[object_idx].fields[field_idx].field_type = typ;
                         }
                         FieldReferenceKind::ExplicitJoin(join_name) => {
                             let Some(join) = objects[object_idx]
@@ -353,7 +382,7 @@ impl ParseResult {
                             let Some(field) = foreign_entity
                                 .fields
                                 .iter()
-                                .find(|x| x.name == *join.foreign_field)
+                                .find(|x| x.name == objects[object_idx].fields[field_idx].location.name)
                             else {
                                 errors.push(RepackError::from_field_with_msg(
                                     RepackErrorKind::JoinFieldNotFound,
@@ -415,15 +444,15 @@ impl ParseResult {
     }
 
     /// Filters objects based on category inclusion and explicit exclusions.
-    /// 
+    ///
     /// This method selects objects for code generation based on the target
     /// configuration's category filters and exclusion lists. Objects without
     /// categories are included by default when no category filter is specified.
-    /// 
+    ///
     /// # Arguments
     /// * `categories` - List of categories to include (empty means include all)
     /// * `excludes` - List of object names to explicitly exclude
-    /// 
+    ///
     /// # Returns
     /// A vector of object references that match the filtering criteria
     pub fn included_objects(&self, categories: &[String], excludes: &[String]) -> Vec<&Object> {
@@ -442,14 +471,14 @@ impl ParseResult {
     }
 
     /// Filters enums based on category inclusion and explicit exclusions.
-    /// 
+    ///
     /// Similar to included_objects, this method selects enums for code generation
     /// based on category matching and exclusion rules.
-    /// 
+    ///
     /// # Arguments
     /// * `categories` - List of categories to include (empty means include all)
     /// * `excludes` - List of enum names to explicitly exclude
-    /// 
+    ///
     /// # Returns
     /// A vector of enum references that match the filtering criteria
     pub fn included_enums(&self, categories: &[String], excludes: &[String]) -> Vec<&Enum> {
