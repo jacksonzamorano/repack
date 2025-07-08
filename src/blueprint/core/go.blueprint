@@ -16,20 +16,20 @@ package [package];
 
 [imports]
 
-[each enum]
+[each enum][br]
 type [name] string
 
 const (
-	[each case]
+	[each case][br]
 	[enum_name][name] [enum_name] = "[value]"
-	[/each]
+	[/each][br]
 )
-[/each]
+[/each][br]
 
-[each object]
+[each object][br]
 type [name] struct {
-	[each field]
+	[each field][br]
 	[name.titlecase] [if optional]*[/if][if array]\[][/if][type] `json:"[name]"`
-	[/each]
+	[/each][br]
 }
 [/each]

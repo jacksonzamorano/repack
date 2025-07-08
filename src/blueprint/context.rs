@@ -238,10 +238,8 @@ impl<'a> BlueprintExecutionContext<'a> {
         Ok(Self {
             variables,
             flags,
-            object: None,
-            field: None,
-            enm: None,
             func_args: Some(args),
+            ..self.clone()
         })
     }
     pub fn with_func_arg(&self, arg: &'a String) -> Result<Self, RepackError> {

@@ -15,6 +15,7 @@ const CORE_BLUEPRINTS: &[&str] = &[
     include_str!("core/postgres.blueprint"),
     include_str!("core/typescript.blueprint"),
     include_str!("core/go.blueprint"),
+    include_str!("core/markdown.blueprint"),
 ];
 
 /// Central repository for managing and accessing blueprint definitions.
