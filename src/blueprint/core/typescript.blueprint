@@ -16,7 +16,7 @@
 
 export interface [name] {
 [each field][br]
-	[name.camelcase][if optional]?[/if]: [type]
+	[name][if optional]?[/if]: [type]
 [/each][br]
 }
 [/each]
