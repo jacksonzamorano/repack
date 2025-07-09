@@ -8,10 +8,15 @@ pub fn graph_valid(objects: &[Object]) -> Result<(), RepackError> {
         graph.push_back(vec![obj.name.clone()]);
     }
     while let Some(eval) = graph.pop_front() {
-        let eval_object: &Object = objects
+        let Some(eval_object) = objects
             .iter()
             .find(|obj| *obj.name == *eval.last().unwrap())
-            .unwrap();
+        else {
+            return Err(RepackError::global(
+                RepackErrorKind::UnknownObject,
+                format!("'{}' => '{}'", eval.last().unwrap(), eval.first().unwrap()),
+            ));
+        };
         if let Some(error) = eval_object
             .depends_on()
             .iter()

@@ -38,6 +38,7 @@ pub enum RepackErrorKind {
     VariableNotInScope,
     InvalidVariableModifier,
     UnknownLink,
+    UnknownObject,
 }
 impl RepackErrorKind {
     pub fn as_string(&self) -> &'static str {
@@ -70,6 +71,7 @@ impl RepackErrorKind {
             Self::VariableNotInScope => "Variable was not found in scope:",
             Self::InvalidVariableModifier => "Unknown variable modifier specified:",
             Self::UnknownLink => "Requested import but no link was defined for ",
+            Self::UnknownObject => "Attempted to resolve this dependancy but the object couldn't be found: ",
         }
     }
 }
