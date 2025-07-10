@@ -83,8 +83,8 @@ impl<'a> BlueprintExecutionContext<'a> {
         config: &Output,
         writer: &mut dyn TokenConsumer,
     ) -> Result<Self, RepackError> {
-        let mut variables = HashMap::new();
-        let mut flags = HashMap::new();
+        let mut variables = self.variables.clone();
+        let mut flags = self.flags.clone();
 
         let resolved_type = match field.field_type() {
             FieldType::Core(typ) => {
@@ -165,13 +165,9 @@ impl<'a> BlueprintExecutionContext<'a> {
             func_args: None,
         })
     }
-    pub fn with_join(
-        &self,
-        obj: &'a Object,
-        join: &'a ObjectJoin,
-    ) -> Result<Self, RepackError> {
-        let mut variables = HashMap::new();
-        let flags = HashMap::new();
+    pub fn with_join(&self, obj: &'a Object, join: &'a ObjectJoin) -> Result<Self, RepackError> {
+        let mut variables = self.variables.clone();
+        let flags = self.flags.clone();
 
         variables.insert("name".to_string(), join.join_name.to_string());
         if let Some(tn) = obj.table_name.as_ref() {
@@ -197,7 +193,7 @@ impl<'a> BlueprintExecutionContext<'a> {
     }
 
     pub fn with_enum(&self, enm: &'a Enum) -> Result<Self, RepackError> {
-        let mut variables = HashMap::new();
+        let mut variables = self.variables.clone();
         variables.insert("name".to_string(), enm.name.to_string());
         Ok(Self {
             variables,
