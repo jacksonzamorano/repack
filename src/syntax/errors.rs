@@ -1,9 +1,9 @@
 use crate::blueprint::SnippetDetails;
 
-use super::{Field, Object, Output};
+use super::{ConfigurationInstance, Field, Object, Output};
 
 /// Enumeration of all possible error types that can occur during schema processing.
-/// 
+///
 /// Each error kind represents a specific category of validation, parsing, or generation
 /// error. The u32 representation provides unique error codes for debugging and logging.
 /// Error codes are used in formatted error messages as E0001, E0002, etc.
@@ -37,8 +37,17 @@ pub enum RepackErrorKind {
     SnippetNotClosed,
     VariableNotInScope,
     InvalidVariableModifier,
+    UnknownConfiguration,
+    MissingConfigurationField,
+    ExtraConfigurationField,
     UnknownLink,
     UnknownObject,
+    UnknownError,
+}
+impl Default for RepackErrorKind {
+    fn default() -> Self {
+        Self::UnknownError
+    }
 }
 impl RepackErrorKind {
     pub fn as_string(&self) -> &'static str {
@@ -70,34 +79,50 @@ impl RepackErrorKind {
             Self::SnippetNotClosed => "Block was not closed:",
             Self::VariableNotInScope => "Variable was not found in scope:",
             Self::InvalidVariableModifier => "Unknown variable modifier specified:",
+            Self::UnknownConfiguration => "Unknown configuration:",
+            Self::MissingConfigurationField => "Expected configuration field but it wasn't found:",
+            Self::ExtraConfigurationField => "An extra configuration field was found:",
             Self::UnknownLink => "Requested import but no link was defined for ",
-            Self::UnknownObject => "Attempted to resolve this dependancy but the object couldn't be found: ",
+            Self::UnknownObject => {
+                "Attempted to resolve this dependancy but the object couldn't be found: "
+            }
+            Self::UnknownError => "An unknown error occured.",
         }
     }
 }
 
 impl RepackError {
     /// Converts the error into a formatted string message for display.
-    /// 
+    ///
     /// This method creates a comprehensive error message that includes:
     /// - Error code (E0001 format)
     /// - Context location (language -> object.field)
     /// - Error description and details
     /// - Stack trace for nested errors
-    /// 
+    ///
     /// # Returns
     /// A formatted string suitable for console output or logging
     pub fn into_string(self) -> String {
         let msg = self.error.as_string();
-        let loc = match (self.lang_name, self.obj_name, self.field_name) {
-            (Some(lang), None, None) => format!(" ({})", lang),
-            (None, Some(obj_name), None) => format!(" ({})", obj_name),
-            (None, Some(obj_name), Some(field_name)) => format!(" ({}.{})", obj_name, field_name),
-            (Some(lang), Some(obj_name), None) => format!(" ({} -> {})", lang, obj_name),
-            (Some(lang), Some(obj_name), Some(field_name)) => {
+        let loc = match (
+            self.lang_name,
+            self.obj_name,
+            self.field_name,
+            self.instance_name,
+        ) {
+            (Some(lang), None, None, None) => format!(" ({})", lang),
+            (None, Some(obj_name), None, None) => format!(" ({})", obj_name),
+            (None, Some(obj_name), Some(field_name), None) => {
+                format!(" ({}.{})", obj_name, field_name)
+            }
+            (Some(lang), Some(obj_name), None, None) => format!(" ({} -> {})", lang, obj_name),
+            (Some(lang), Some(obj_name), Some(field_name), None) => {
                 format!(" ({} -> {}.{})", lang, obj_name, field_name)
             }
-            (_, _, _) => String::new(),
+            (None, None, None, Some(instance)) => {
+                format!(" ({})", instance)
+            }
+            (_, _, _, _) => String::new(),
         };
 
         let details = self.error_details.unwrap_or_default();
@@ -106,16 +131,19 @@ impl RepackError {
         } else {
             format!("\n\n--- Context: ---\n{}", self.stack.join("\n"))
         };
-        format!("[E{:04}]{} {} {}{}", self.error as u32, loc, msg, details, stack)
+        format!(
+            "[E{:04}]{} {} {}{}",
+            self.error as u32, loc, msg, details, stack
+        )
     }
 }
 
 /// Represents a complete error with context information for debugging.
-/// 
+///
 /// RepackError combines an error type with contextual information about where
 /// the error occurred (language, object, field) and provides detailed error
 /// messages with stack traces for complex nested errors.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct RepackError {
     /// The specific type/category of error that occurred
     pub error: RepackErrorKind,
@@ -125,6 +153,8 @@ pub struct RepackError {
     pub obj_name: Option<String>,
     /// The field name where the error occurred (if applicable)
     pub field_name: Option<String>,
+    /// Instance name
+    pub instance_name: Option<String>,
     /// Additional details or context about the error
     pub error_details: Option<String>,
     /// Stack trace for nested processing contexts (e.g., snippet processing)
@@ -133,57 +163,52 @@ pub struct RepackError {
 
 impl RepackError {
     /// Creates a global error without specific object or field context.
-    /// 
+    ///
     /// Used for system-level errors like file I/O issues or blueprint loading problems.
-    /// 
+    ///
     /// # Arguments
     /// * `error` - The type of error that occurred
     /// * `msg` - Detailed error message
     pub fn global(error: RepackErrorKind, msg: String) -> RepackError {
         RepackError {
             error,
-            lang_name: None,
-            obj_name: None,
-            field_name: None,
             error_details: Some(msg),
             stack: Vec::new(),
+            ..Default::default()
         }
     }
     /// Creates an error associated with a specific object.
-    /// 
+    ///
     /// Used for object-level validation errors like missing table names
     /// or inheritance issues.
-    /// 
+    ///
     /// # Arguments
     /// * `error` - The type of error that occurred
     /// * `obj` - The object where the error was found
     pub fn from_obj(error: RepackErrorKind, obj: &Object) -> RepackError {
         RepackError {
             error,
-            lang_name: None,
             obj_name: Some(obj.name.to_string()),
-            field_name: None,
-            error_details: None,
             stack: Vec::new(),
+            ..Default::default()
         }
     }
 
     pub fn from_obj_with_msg(error: RepackErrorKind, obj: &Object, msg: String) -> RepackError {
         RepackError {
             error,
-            lang_name: None,
             obj_name: Some(obj.name.to_string()),
-            field_name: None,
             error_details: Some(msg),
             stack: Vec::new(),
+            ..Default::default()
         }
     }
 
     /// Creates an error associated with a specific field in an object.
-    /// 
+    ///
     /// Used for field-level validation errors like type resolution failures
     /// or invalid field configurations.
-    /// 
+    ///
     /// # Arguments
     /// * `error` - The type of error that occurred
     /// * `obj` - The object containing the problematic field
@@ -191,11 +216,10 @@ impl RepackError {
     pub fn from_field(error: RepackErrorKind, obj: &Object, field: &Field) -> RepackError {
         RepackError {
             error,
-            lang_name: None,
             obj_name: Some(obj.name.to_string()),
             field_name: Some(field.name.to_string()),
-            error_details: None,
             stack: Vec::new(),
+            ..Default::default()
         }
     }
 
@@ -207,11 +231,11 @@ impl RepackError {
     ) -> RepackError {
         RepackError {
             error,
-            lang_name: None,
             obj_name: Some(obj.name.to_string()),
             field_name: Some(field.name.to_string()),
             error_details: Some(msg),
             stack: Vec::new(),
+            ..Default::default()
         }
     }
 
@@ -220,10 +244,8 @@ impl RepackError {
         RepackError {
             error,
             lang_name: Some(lang.profile.clone()),
-            obj_name: None,
-            field_name: None,
-            error_details: None,
             stack: Vec::new(),
+            ..Default::default()
         }
     }
 
@@ -233,9 +255,8 @@ impl RepackError {
             error,
             lang_name: Some(lang.profile.clone()),
             obj_name: Some(obj.name.to_string()),
-            field_name: None,
-            error_details: None,
             stack: Vec::new(),
+            ..Default::default()
         }
     }
 
@@ -250,9 +271,9 @@ impl RepackError {
             error,
             lang_name: Some(lang.profile.clone()),
             obj_name: Some(obj.name.to_string()),
-            field_name: None,
             error_details: Some(msg),
             stack: Vec::new(),
+            ..Default::default()
         }
     }
 
@@ -270,6 +291,7 @@ impl RepackError {
             field_name: Some(field.name.to_string()),
             error_details: Some(msg),
             stack: Vec::new(),
+            ..Default::default()
         }
     }
 
@@ -277,10 +299,23 @@ impl RepackError {
         RepackError {
             error,
             lang_name: Some(lang.profile.clone()),
-            obj_name: None,
-            field_name: None,
             error_details: Some(msg),
             stack: Vec::new(),
+            ..Default::default()
+        }
+    }
+
+    pub fn from_instance_with_msg(
+        error: RepackErrorKind,
+        instance: &ConfigurationInstance,
+        msg: String,
+    ) -> RepackError {
+        RepackError {
+            error,
+            instance_name: Some(instance.name.clone()),
+            error_details: Some(msg),
+            stack: Vec::new(),
+            ..Default::default()
         }
     }
 

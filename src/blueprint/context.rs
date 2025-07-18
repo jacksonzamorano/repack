@@ -1,8 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::syntax::{
-    Enum, Field, FieldReferenceKind, FieldType, Object, ObjectJoin, ObjectType, Output,
-    RepackError, RepackErrorKind,
+    ConfigurationInstance, Enum, EnumCase, Field, FieldReferenceKind, FieldType, Object,
+    ObjectJoin, ObjectType, Output, RepackError, RepackErrorKind,
 };
 
 use super::{Blueprint, SnippetMainTokenName, SnippetSecondaryTokenName};
@@ -204,13 +204,16 @@ impl<'a> BlueprintExecutionContext<'a> {
             func_args: None,
         })
     }
-    pub fn with_enum_case(&self, enm: &'a Enum, val: &'a String) -> Result<Self, RepackError> {
+    pub fn with_enum_case(&self, enm: &'a Enum, val: &'a EnumCase) -> Result<Self, RepackError> {
         let mut variables = HashMap::new();
         let flags = HashMap::new();
 
         variables.insert("enum_name".to_string(), enm.name.to_string());
-        variables.insert("name".to_string(), val.to_string());
-        variables.insert("value".to_string(), val.to_string());
+        variables.insert("name".to_string(), val.name.to_string());
+        variables.insert(
+            "value".to_string(),
+            val.value.as_ref().unwrap_or(&val.name).to_string(),
+        );
 
         Ok(Self {
             variables,
@@ -243,6 +246,21 @@ impl<'a> BlueprintExecutionContext<'a> {
         let flags = HashMap::new();
 
         variables.insert("arg".to_string(), arg.to_string());
+
+        Ok(Self {
+            variables,
+            flags,
+            ..self.clone()
+        })
+    }
+    pub fn with_instance(&self, instance: &'a ConfigurationInstance) -> Result<Self, RepackError> {
+        let mut variables = self.variables.clone();
+        let flags = self.flags.clone();
+
+        variables.insert("name".to_string(), instance.name.to_string());
+        for (k, v) in &instance.values {
+            variables.insert(k.to_string(), v.to_string());
+        }
 
         Ok(Self {
             variables,

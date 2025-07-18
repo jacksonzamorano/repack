@@ -22,6 +22,7 @@ pub enum SnippetMainTokenName {
     Import,
     PlaceImports,
     Break,
+    Exec,
     Variable(String),
 }
 impl SnippetMainTokenName {
@@ -42,6 +43,7 @@ impl SnippetMainTokenName {
             "import" => Self::Import,
             "imports" => Self::PlaceImports,
             "br" => Self::Break,
+            "exec" => Self::Exec,
             _ => Self::Variable(val.to_string()),
         }
     }
@@ -51,6 +53,7 @@ pub enum SnippetSecondaryTokenName {
     // Define
     Id,
     Name,
+    Kind,
     Object,
     Field,
     Enum,
@@ -79,6 +82,7 @@ impl SnippetSecondaryTokenName {
         match val {
             "id" => Self::Id,
             "name" => Self::Name,
+            "kind" => Self::Kind,
             "object" => Self::Object,
             "field" => Self::Field,
             "enum" => Self::Enum,
@@ -117,11 +121,29 @@ impl<'a> SnippetReference<'a> {
     }
 }
 
+#[derive(Debug)]
+pub enum BlueprintKind {
+    Code,
+    Configure,
+    Document,
+}
+impl BlueprintKind {
+    pub fn from_string(x: &str) -> BlueprintKind {
+        match x {
+            "code" => Self::Code,
+            "configure" => Self::Configure,
+            "document" => Self::Document,
+            _ => panic!("Unknown blueprint kind {}", x),
+        }
+    }
+}
+
 #[allow(dead_code)]
 #[derive(Debug)]
 pub struct Blueprint {
     pub id: String,
     pub name: String,
+    pub kind: BlueprintKind,
     pub links: HashMap<String, String>,
     pub utilities: HashMap<SnippetIdentifier, String>,
     pub tokens: Vec<FlyToken>,
@@ -131,6 +153,7 @@ impl Blueprint {
         let mut lang = Blueprint {
             id: String::new(),
             name: String::new(),
+            kind: BlueprintKind::Code,
             links: HashMap::new(),
             utilities: HashMap::new(),
             tokens: Vec::new(),
@@ -238,6 +261,13 @@ impl Blueprint {
             .get(&(SnippetMainTokenName::Meta, SnippetSecondaryTokenName::Name))
         {
             lang.name = name.clone();
+        }
+
+        if let Some(kind) = lang
+            .utilities
+            .get(&(SnippetMainTokenName::Meta, SnippetSecondaryTokenName::Kind))
+        {
+            lang.kind = BlueprintKind::from_string(kind)
         }
 
         if lang

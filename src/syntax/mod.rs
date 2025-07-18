@@ -1,8 +1,10 @@
+mod configuration;
 mod dependancies;
 mod enums;
 mod errors;
 mod field;
 mod field_function;
+mod instance;
 mod language;
 mod obj_function;
 mod object;
@@ -12,10 +14,12 @@ mod snippet;
 mod tokens;
 mod types;
 
+pub use configuration::*;
 pub use enums::*;
 pub use errors::*;
 pub use field::*;
 pub use field_function::*;
+pub use instance::*;
 pub use language::Output;
 pub use obj_function::*;
 pub use object::{Object, ObjectJoin, ObjectType};

@@ -1,7 +1,13 @@
 use super::{FileContents, Token};
 
+#[derive(Debug)]
+pub struct EnumCase {
+    pub name: String,
+    pub value: Option<String>,
+}
+
 /// Represents an enumeration type definition in the schema.
-/// 
+///
 /// Enums define a fixed set of possible values that can be used as field types.
 /// They are useful for representing status codes, categories, or any field
 /// that should be restricted to a predefined set of values.
@@ -12,21 +18,21 @@ pub struct Enum {
     /// Tags/categories for organizing and filtering enums during generation
     pub categories: Vec<String>,
     /// The list of possible values this enum can take
-    pub options: Vec<String>,
+    pub options: Vec<EnumCase>,
 }
 impl Enum {
     /// Parses an Enum definition from the input file contents.
-    /// 
+    ///
     /// This method reads the enum definition syntax and constructs an Enum instance
     /// with its name, categories (marked with #), and the list of possible values
     /// enclosed in braces.
-    /// 
+    ///
     /// # Arguments
     /// * `contents` - Mutable reference to the file contents being parsed
-    /// 
+    ///
     /// # Returns
     /// A fully constructed Enum with all parsed options and metadata
-    /// 
+    ///
     /// # Panics
     /// Panics if the expected enum name is missing or malformed
     pub fn read_from_contents(contents: &mut FileContents) -> Enum {
@@ -60,7 +66,15 @@ impl Enum {
                     break 'cmd;
                 }
                 Token::Literal(lit) => {
-                    options.push(lit);
+                    let mut cs = EnumCase {
+                        name: lit,
+                        value: None,
+                    };
+                    match contents.take() {
+                        Some(Token::Literal(val)) => cs.value = Some(val),
+                        _ => {}
+                    }
+                    options.push(cs);
                 }
                 _ => {}
             }

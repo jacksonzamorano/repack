@@ -1,4 +1,4 @@
-blueprint "markdown.blueprint"
+blueprint "output_config.blueprint"
 
 output markdown @test;
 output postgres @test/postgres #model #view;
@@ -7,10 +7,28 @@ output rust @test/rust #model #view;
 output go @test/go #model #view {
 	package main
 }
+output "md-config" @test;
 
 snippet base {
 	id uuid db:pk
 	created_date datetime db:default("NOW()")
+}
+
+configuration ApiDeployment {
+	host_ip
+	db_username
+	db_password
+}
+
+instance Production: ApiDeployment @prod {
+	host_ip "192.168.0.1"
+	db_username "admin"
+	db_password "test"
+}
+instance Staging: ApiDeployment @staging {
+	host_ip "10.0.0.1"
+	db_username "admin2"
+	db_password "test2"
 }
 
 enum UserType #model {

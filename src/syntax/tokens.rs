@@ -42,6 +42,8 @@ pub enum Token {
     With,
     Blueprint,
     Convert,
+    Configuration,
+    Instance,
 }
 impl Token {
     /// Converts a single byte character into a Token if it matches a known symbol.
@@ -108,6 +110,8 @@ impl Token {
             "with" => Token::With,
             "conversion" => Token::Convert,
             "blueprint" => Token::Blueprint,
+            "configuration" => Token::Configuration,
+            "instance" => Token::Instance,
 
             _ => Token::Literal(string.trim().to_string()),
         }

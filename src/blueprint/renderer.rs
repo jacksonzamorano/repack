@@ -7,8 +7,8 @@ use std::{
 use crate::syntax::{FieldReferenceKind, Output, ParseResult, RepackError, RepackErrorKind};
 
 use super::{
-    Blueprint, BlueprintExecutionContext, FlyToken, SnippetMainTokenName, SnippetReference,
-    SnippetSecondaryTokenName, TokenConsumer,
+    Blueprint, BlueprintExecutionContext, FlyToken, SnippetMainTokenName,
+    SnippetReference, SnippetSecondaryTokenName, TokenConsumer,
 };
 
 /// Represents different types of content that can be written to output files.
@@ -89,6 +89,8 @@ pub struct BlueprintRenderer<'a> {
     pub parse_result: &'a ParseResult,
     /// Output configuration specifying target location, categories, and options
     pub config: &'a Output,
+    /// Filter: differs in context, but used to reject certain builds.
+    pub filter: Option<String>,
 }
 impl<'a> BlueprintRenderer<'a> {
     /// Creates a new BlueprintRenderer with the necessary components for code generation.
@@ -109,6 +111,7 @@ impl<'a> BlueprintRenderer<'a> {
             parse_result,
             blueprint,
             config,
+            filter: None,
         }
     }
 
@@ -265,11 +268,25 @@ impl<'a> BlueprintRenderer<'a> {
                         args.iter().map(|x| context.with_func_arg(&x)).collect()
                     }
                     _ => {
-                        return Err(RepackError::from_lang_with_msg(
-                            RepackErrorKind::VariableNotInScope,
-                            self.config,
-                            content.details.secondary_token.to_string(),
-                        ));
+                        let instances = self
+                            .parse_result
+                            .configuration_instances
+                            .iter()
+                            .filter(|cs| cs.configuration == content.details.secondary_token)
+                            .collect::<Vec<_>>();
+                        if instances.len() > 0 {
+                            instances
+                                .iter()
+                                .filter(|x| x.environment == self.filter)
+                                .map(|x| context.with_instance(&x))
+                                .collect()
+                        } else {
+                            return Err(RepackError::from_lang_with_msg(
+                                RepackErrorKind::VariableNotInScope,
+                                self.config,
+                                content.details.secondary_token.to_string(),
+                            ));
+                        }
                     }
                 };
                 let len = iter_options.len();
@@ -515,7 +532,8 @@ impl<'a> BlueprintRenderer<'a> {
     /// # Returns
     /// * `Ok(())` if code generation completes successfully
     /// * `Err(RepackError)` if any step in the generation process fails
-    pub fn build(&mut self) -> Result<(), RepackError> {
+    pub fn build(&mut self, filter: Option<String>) -> Result<(), RepackError> {
+        self.filter = filter;
         let mut files = BlueprintBuildResult::default();
         let mut context = BlueprintExecutionContext::new();
         for opt in &self.config.options {

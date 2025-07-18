@@ -1,8 +1,9 @@
 use crate::syntax::FieldReferenceKind;
 
 use super::{
-    CustomFieldType, Enum, FieldType, FileContents, Object, ObjectJoin, ObjectType, Output,
-    RepackError, RepackErrorKind, Snippet, Token, dependancies::graph_valid, language,
+    Configuration, ConfigurationInstance, CustomFieldType, Enum, FieldType, FileContents, Object,
+    ObjectJoin, ObjectType, Output, RepackError, RepackErrorKind, Snippet, Token,
+    dependancies::graph_valid, language,
 };
 
 /// Represents the complete parsed schema with all defined entities and configurations.
@@ -20,6 +21,11 @@ pub struct ParseResult {
     pub enums: Vec<Enum>,
     /// List of external blueprint files to be loaded for code generation
     pub include_blueprints: Vec<String>,
+    /// List of configuration schemas
+    #[allow(dead_code)]
+    pub configuration_schemas: Vec<Configuration>,
+    /// List of configuration instances
+    pub configuration_instances: Vec<ConfigurationInstance>,
 }
 
 impl ParseResult {
@@ -46,6 +52,8 @@ impl ParseResult {
         let mut languages = Vec::new();
         let mut enums = Vec::new();
         let mut include_blueprints = Vec::new();
+        let mut configuration_schemas = Vec::new();
+        let mut configuration_instances = Vec::new();
 
         while let Some(token) = contents.next() {
             match *token {
@@ -87,6 +95,13 @@ impl ParseResult {
                     if let Some(Token::Literal(path)) = contents.take() {
                         include_blueprints.push(path);
                     }
+                }
+                Token::Configuration => {
+                    configuration_schemas.push(Configuration::read_from_contents(&mut contents));
+                }
+                Token::Instance => {
+                    configuration_instances
+                        .push(ConfigurationInstance::read_from_contents(&mut contents));
                 }
                 _ => {}
             }
@@ -304,8 +319,7 @@ impl ParseResult {
                             };
                             let field_type = referenced_foreign_field.field_type.clone();
                             if matches!(objects[object_idx].object_type, ObjectType::Synthetic) {
-                                let join_name =
-                                    format!("j_{}", referenced_field.name);
+                                let join_name = format!("j_{}", referenced_field.name);
                                 if !objects[object_idx]
                                     .joins
                                     .iter()
@@ -421,6 +435,43 @@ impl ParseResult {
             object_idx += 1;
         }
 
+        for instance in &configuration_instances {
+            let Some(config) = configuration_schemas
+                .iter()
+                .find(|cs| cs.name == instance.configuration)
+            else {
+                errors.push(RepackError::from_instance_with_msg(
+                    RepackErrorKind::UnknownConfiguration,
+                    instance,
+                    instance.configuration.to_string(),
+                ));
+                continue;
+            };
+            for field in instance.values.keys() {
+                if config
+                    .fields
+                    .iter()
+                    .position(|x| x.name == *field)
+                    .is_none()
+                {
+                    errors.push(RepackError::from_instance_with_msg(
+                        RepackErrorKind::ExtraConfigurationField,
+                        instance,
+                        field.to_string(),
+                    ));
+                }
+            }
+            for field in &config.fields {
+                if !instance.values.contains_key(&field.name) {
+                    errors.push(RepackError::from_instance_with_msg(
+                        RepackErrorKind::MissingConfigurationField,
+                        instance,
+                        field.name.to_string(),
+                    ));
+                }
+            }
+        }
+
         for object in &objects {
             if let Some(mut errs) = object.errors() {
                 errors.append(&mut errs);
@@ -441,6 +492,8 @@ impl ParseResult {
                 languages,
                 enums,
                 include_blueprints,
+                configuration_schemas,
+                configuration_instances,
             })
         }
     }

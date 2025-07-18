@@ -26,7 +26,7 @@ DROP TYPE IF EXISTS [name];
 [/each]
 
 [each enum][br]
-CREATE TYPE [name] AS ENUM([each case]'[name]'[if sep], [/if][/each]);
+CREATE TYPE [name] AS ENUM([each case]'[value]'[if sep], [/if][/each]);
 [/each]
 
 [each object]
