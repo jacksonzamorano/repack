@@ -2,13 +2,18 @@ use std::{
     collections::{HashMap, HashSet},
     env::current_dir,
     fs::{self},
+    io::Write,
+    process::{Command, Stdio},
 };
 
-use crate::syntax::{FieldReferenceKind, Output, ParseResult, RepackError, RepackErrorKind};
+use crate::{
+    Console,
+    syntax::{FieldReferenceKind, Output, ParseResult, RepackError, RepackErrorKind},
+};
 
 use super::{
-    Blueprint, BlueprintExecutionContext, FlyToken, SnippetMainTokenName,
-    SnippetReference, SnippetSecondaryTokenName, TokenConsumer,
+    Blueprint, BlueprintExecutionContext, FlyToken, SnippetMainTokenName, SnippetReference,
+    SnippetSecondaryTokenName, TokenConsumer,
 };
 
 /// Represents different types of content that can be written to output files.
@@ -425,6 +430,29 @@ impl<'a> BlueprintRenderer<'a> {
                             self.render_tokens(content.contents, &u_context, writer)?;
                         };
                     }
+                }
+            }
+            SnippetMainTokenName::Exec => {
+                let mut exec_reader = String::new();
+                self.render_tokens(content.contents, &context, &mut exec_reader)?;
+                Console::update_msg(&format!(
+                    "{} would like to run a command. [y/N]",
+                    self.blueprint.name
+                ));
+                let confirm = Console::ask_confirmation();
+                if confirm {
+                    Console::update_msg("Executing...");
+                    let mut exec = Command::new("sh")
+                        .arg("-s")
+                        .stdin(Stdio::piped())
+                        .stdout(Stdio::null())
+                        .stderr(Stdio::inherit())
+                        .spawn()
+                        .unwrap();
+                    if let Some(stdin) = exec.stdin.as_mut() {
+                        stdin.write_all(exec_reader.as_bytes()).unwrap();
+                    }
+                    exec.wait().unwrap();
                 }
             }
             SnippetMainTokenName::PlaceImports => {

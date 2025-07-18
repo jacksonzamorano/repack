@@ -8,6 +8,40 @@ use crate::blueprint::BlueprintStore;
 mod blueprint;
 mod syntax;
 
+const WIDTH: usize = 60;
+
+pub struct Console;
+impl Console {
+    fn begin() {
+        println!("[] Loading...");
+        print!("");
+    }
+    fn update_ct(i: usize, n: usize, title: &str) {
+        print!("\x1B[1A");
+        print!("\r\x1B[2K[{}/{}] {:<width$}\n", i, n, title, width = WIDTH);
+        std::io::Write::flush(&mut std::io::stdout()).unwrap();
+    }
+    fn update_msg(msg: &str) {
+        print!("\r\x1B[2K  {:<width$}", msg, width = WIDTH);
+        std::io::Write::flush(&mut std::io::stdout()).unwrap();
+    }
+    fn finalize() {
+        println!()
+    }
+    fn error(message: &str) {
+        print!("\n{}", message);
+        std::io::Write::flush(&mut std::io::stdout()).unwrap();
+    }
+    fn ask_confirmation() -> bool {
+        let mut input = String::new();
+        if let Err(_) = std::io::stdin().read_line(&mut input) {
+            return false;
+        }
+        print!("\x1B[1A");
+        matches!(input.trim().to_lowercase().as_str(), "y" | "yes")
+    }
+}
+
 /// Defines the operational mode for the repack code generator.
 ///
 /// This enum determines what action the tool will take when executed.
@@ -45,6 +79,9 @@ fn print_usage() {
 /// The tool expects at least one argument (the input schema file) and supports
 /// the --clean flag to remove previously generated files instead of building.
 fn main() {
+    Console::begin();
+    let mut task_index = 1;
+    let mut task_count = 1;
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 2 {
         print_usage();
@@ -64,15 +101,14 @@ fn main() {
         }
     };
 
-    let msg = include_bytes!("welcome.txt");
-    _ = std::io::stdout().write_all(msg);
+    Console::update_ct(task_index, task_count, "Planning...");
 
     let contents = FileContents::new(file);
     let parse_result = match ParseResult::from_contents(contents) {
         Ok(res) => res,
         Err(e) => {
             for err in e {
-                println!("{}", err.into_string());
+                Console::error(&err.into_string());
             }
             exit(1);
         }
@@ -96,60 +132,73 @@ fn main() {
             );
         }
     }
-    for output in &parse_result.languages {
-        let Some(bp) = store.blueprint(&output.profile) else {
-            println!(
-                "[{}] Could not find this blueprint. Have you imported it?",
-                output.profile
-            );
-            continue;
-        };
-        match command {
-            Behavior::Configure => {
-                if !matches!(bp.kind, blueprint::BlueprintKind::Configure) {
-                    continue;
+
+    let outputs = parse_result
+        .languages
+        .iter()
+        .filter_map(|lng| {
+            let Some(bp) = store.blueprint(&lng.profile) else {
+                Console::error(&format!(
+                    "[{}] Could not find this blueprint. Have you imported it?",
+                    lng.profile
+                ));
+                exit(2)
+            };
+            match command {
+                Behavior::Configure => {
+                    if !matches!(bp.kind, blueprint::BlueprintKind::Configure) {
+                        return None;
+                    }
+                    return Some(("Building", lng, bp));
                 }
-            }
-            Behavior::Build => {
-                if !matches!(bp.kind, blueprint::BlueprintKind::Code) {
-                    continue;
+                Behavior::Build => {
+                    if !matches!(bp.kind, blueprint::BlueprintKind::Code) {
+                        return None;
+                    }
+                    return Some(("Building", lng, bp));
                 }
-            }
-            Behavior::Document => {
-                if !matches!(bp.kind, blueprint::BlueprintKind::Document) {
-                    continue;
+                Behavior::Document => {
+                    if !matches!(bp.kind, blueprint::BlueprintKind::Document) {
+                        return None;
+                    }
+                    return Some(("Documenting", lng, bp));
                 }
+                Behavior::Clean => return Some(("Cleaning", lng, bp)),
             }
-            _ => {}
-        }
+        })
+        .collect::<Vec<_>>();
+    task_count += outputs.len();
+
+    for (task_string, output, bp) in outputs {
+        task_index += 1;
+        Console::update_ct(
+            task_index,
+            task_count,
+            &format!("{} {}...", task_string, bp.name),
+        );
         let mut builder = BlueprintRenderer::new(&parse_result, bp, output);
         match command {
             Behavior::Build | Behavior::Document => match builder.build(None) {
-                Ok(_) => {
-                    println!("[{}] Built successfully!", output.profile);
-                }
+                Ok(_) => {}
                 Err(e) => {
-                    println!("{}", e.into_string());
+                    Console::error(&e.into_string());
                 }
             },
             Behavior::Clean => match builder.clean() {
-                Ok(_) => {
-                    println!("[{}] Cleaned successfully!", output.profile);
-                }
+                Ok(_) => {}
                 Err(e) => {
-                    println!("{}", e.into_string());
+                    Console::error(&e.into_string());
                 }
             },
             Behavior::Configure => match builder.build(filter.clone()) {
-                Ok(_) => {
-                    println!("[{}] Built configurations successfully!", output.profile);
-                }
+                Ok(_) => {}
                 Err(e) => {
-                    println!("{}", e.into_string());
+                    Console::error(&e.into_string());
                 }
             },
         }
     }
-    let msg = include_bytes!("done.txt");
-    _ = std::io::stdout().write_all(msg);
+    Console::update_ct(task_index, task_count, "⚡️ Completed");
+    Console::update_msg("Project built.");
+    Console::finalize();
 }

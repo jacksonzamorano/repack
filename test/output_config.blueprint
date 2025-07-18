@@ -18,5 +18,5 @@
 - Username: [db_username][br]
 - Password: [db_password][br]
 
-[exec]echo "[db_username]"[br][/exec]
+[exec]echo "[host_ip]"[/exec]
 [/each]

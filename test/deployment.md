@@ -1,5 +1,5 @@
 # Deployment
-## Staging
-- IP: 10.0.0.1
-- Username: admin2
-- Password: test2
+## Production
+- IP: 192.168.0.1
+- Username: admin
+- Password: test
