@@ -99,11 +99,7 @@ impl<'a> BlueprintFileReader<'a> {
                     temp.pop();
                 }
             }
-            if *next == b'\\' {
-                last_ignore = true;
-            } else {
-                last_ignore = false;
-            }
+            last_ignore = *next == b'\\';
             match self.reader.peek() {
                 Some(b'[') if !last_ignore => {
                     temp.push(*next as char);

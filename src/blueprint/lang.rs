@@ -133,7 +133,7 @@ impl BlueprintKind {
             "code" => Self::Code,
             "configure" => Self::Configure,
             "document" => Self::Document,
-            _ => panic!("Unknown blueprint kind {}", x),
+            _ => panic!("Unknown blueprint kind {x}"),
         }
     }
 }

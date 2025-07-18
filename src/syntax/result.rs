@@ -448,11 +448,9 @@ impl ParseResult {
                 continue;
             };
             for field in instance.values.keys() {
-                if config
+                if !config
                     .fields
-                    .iter()
-                    .position(|x| x.name == *field)
-                    .is_none()
+                    .iter().any(|x| x.name == *field)
                 {
                     errors.push(RepackError::from_instance_with_msg(
                         RepackErrorKind::ExtraConfigurationField,

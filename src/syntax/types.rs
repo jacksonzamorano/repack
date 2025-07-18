@@ -78,7 +78,7 @@ impl Display for CoreType {
             Self::DateTime => "datetime".to_string(),
             Self::Uuid => "uuid".to_string(),
         };
-        write!(f, "{}", res)
+        write!(f, "{res}")
     }
 }
 
@@ -100,10 +100,10 @@ impl Display for FieldType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             FieldType::Core(s) => {
-                write!(f, "{}", s)
+                write!(f, "{s}")
             }
             FieldType::Custom(s, _) => {
-                write!(f, "{}", s)
+                write!(f, "{s}")
             }
         }
     }

@@ -16,7 +16,7 @@ impl ConfigurationInstance {
             panic!("Could not find a name for this instance.");
         };
         let Token::Literal(name_ref) = name_opt else {
-            panic!("Started instance, expected a name but got {:?}", name_opt);
+            panic!("Started instance, expected a name but got {name_opt:?}");
         };
         let name = name_ref.to_string();
         let mut environment: Option<String> = None;

@@ -89,14 +89,11 @@ fn main() {
         let mut path = PathBuf::from(&file);
         path.pop();
         path.push(add);
-        match store.load_file(&path) {
-            Err(_) => {
-                panic!(
-                    "Could not load external library '{}'",
-                    path.to_str().unwrap()
-                );
-            }
-            _ => {}
+        if store.load_file(&path).is_err() {
+            panic!(
+                "Could not load external library '{}'",
+                path.to_str().unwrap()
+            );
         }
     }
     for output in &parse_result.languages {
@@ -109,7 +106,6 @@ fn main() {
         };
         match command {
             Behavior::Configure => {
-                if filter.is_none() {}
                 if !matches!(bp.kind, blueprint::BlueprintKind::Configure) {
                     continue;
                 }

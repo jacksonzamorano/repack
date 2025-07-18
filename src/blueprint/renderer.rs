@@ -164,7 +164,7 @@ impl<'a> BlueprintRenderer<'a> {
                             ));
                         }
                     }
-                    match self.render_snippet(
+                    if let Err(mut e) = self.render_snippet(
                         SnippetReference {
                             details: snip,
                             contents: &content[starting_at..index],
@@ -172,11 +172,8 @@ impl<'a> BlueprintRenderer<'a> {
                         context,
                         writer,
                     ) {
-                        Err(mut e) => {
-                            e.add_to_stack(&snip);
-                            return Err(e);
-                        }
-                        _ => {}
+                        e.add_to_stack(snip);
+                        return Err(e);
                     }
                 }
                 _ => {
@@ -265,7 +262,7 @@ impl<'a> BlueprintRenderer<'a> {
                                 "args in non-func context".to_string(),
                             ));
                         };
-                        args.iter().map(|x| context.with_func_arg(&x)).collect()
+                        args.iter().map(|x| context.with_func_arg(x)).collect()
                     }
                     _ => {
                         let instances = self
@@ -274,11 +271,11 @@ impl<'a> BlueprintRenderer<'a> {
                             .iter()
                             .filter(|cs| cs.configuration == content.details.secondary_token)
                             .collect::<Vec<_>>();
-                        if instances.len() > 0 {
+                        if !instances.is_empty() {
                             instances
                                 .iter()
                                 .filter(|x| x.environment == self.filter)
-                                .map(|x| context.with_instance(&x))
+                                .map(|x| context.with_instance(x))
                                 .collect()
                         } else {
                             return Err(RepackError::from_lang_with_msg(
@@ -374,7 +371,6 @@ impl<'a> BlueprintRenderer<'a> {
                     )
                 })?;
                 if let Some(field) = context.field {
-                    if field.name == "id" {}
                     if !field
                         .functions_in_namespace(namespace)
                         .iter()
@@ -440,7 +436,7 @@ impl<'a> BlueprintRenderer<'a> {
                 } else {
                     return Err(RepackError::from_lang_with_msg(
                         RepackErrorKind::UnknownLink,
-                        &self.config,
+                        self.config,
                         content.details.secondary_token.to_string(),
                     ));
                 }

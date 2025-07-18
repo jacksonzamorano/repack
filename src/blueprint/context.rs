@@ -124,10 +124,9 @@ impl<'a> BlueprintExecutionContext<'a> {
                     .map(|x| x.to_string())
                     .unwrap_or_default(),
             ),
-            FieldReferenceKind::ImplicitJoin(local_field_name) => (
-                field.location.name.clone(),
-                format!("j_{}", local_field_name),
-            ),
+            FieldReferenceKind::ImplicitJoin(local_field_name) => {
+                (field.location.name.clone(), format!("j_{local_field_name}"))
+            }
             FieldReferenceKind::ExplicitJoin(jn) => (field.location.name.clone(), jn.to_string()),
         };
         variables.insert("ref_table".to_string(), loc);
@@ -150,10 +149,10 @@ impl<'a> BlueprintExecutionContext<'a> {
         );
         flags.insert(
             "local",
-            match &field.location.reference {
-                FieldReferenceKind::Local | FieldReferenceKind::FieldType(_) => true,
-                _ => false,
-            },
+            matches!(
+                field.location.reference,
+                FieldReferenceKind::Local | FieldReferenceKind::FieldType(_)
+            ),
         );
 
         Ok(Self {
@@ -229,7 +228,7 @@ impl<'a> BlueprintExecutionContext<'a> {
         let mut flags = HashMap::new();
 
         for (idx, arg) in args.iter().enumerate() {
-            variables.insert(format!("{}", idx), arg.to_string());
+            variables.insert(format!("{idx}"), arg.to_string());
         }
 
         flags.insert("has_args", !args.is_empty());

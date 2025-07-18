@@ -113,7 +113,7 @@ impl Object {
             panic!("Read record type, expected a name but got end of file.");
         };
         let Token::Literal(name_ref) = name_opt else {
-            panic!("Read record type, expected a name but got {:?}", name_opt);
+            panic!("Read record type, expected a name but got {name_opt:?}");
         };
         let name = name_ref.to_string();
         let mut fields = Vec::new();

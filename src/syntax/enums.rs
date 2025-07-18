@@ -40,7 +40,7 @@ impl Enum {
             panic!("Read enum name, expected a name but got end of file.");
         };
         let Token::Literal(name_ref) = name_opt else {
-            panic!("Read enum name, expected a name but got {:?}", name_opt);
+            panic!("Read enum name, expected a name but got {name_opt:?}");
         };
         let name = name_ref.to_string();
         let mut options = Vec::new();
@@ -70,10 +70,7 @@ impl Enum {
                         name: lit,
                         value: None,
                     };
-                    match contents.take() {
-                        Some(Token::Literal(val)) => cs.value = Some(val),
-                        _ => {}
-                    }
+                    if let Some(Token::Literal(val)) = contents.take() { cs.value = Some(val) }
                     options.push(cs);
                 }
                 _ => {}

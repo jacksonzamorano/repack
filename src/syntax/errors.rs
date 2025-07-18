@@ -104,27 +104,6 @@ impl RepackError {
     /// A formatted string suitable for console output or logging
     pub fn into_string(self) -> String {
         let msg = self.error.as_string();
-        let loc = match (
-            self.lang_name,
-            self.obj_name,
-            self.field_name,
-            self.instance_name,
-        ) {
-            (Some(lang), None, None, None) => format!(" ({})", lang),
-            (None, Some(obj_name), None, None) => format!(" ({})", obj_name),
-            (None, Some(obj_name), Some(field_name), None) => {
-                format!(" ({}.{})", obj_name, field_name)
-            }
-            (Some(lang), Some(obj_name), None, None) => format!(" ({} -> {})", lang, obj_name),
-            (Some(lang), Some(obj_name), Some(field_name), None) => {
-                format!(" ({} -> {}.{})", lang, obj_name, field_name)
-            }
-            (None, None, None, Some(instance)) => {
-                format!(" ({})", instance)
-            }
-            (_, _, _, _) => String::new(),
-        };
-
         let details = self.error_details.unwrap_or_default();
         let stack = if self.stack.is_empty() {
             String::new()
@@ -133,7 +112,7 @@ impl RepackError {
         };
         format!(
             "[E{:04}]{} {} {}{}",
-            self.error as u32, loc, msg, details, stack
+            self.error as u32, self.specifier, msg, details, stack
         )
     }
 }
@@ -147,14 +126,8 @@ impl RepackError {
 pub struct RepackError {
     /// The specific type/category of error that occurred
     pub error: RepackErrorKind,
-    /// The target language/profile being processed when the error occurred
-    pub lang_name: Option<String>,
-    /// The object name where the error occurred
-    pub obj_name: Option<String>,
-    /// The field name where the error occurred (if applicable)
-    pub field_name: Option<String>,
-    /// Instance name
-    pub instance_name: Option<String>,
+    /// The location the error occured.
+    pub specifier: String,
     /// Additional details or context about the error
     pub error_details: Option<String>,
     /// Stack trace for nested processing contexts (e.g., snippet processing)
@@ -188,7 +161,7 @@ impl RepackError {
     pub fn from_obj(error: RepackErrorKind, obj: &Object) -> RepackError {
         RepackError {
             error,
-            obj_name: Some(obj.name.to_string()),
+            specifier: format!(" ({})", obj.name),
             stack: Vec::new(),
             ..Default::default()
         }
@@ -197,10 +170,9 @@ impl RepackError {
     pub fn from_obj_with_msg(error: RepackErrorKind, obj: &Object, msg: String) -> RepackError {
         RepackError {
             error,
-            obj_name: Some(obj.name.to_string()),
+            specifier: format!(" ({})", obj.name),
             error_details: Some(msg),
             stack: Vec::new(),
-            ..Default::default()
         }
     }
 
@@ -216,8 +188,7 @@ impl RepackError {
     pub fn from_field(error: RepackErrorKind, obj: &Object, field: &Field) -> RepackError {
         RepackError {
             error,
-            obj_name: Some(obj.name.to_string()),
-            field_name: Some(field.name.to_string()),
+            specifier: format!(" ({}.{})", obj.name, field.name),
             stack: Vec::new(),
             ..Default::default()
         }
@@ -231,11 +202,9 @@ impl RepackError {
     ) -> RepackError {
         RepackError {
             error,
-            obj_name: Some(obj.name.to_string()),
-            field_name: Some(field.name.to_string()),
+            specifier: format!(" ({}.{})", obj.name, field.name),
             error_details: Some(msg),
             stack: Vec::new(),
-            ..Default::default()
         }
     }
 
@@ -243,7 +212,7 @@ impl RepackError {
     pub fn from_lang(error: RepackErrorKind, lang: &Output) -> RepackError {
         RepackError {
             error,
-            lang_name: Some(lang.profile.clone()),
+            specifier: format!(" ({})", lang.profile),
             stack: Vec::new(),
             ..Default::default()
         }
@@ -253,8 +222,7 @@ impl RepackError {
     pub fn from_lang_with_obj(error: RepackErrorKind, lang: &Output, obj: &Object) -> RepackError {
         RepackError {
             error,
-            lang_name: Some(lang.profile.clone()),
-            obj_name: Some(obj.name.to_string()),
+            specifier: format!(" ({} -> {})", lang.profile, obj.name),
             stack: Vec::new(),
             ..Default::default()
         }
@@ -269,11 +237,9 @@ impl RepackError {
     ) -> RepackError {
         RepackError {
             error,
-            lang_name: Some(lang.profile.clone()),
-            obj_name: Some(obj.name.to_string()),
+            specifier: format!(" ({} -> {})", lang.profile, obj.name),
             error_details: Some(msg),
             stack: Vec::new(),
-            ..Default::default()
         }
     }
 
@@ -286,22 +252,18 @@ impl RepackError {
     ) -> RepackError {
         RepackError {
             error,
-            lang_name: Some(lang.profile.clone()),
-            obj_name: Some(obj.name.to_string()),
-            field_name: Some(field.name.to_string()),
+            specifier: format!(" ({} -> {}.{})", lang.profile, obj.name, field.name),
             error_details: Some(msg),
             stack: Vec::new(),
-            ..Default::default()
         }
     }
 
     pub fn from_lang_with_msg(error: RepackErrorKind, lang: &Output, msg: String) -> RepackError {
         RepackError {
             error,
-            lang_name: Some(lang.profile.clone()),
+            specifier: format!(" ({})", lang.profile),
             error_details: Some(msg),
             stack: Vec::new(),
-            ..Default::default()
         }
     }
 
@@ -312,10 +274,9 @@ impl RepackError {
     ) -> RepackError {
         RepackError {
             error,
-            instance_name: Some(instance.name.clone()),
+            specifier: format!(" ({})", instance.name),
             error_details: Some(msg),
             stack: Vec::new(),
-            ..Default::default()
         }
     }
 

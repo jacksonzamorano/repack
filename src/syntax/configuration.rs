@@ -17,8 +17,7 @@ impl Configuration {
         };
         let Token::Literal(name_ref) = name_opt else {
             panic!(
-                "Started configuration, expected a name but got {:?}",
-                name_opt
+                "Started configuration, expected a name but got {name_opt:?}"
             );
         };
         let name = name_ref.to_string();
