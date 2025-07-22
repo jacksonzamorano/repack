@@ -318,6 +318,7 @@ impl ParseResult {
                                 continue;
                             };
                             let field_type = referenced_foreign_field.field_type.clone();
+                            let opt = referenced_foreign_field.optional;
                             if matches!(objects[object_idx].object_type, ObjectType::Synthetic) {
                                 let join_name = format!("j_{}", referenced_field.name);
                                 if !objects[object_idx]
@@ -336,6 +337,7 @@ impl ParseResult {
                                     objects[object_idx].joins.push(j);
                                 }
                             }
+                            objects[object_idx].fields[field_idx].optional = opt;
                             objects[object_idx].fields[field_idx].field_type = field_type
                         }
                         FieldReferenceKind::FieldType(joining_entity) => {
@@ -368,6 +370,8 @@ impl ParseResult {
                             };
                             let typ = referenced_foreign_field.field_type.clone();
 
+                            objects[object_idx].fields[field_idx].optional =
+                                referenced_foreign_field.optional;
                             objects[object_idx].fields[field_idx].field_type = typ;
                         }
                         FieldReferenceKind::ExplicitJoin(join_name) => {
@@ -409,8 +413,10 @@ impl ParseResult {
                                 field_idx += 1;
                                 continue;
                             };
+                            let opt = field.optional;
                             objects[object_idx].fields[field_idx].field_type =
                                 field.field_type.clone();
+                            objects[object_idx].fields[field_idx].optional = opt;
                         }
                     }
                 }
@@ -448,10 +454,7 @@ impl ParseResult {
                 continue;
             };
             for field in instance.values.keys() {
-                if !config
-                    .fields
-                    .iter().any(|x| x.name == *field)
-                {
+                if !config.fields.iter().any(|x| x.name == *field) {
                     errors.push(RepackError::from_instance_with_msg(
                         RepackErrorKind::ExtraConfigurationField,
                         instance,
