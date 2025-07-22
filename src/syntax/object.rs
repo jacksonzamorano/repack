@@ -37,6 +37,8 @@ pub struct ObjectJoin {
     /// The name identifier for this join relationship.
     /// Used in code generation to create meaningful method and variable names.
     pub join_name: String,
+    pub local_entity: Option<String>,
+    pub local_base: Option<String>,
     /// The field name in the current object that participates in the join.
     pub local_field: String,
     /// The join condition operator (typically "=" for equality joins).
@@ -47,6 +49,7 @@ pub struct ObjectJoin {
     pub foreign_table: Option<String>,
     /// The field name in the foreign entity that participates in the join.
     pub foreign_field: String,
+    pub join_type: String,
 }
 
 /// Represents a complete object definition in the schema system.
@@ -177,6 +180,9 @@ impl Object {
                     let Some(Token::Literal(join_name)) = contents.take() else {
                         continue;
                     };
+                    let Some(Token::Literal(join_type)) = contents.take() else {
+                        continue;
+                    };
                     let Some(Token::Literal(obj_1_name)) = contents.take() else {
                         continue;
                     };
@@ -198,6 +204,9 @@ impl Object {
                     if obj_1_name == "self" {
                         joins.push(ObjectJoin {
                             join_name,
+                            join_type,
+                            local_base: None,
+                            local_entity: None,
                             local_field: obj_1_field,
                             condition: "=".to_string(),
                             foreign_entity: obj_2_name,
@@ -207,6 +216,33 @@ impl Object {
                     } else if obj_2_name == "self" {
                         joins.push(ObjectJoin {
                             join_name,
+                            join_type,
+                            local_base: None,
+                            local_entity: None,
+                            local_field: obj_2_field,
+                            condition: "=".to_string(),
+                            foreign_entity: obj_1_name,
+                            foreign_field: obj_1_field,
+                            foreign_table: None,
+                        });
+                    } else if joins.iter().find(|x| x.join_name == obj_1_name).is_some() {
+                        joins.push(ObjectJoin {
+                            join_name,
+                            join_type,
+                            local_base: Some(obj_1_name),
+                            local_entity: None,
+                            local_field: obj_1_field,
+                            condition: "=".to_string(),
+                            foreign_entity: obj_2_name,
+                            foreign_field: obj_2_field,
+                            foreign_table: None,
+                        });
+                    } else if joins.iter().find(|x| x.join_name == obj_2_name).is_some() {
+                        joins.push(ObjectJoin {
+                            join_name,
+                            join_type,
+                            local_entity: None,
+                            local_base: Some(obj_2_name),
                             local_field: obj_2_field,
                             condition: "=".to_string(),
                             foreign_entity: obj_1_name,

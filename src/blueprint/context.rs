@@ -1,7 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::syntax::{
-    ConfigurationInstance, CoreType, Enum, EnumCase, Field, FieldReferenceKind, FieldType, Object, ObjectJoin, ObjectType, Output, RepackError, RepackErrorKind
+    ConfigurationInstance, CoreType, Enum, EnumCase, Field, FieldReferenceKind, FieldType, Object,
+    ObjectJoin, ObjectType, Output, RepackError, RepackErrorKind,
 };
 
 use super::{Blueprint, SnippetMainTokenName, SnippetSecondaryTokenName};
@@ -153,13 +154,34 @@ impl<'a> BlueprintExecutionContext<'a> {
                 FieldReferenceKind::Local | FieldReferenceKind::FieldType(_)
             ),
         );
-        flags.insert("uuid", matches!(field.field_type(), FieldType::Core(CoreType::Uuid)));
-        flags.insert("string", matches!(field.field_type(), FieldType::Core(CoreType::String)));
-        flags.insert("int32", matches!(field.field_type(), FieldType::Core(CoreType::Int32)));
-        flags.insert("int64", matches!(field.field_type(), FieldType::Core(CoreType::Int64)));
-        flags.insert("float64", matches!(field.field_type(), FieldType::Core(CoreType::Float64)));
-        flags.insert("boolean", matches!(field.field_type(), FieldType::Core(CoreType::Boolean)));
-        flags.insert("datetime", matches!(field.field_type(), FieldType::Core(CoreType::DateTime)));
+        flags.insert(
+            "uuid",
+            matches!(field.field_type(), FieldType::Core(CoreType::Uuid)),
+        );
+        flags.insert(
+            "string",
+            matches!(field.field_type(), FieldType::Core(CoreType::String)),
+        );
+        flags.insert(
+            "int32",
+            matches!(field.field_type(), FieldType::Core(CoreType::Int32)),
+        );
+        flags.insert(
+            "int64",
+            matches!(field.field_type(), FieldType::Core(CoreType::Int64)),
+        );
+        flags.insert(
+            "float64",
+            matches!(field.field_type(), FieldType::Core(CoreType::Float64)),
+        );
+        flags.insert(
+            "boolean",
+            matches!(field.field_type(), FieldType::Core(CoreType::Boolean)),
+        );
+        flags.insert(
+            "datetime",
+            matches!(field.field_type(), FieldType::Core(CoreType::DateTime)),
+        );
 
         Ok(Self {
             variables,
@@ -175,9 +197,14 @@ impl<'a> BlueprintExecutionContext<'a> {
         let flags = self.flags.clone();
 
         variables.insert("name".to_string(), join.join_name.to_string());
-        if let Some(tn) = obj.table_name.as_ref() {
-            variables.insert("local_entity".to_string(), tn.to_string());
-        }
+        variables.insert(
+            "local_entity".to_string(),
+            join.local_base.as_ref().unwrap().to_string(),
+        );
+        variables.insert(
+            "local_base".to_string(),
+            join.local_base.as_ref().unwrap().to_string(),
+        );
         variables.insert("ref_entity".to_string(), join.foreign_entity.to_string());
         variables.insert("local_field".to_string(), join.local_field.to_string());
         variables.insert("ref_field".to_string(), join.foreign_field.to_string());
@@ -186,6 +213,7 @@ impl<'a> BlueprintExecutionContext<'a> {
             join.foreign_table.as_ref().unwrap().to_string(),
         );
         variables.insert("condition".to_string(), join.condition.to_string());
+        variables.insert("join_type".to_string(), join.join_type.to_string());
 
         Ok(Self {
             variables,

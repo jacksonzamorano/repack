@@ -328,6 +328,9 @@ impl ParseResult {
                                 {
                                     let j = ObjectJoin {
                                         join_name,
+                                        join_type: "INNER JOIN".to_string(),
+                                        local_entity: Some(objects[object_idx].name.clone()),
+                                        local_base: objects[object_idx].table_name.clone(),
                                         local_field: referenced_field.name.to_string(),
                                         condition: "=".to_string(),
                                         foreign_entity: referenced_entity.name.clone(),
@@ -438,6 +441,52 @@ impl ParseResult {
                 }
                 field_idx += 1;
             }
+
+            let mut join_idx = 0;
+            while join_idx < objects[object_idx].joins.len() {
+                if objects[object_idx].joins[join_idx].local_base.is_none()
+                    && objects[object_idx].joins[join_idx].local_entity.is_none()
+                {
+                    objects[object_idx].joins[join_idx].local_base =
+                        Some(objects[object_idx].table_name.as_ref().unwrap().clone());
+                    objects[object_idx].joins[join_idx].local_entity =
+                        Some(objects[object_idx].name.clone());
+                    join_idx += 1;
+                    continue;
+                }
+                if let Some(le) = &objects[object_idx].joins[join_idx].local_entity {
+                    if let Some(obj) = objects.iter().find(|x| x.name == *le) {
+                        if let Some(tn) = obj.table_name.clone() {
+                            objects[object_idx].joins[join_idx].local_base = Some(tn);
+                        } else {
+                            errors.push(RepackError::from_obj_with_msg(
+                                RepackErrorKind::JoinNoTableName,
+                                &objects[object_idx],
+                                le.clone(),
+                            ));
+                        }
+                    } else {
+                        errors.push(RepackError::from_obj_with_msg(
+                            RepackErrorKind::JoinObjectNotFound,
+                            &objects[object_idx],
+                            objects[object_idx].joins[join_idx]
+                                .local_base
+                                .as_ref()
+                                .unwrap()
+                                .to_string(),
+                        ));
+                    }
+                } else if let Some(lt) = &objects[object_idx].joins[join_idx].local_base {
+                    if let Some(obj) = objects.iter().find(|x| match &x.table_name {
+                        Some(val) if *val == *lt => true,
+                        _ => false,
+                    }) {
+                        objects[object_idx].joins[join_idx].local_entity = Some(obj.name.clone());
+                    }
+                }
+                join_idx += 1;
+            }
+
             object_idx += 1;
         }
 
