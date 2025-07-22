@@ -1,8 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::syntax::{
-    ConfigurationInstance, Enum, EnumCase, Field, FieldReferenceKind, FieldType, Object,
-    ObjectJoin, ObjectType, Output, RepackError, RepackErrorKind,
+    ConfigurationInstance, CoreType, Enum, EnumCase, Field, FieldReferenceKind, FieldType, Object, ObjectJoin, ObjectType, Output, RepackError, RepackErrorKind
 };
 
 use super::{Blueprint, SnippetMainTokenName, SnippetSecondaryTokenName};
@@ -154,6 +153,13 @@ impl<'a> BlueprintExecutionContext<'a> {
                 FieldReferenceKind::Local | FieldReferenceKind::FieldType(_)
             ),
         );
+        flags.insert("uuid", matches!(field.field_type(), FieldType::Core(CoreType::Uuid)));
+        flags.insert("string", matches!(field.field_type(), FieldType::Core(CoreType::String)));
+        flags.insert("int32", matches!(field.field_type(), FieldType::Core(CoreType::Int32)));
+        flags.insert("int64", matches!(field.field_type(), FieldType::Core(CoreType::Int64)));
+        flags.insert("float64", matches!(field.field_type(), FieldType::Core(CoreType::Float64)));
+        flags.insert("boolean", matches!(field.field_type(), FieldType::Core(CoreType::Boolean)));
+        flags.insert("datetime", matches!(field.field_type(), FieldType::Core(CoreType::DateTime)));
 
         Ok(Self {
             variables,
