@@ -1,32 +1,12 @@
-use super::{
-    Field, FieldFunctionName, FileContents, FunctionNamespace, Object, Output, RepackError,
-    RepackErrorKind, Token,
-};
+use super::{FileContents, Token};
 
 #[derive(Debug, Clone)]
 pub struct FieldFunction {
-    pub namespace: FunctionNamespace,
-    pub name: FieldFunctionName,
+    pub namespace: String,
+    pub name: String,
     pub args: Vec<String>,
 }
 impl FieldFunction {
-    pub fn arg(
-        &self,
-        output: &Output,
-        obj: &Object,
-        field: &Field,
-        i: usize,
-    ) -> Result<&String, RepackError> {
-        self.args
-            .get(i)
-            .ok_or(RepackError::from_lang_with_obj_field_msg(
-                RepackErrorKind::ExpectedArgument,
-                output,
-                obj,
-                field,
-                i.to_string(),
-            ))
-    }
     pub fn from_contents(namespace: String, contents: &mut FileContents) -> Option<FieldFunction> {
         if contents.take()? != Token::Colon {
             return None;
@@ -59,8 +39,8 @@ impl FieldFunction {
         }
 
         Some(FieldFunction {
-            namespace: FunctionNamespace::from_string(&namespace),
-            name: FieldFunctionName::from_string(&name),
+            namespace,
+            name,
             args,
         })
     }

@@ -1,0 +1,22 @@
+[meta id]md-config[/meta]
+[meta name]Markdown Configuration[/meta]
+[meta kind]configure[/meta]
+
+[define int32]32-bit integer[/define]
+[define int64]64-bit integer[/define]
+[define datetime]Timestamp[/define]
+[define string]String[/define]
+[define boolean]Boolean[/define]
+[define uuid]UUID v4[/define]
+
+[file]deployment.md[/file]
+
+# Deployment
+[each ApiDeployment][br]
+## [name][br]
+- IP: [host_ip][br]
+- Username: [db_username][br]
+- Password: [db_password][br]
+
+[exec]echo "[host_ip]"[/exec]
+[/each]

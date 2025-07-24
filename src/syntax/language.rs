@@ -1,5 +1,4 @@
-use super::{FileContents, RepackError, RepackErrorKind, Token};
-use crate::profiles::OutputProfile;
+use super::{FileContents, RepackError, Token};
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -16,7 +15,7 @@ impl Output {
             panic!("Read record type, expected a name but got end of file.");
         };
         let Token::Literal(name_ref) = name_opt else {
-            panic!("Read record type, expected a name but got {:?}", name_opt);
+            panic!("Read record type, expected a name but got {name_opt:?}");
         };
         let output_language = name_ref.to_string();
         let mut location = None;
@@ -84,13 +83,13 @@ impl Output {
     }
 
     pub fn errors(&self) -> Vec<RepackError> {
-        let mut errors = Vec::new();
-        if OutputProfile::from_keyword(&self.profile).is_none() {
-            errors.push(RepackError::from_lang(
-                RepackErrorKind::UnknownLanguage,
-                self,
-            ));
-        }
-        errors
+        
+        // if OutputProfile::from_keyword(&self.profile).is_none() {
+        //     errors.push(RepackError::from_lang(
+        //         RepackErrorKind::UnknownLanguage,
+        //         self,
+        //     ));
+        // }
+        Vec::new()
     }
 }

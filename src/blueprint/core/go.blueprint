@@ -1,0 +1,35 @@
+[meta id]go[/meta]
+[meta name]Go[/meta]
+
+[define int32]int32[/define]
+[define int64]int64[/define]
+[define float64]float64[/define]
+[define string]string[/define]
+[define uuid]uuid.UUID[/define]
+[define boolean]bool[/define]
+[define datetime]time.Time[/define]
+[link uuid]import "github.com/google/uuid"[/link]
+[link datetime]import "time"[/link]
+
+[file]model.go[/file]
+package [package];
+
+[imports]
+
+[each enum][br]
+type [name] string
+
+const (
+	[each case][br]
+	[enum_name][name] [enum_name] = "[value]"
+	[/each][br]
+)
+[/each][br]
+
+[each object][br]
+type [name] struct {
+	[each field][br]
+	[name.titlecase] [if optional]*[/if][if array]\[][/if][type] `json:"[name]"`
+	[/each][br]
+}
+[/each]

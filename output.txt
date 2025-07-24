@@ -1,0 +1,11 @@
+
+############
+## repack ##
+############
+
+[postgres] Built successfully!
+[E0020] (typescript -> User.id) Type is not allowed: uuid
+
+-------------------------------
+|  ⚡️ Build completed, GLHF!  |
+-------------------------------

@@ -1,18 +1,49 @@
 use crate::syntax::FieldReferenceKind;
 
 use super::{
-    CustomFieldType, Enum, FieldType, FileContents, Object, ObjectType, Output, RepackError,
-    RepackErrorKind, Snippet, Token, dependancies::graph_valid, language,
+    Configuration, ConfigurationInstance, CustomFieldType, Enum, FieldType, FileContents, Object,
+    ObjectJoin, ObjectType, Output, RepackError, RepackErrorKind, Snippet, Token,
+    dependancies::graph_valid, language,
 };
 
+/// Represents the complete parsed schema with all defined entities and configurations.
+///
+/// ParseResult contains all the parsed elements from a schema file, including objects,
+/// enums, output configurations, and blueprint dependencies. This structure serves as
+/// the primary input for code generation and validation processes.
 #[derive(Debug)]
 pub struct ParseResult {
+    /// All parsed object definitions (records, structs, synthetics)
     pub objects: Vec<Object>,
+    /// Output configuration definitions specifying target languages and settings
     pub languages: Vec<Output>,
+    /// All parsed enumeration definitions
     pub enums: Vec<Enum>,
+    /// List of external blueprint files to be loaded for code generation
+    pub include_blueprints: Vec<String>,
+    /// List of configuration schemas
+    #[allow(dead_code)]
+    pub configuration_schemas: Vec<Configuration>,
+    /// List of configuration instances
+    pub configuration_instances: Vec<ConfigurationInstance>,
 }
 
 impl ParseResult {
+    /// Parses the complete schema from tokenized file contents.
+    ///
+    /// This method performs the complete parsing pipeline:
+    /// 1. Parses all top-level definitions (objects, enums, outputs, imports)
+    /// 2. Expands snippet inclusions into objects
+    /// 3. Resolves dependency ordering for objects
+    /// 4. Resolves all field type references and relationships
+    /// 5. Validates the complete schema for consistency
+    ///
+    /// # Arguments
+    /// * `contents` - The tokenized file contents to parse
+    ///
+    /// # Returns
+    /// * `Ok(ParseResult)` if parsing succeeds with a valid schema
+    /// * `Err(Vec<RepackError>)` if any validation or parsing errors occur
     pub fn from_contents(mut contents: FileContents) -> Result<ParseResult, Vec<RepackError>> {
         let mut errors = Vec::<RepackError>::new();
 
@@ -20,6 +51,9 @@ impl ParseResult {
         let mut snippets = Vec::new();
         let mut languages = Vec::new();
         let mut enums = Vec::new();
+        let mut include_blueprints = Vec::new();
+        let mut configuration_schemas = Vec::new();
+        let mut configuration_instances = Vec::new();
 
         while let Some(token) = contents.next() {
             match *token {
@@ -32,6 +66,12 @@ impl ParseResult {
                 Token::StructType => {
                     objects.push(Object::read_from_contents(
                         ObjectType::Struct,
+                        &mut contents,
+                    ));
+                }
+                Token::SyntheticType => {
+                    objects.push(Object::read_from_contents(
+                        ObjectType::Synthetic,
                         &mut contents,
                     ));
                 }
@@ -50,6 +90,18 @@ impl ParseResult {
                     if let Some(Token::Literal(path)) = contents.take() {
                         contents.add_relative(&path);
                     }
+                }
+                Token::Blueprint => {
+                    if let Some(Token::Literal(path)) = contents.take() {
+                        include_blueprints.push(path);
+                    }
+                }
+                Token::Configuration => {
+                    configuration_schemas.push(Configuration::read_from_contents(&mut contents));
+                }
+                Token::Instance => {
+                    configuration_instances
+                        .push(ConfigurationInstance::read_from_contents(&mut contents));
                 }
                 _ => {}
             }
@@ -115,7 +167,43 @@ impl ParseResult {
         while object_idx < objects.len() {
             let mut field_idx: usize = 0;
 
+            let mut join_idx: usize = 0;
+            while join_idx < objects[object_idx].joins.len() {
+                if objects[object_idx].joins[join_idx].foreign_table.is_some() {
+                    continue;
+                }
+                let Some(entity) = objects
+                    .iter()
+                    .find(|x| x.name == objects[object_idx].joins[join_idx].foreign_entity)
+                else {
+                    errors.push(RepackError::from_obj(
+                        RepackErrorKind::JoinFieldUnresolvable,
+                        &objects[object_idx],
+                    ));
+                    join_idx += 1;
+                    continue;
+                };
+                let Some(table_name) = entity.table_name.as_ref() else {
+                    errors.push(RepackError::from_obj(
+                        RepackErrorKind::JoinNoTableName,
+                        &objects[object_idx],
+                    ));
+                    join_idx += 1;
+                    continue;
+                };
+                objects[object_idx].joins[join_idx].foreign_table = Some(table_name.to_string());
+                join_idx += 1;
+            }
+
             if let Some(parent_obj_name) = &objects[object_idx].inherits {
+                if !matches!(&objects[object_idx].object_type, ObjectType::Synthetic) {
+                    errors.push(RepackError::from_obj(
+                        RepackErrorKind::CannotInherit,
+                        &objects[object_idx],
+                    ));
+                    object_idx += 1;
+                    continue;
+                }
                 let Some(parent_obj_idx) =
                     objects.iter().position(|obj| obj.name == *parent_obj_name)
                 else {
@@ -142,6 +230,8 @@ impl ParseResult {
                         }
                     }
                 }
+                let mut parent_joins = objects[parent_obj_idx].joins.clone();
+                objects[object_idx].joins.append(&mut parent_joins);
                 objects[object_idx].table_name = objects[parent_obj_idx].table_name.clone();
                 objects[object_idx]
                     .fields
@@ -227,8 +317,31 @@ impl ParseResult {
                                 field_idx += 1;
                                 continue;
                             };
-                            objects[object_idx].fields[field_idx].field_type =
-                                referenced_foreign_field.field_type.clone();
+                            let field_type = referenced_foreign_field.field_type.clone();
+                            let opt = referenced_foreign_field.optional;
+                            if matches!(objects[object_idx].object_type, ObjectType::Synthetic) {
+                                let join_name = format!("j_{}", referenced_field.name);
+                                if !objects[object_idx]
+                                    .joins
+                                    .iter()
+                                    .any(|x| x.join_name == *join_name)
+                                {
+                                    let j = ObjectJoin {
+                                        join_name,
+                                        join_type: "INNER JOIN".to_string(),
+                                        local_entity: Some(objects[object_idx].name.clone()),
+                                        local_base: objects[object_idx].table_name.clone(),
+                                        local_field: referenced_field.name.to_string(),
+                                        condition: "=".to_string(),
+                                        foreign_entity: referenced_entity.name.clone(),
+                                        foreign_table: referenced_entity.table_name.clone(),
+                                        foreign_field: referenced_field.location.name.to_string(),
+                                    };
+                                    objects[object_idx].joins.push(j);
+                                }
+                            }
+                            objects[object_idx].fields[field_idx].optional = opt;
+                            objects[object_idx].fields[field_idx].field_type = field_type
                         }
                         FieldReferenceKind::FieldType(joining_entity) => {
                             let Some(referenced_entity) =
@@ -258,8 +371,11 @@ impl ParseResult {
                                 field_idx += 1;
                                 continue;
                             };
-                            objects[object_idx].fields[field_idx].field_type =
-                                referenced_foreign_field.field_type.clone();
+                            let typ = referenced_foreign_field.field_type.clone();
+
+                            objects[object_idx].fields[field_idx].optional =
+                                referenced_foreign_field.optional;
+                            objects[object_idx].fields[field_idx].field_type = typ;
                         }
                         FieldReferenceKind::ExplicitJoin(join_name) => {
                             let Some(join) = objects[object_idx]
@@ -280,7 +396,7 @@ impl ParseResult {
                                 objects.iter().find(|x| x.name == *join.foreign_entity)
                             else {
                                 errors.push(RepackError::from_field_with_msg(
-                                    RepackErrorKind::ExplicitJoinObjectNotFound,
+                                    RepackErrorKind::JoinObjectNotFound,
                                     &objects[object_idx],
                                     &objects[object_idx].fields[field_idx],
                                     join.foreign_entity.to_string(),
@@ -288,13 +404,11 @@ impl ParseResult {
                                 field_idx += 1;
                                 continue;
                             };
-                            let Some(field) = foreign_entity
-                                .fields
-                                .iter()
-                                .find(|x| x.name == *join.foreign_field) else 
-                            {
+                            let Some(field) = foreign_entity.fields.iter().find(|x| {
+                                x.name == objects[object_idx].fields[field_idx].location.name
+                            }) else {
                                 errors.push(RepackError::from_field_with_msg(
-                                    RepackErrorKind::ExplicitJoinFieldNotFound,
+                                    RepackErrorKind::JoinFieldNotFound,
                                     &objects[object_idx],
                                     &objects[object_idx].fields[field_idx],
                                     join.foreign_field.to_string(),
@@ -302,7 +416,10 @@ impl ParseResult {
                                 field_idx += 1;
                                 continue;
                             };
-                            objects[object_idx].fields[field_idx].field_type = field.field_type.clone();
+                            let opt = field.optional;
+                            objects[object_idx].fields[field_idx].field_type =
+                                field.field_type.clone();
+                            objects[object_idx].fields[field_idx].optional = opt;
                         }
                     }
                 }
@@ -324,7 +441,85 @@ impl ParseResult {
                 }
                 field_idx += 1;
             }
+
+            let mut join_idx = 0;
+            while join_idx < objects[object_idx].joins.len() {
+                if objects[object_idx].joins[join_idx].local_base.is_none()
+                    && objects[object_idx].joins[join_idx].local_entity.is_none()
+                {
+                    objects[object_idx].joins[join_idx].local_base =
+                        Some(objects[object_idx].table_name.as_ref().unwrap().clone());
+                    objects[object_idx].joins[join_idx].local_entity =
+                        Some(objects[object_idx].name.clone());
+                    join_idx += 1;
+                    continue;
+                }
+                if let Some(le) = &objects[object_idx].joins[join_idx].local_entity {
+                    if let Some(obj) = objects.iter().find(|x| x.name == *le) {
+                        if let Some(tn) = obj.table_name.clone() {
+                            objects[object_idx].joins[join_idx].local_base = Some(tn);
+                        } else {
+                            errors.push(RepackError::from_obj_with_msg(
+                                RepackErrorKind::JoinNoTableName,
+                                &objects[object_idx],
+                                le.clone(),
+                            ));
+                        }
+                    } else {
+                        errors.push(RepackError::from_obj_with_msg(
+                            RepackErrorKind::JoinObjectNotFound,
+                            &objects[object_idx],
+                            objects[object_idx].joins[join_idx]
+                                .local_base
+                                .as_ref()
+                                .unwrap()
+                                .to_string(),
+                        ));
+                    }
+                } else if let Some(lt) = &objects[object_idx].joins[join_idx].local_base {
+                    if let Some(obj) = objects.iter().find(|x| match &x.table_name {
+                        Some(val) if *val == *lt => true,
+                        _ => false,
+                    }) {
+                        objects[object_idx].joins[join_idx].local_entity = Some(obj.name.clone());
+                    }
+                }
+                join_idx += 1;
+            }
+
             object_idx += 1;
+        }
+
+        for instance in &configuration_instances {
+            let Some(config) = configuration_schemas
+                .iter()
+                .find(|cs| cs.name == instance.configuration)
+            else {
+                errors.push(RepackError::from_instance_with_msg(
+                    RepackErrorKind::UnknownConfiguration,
+                    instance,
+                    instance.configuration.to_string(),
+                ));
+                continue;
+            };
+            for field in instance.values.keys() {
+                if !config.fields.iter().any(|x| x.name == *field) {
+                    errors.push(RepackError::from_instance_with_msg(
+                        RepackErrorKind::ExtraConfigurationField,
+                        instance,
+                        field.to_string(),
+                    ));
+                }
+            }
+            for field in &config.fields {
+                if !instance.values.contains_key(&field.name) {
+                    errors.push(RepackError::from_instance_with_msg(
+                        RepackErrorKind::MissingConfigurationField,
+                        instance,
+                        field.name.to_string(),
+                    ));
+                }
+            }
         }
 
         for object in &objects {
@@ -346,7 +541,63 @@ impl ParseResult {
                 objects,
                 languages,
                 enums,
+                include_blueprints,
+                configuration_schemas,
+                configuration_instances,
             })
         }
+    }
+
+    /// Filters objects based on category inclusion and explicit exclusions.
+    ///
+    /// This method selects objects for code generation based on the target
+    /// configuration's category filters and exclusion lists. Objects without
+    /// categories are included by default when no category filter is specified.
+    ///
+    /// # Arguments
+    /// * `categories` - List of categories to include (empty means include all)
+    /// * `excludes` - List of object names to explicitly exclude
+    ///
+    /// # Returns
+    /// A vector of object references that match the filtering criteria
+    pub fn included_objects(&self, categories: &[String], excludes: &[String]) -> Vec<&Object> {
+        self.objects
+            .iter()
+            .filter(|obj| {
+                if obj.categories.is_empty() || categories.is_empty() {
+                    return true;
+                }
+                if excludes.contains(&obj.name) {
+                    return false;
+                }
+                obj.categories.iter().any(|cat| categories.contains(cat))
+            })
+            .collect()
+    }
+
+    /// Filters enums based on category inclusion and explicit exclusions.
+    ///
+    /// Similar to included_objects, this method selects enums for code generation
+    /// based on category matching and exclusion rules.
+    ///
+    /// # Arguments
+    /// * `categories` - List of categories to include (empty means include all)
+    /// * `excludes` - List of enum names to explicitly exclude
+    ///
+    /// # Returns
+    /// A vector of enum references that match the filtering criteria
+    pub fn included_enums(&self, categories: &[String], excludes: &[String]) -> Vec<&Enum> {
+        self.enums
+            .iter()
+            .filter(|enm| {
+                if enm.categories.is_empty() || categories.is_empty() {
+                    return true;
+                }
+                if excludes.contains(&enm.name) {
+                    return false;
+                }
+                enm.categories.iter().any(|cat| categories.contains(cat))
+            })
+            .collect()
     }
 }

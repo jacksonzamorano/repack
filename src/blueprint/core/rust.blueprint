@@ -1,0 +1,41 @@
+[meta id]rust[/meta]
+[meta name]Rust[/meta]
+
+[define int64]i64[/define]
+[define int32]i32[/define]
+[define float64]f64[/define]
+[define string]String[/define]
+[define boolean]bool[/define]
+[define datetime]DateTime<Utc>[/define]
+[define uuid]Uuid[/define]
+[link uuid]use uuid::Uuid;[/link]
+[link datetime]use chrono::{DateTime,Utc}[/link]
+
+[file]model.rs[/file]
+[imports]
+
+[each object]
+pub struct [name] {
+[each field]
+	pub [name]: [if optional]Optional<[/if][if array]Vec<[/if][type][if array]>[/if][if optional]>[/if][if sep],[/if]
+[/each]
+}
+[/each]
+
+[each enum]
+pub enum [name] {
+[each case]
+	[name][if sep],[/if]
+[/each]
+}
+impl [name] {
+	pub fn from_string(val: &str) -> Option<Self> {
+		match val {
+			[each case]
+			"[name]" => Some(Self::[name]),
+			[/each]
+			_ => None
+		}
+	}
+}
+[/each]

@@ -2,13 +2,32 @@ use std::{fs, io::Read, path::PathBuf, process::exit};
 
 use super::Token;
 
+/// Represents the tokenized contents of a schema file with parsing state.
+/// 
+/// FileContents handles the reading, tokenization, and parsing of repack schema files.
+/// It maintains the current parsing position and provides methods for token consumption
+/// during the parsing process. Supports both single files and directory wildcards.
 pub struct FileContents {
+    /// The tokenized representation of the file contents
     pub contents: Vec<Token>,
+    /// The root directory path for resolving relative file inclusions
     pub root: String,
+    /// Current parsing position in the token stream
     pub index: usize,
 }
 
 impl FileContents {
+    /// Creates a new FileContents by reading and tokenizing the specified file.
+    /// 
+    /// This method reads the file, extracts its directory as the root path,
+    /// and tokenizes the contents for parsing. The root path is used for
+    /// resolving relative file inclusions.
+    /// 
+    /// # Arguments
+    /// * `filename` - Path to the schema file to read
+    /// 
+    /// # Returns
+    /// A new FileContents instance ready for parsing
     pub fn new(filename: &str) -> Self {
         let mut path = PathBuf::from(filename);
         path.pop();
@@ -21,6 +40,14 @@ impl FileContents {
         contents
     }
 
+    /// Adds additional file contents relative to the root directory.
+    /// 
+    /// This method supports both individual files and directory wildcards (ending with *).
+    /// For wildcards, it reads all .repack files in the specified directory.
+    /// Used for processing include directives in schema files.
+    /// 
+    /// # Arguments
+    /// * `filename` - Relative path to file or directory pattern to include
     pub fn add_relative(&mut self, filename: &str) {
         let mut path = PathBuf::from(&self.root);
         if filename.ends_with("*") {
@@ -47,9 +74,17 @@ impl FileContents {
         }
     }
 
+    /// Reads and tokenizes a specific file, appending its tokens to the contents.
+    /// 
+    /// This method handles the low-level file reading and tokenization process,
+    /// including comment parsing, string literal handling, and token recognition.
+    /// The tokenization process respects quoted strings and line comments (//).
+    /// 
+    /// # Arguments
+    /// * `filename` - Absolute path to the file to read and tokenize
     pub fn add(&mut self, filename: &str) {
         let Ok(mut file) = std::fs::File::open(filename) else {
-            println!("[EXIT] Unable to load requested file '{}'", filename);
+            println!("[EXIT] Unable to load requested file '{filename}'");
             exit(5);
         };
         let mut contents = vec![];
@@ -99,19 +134,26 @@ impl FileContents {
                             if !byte.is_ascii_whitespace() {
                                 buf.push(byte as char);
                             } else if !buf.is_empty() {
-                                // Handle the buffer content
                                 self.contents.push(Token::from_string(&buf));
                                 buf.clear();
                             }
                         }
                     }
-                } else if byte.is_ascii_whitespace() {
+                } else if byte == b'\n' || byte == b'\r' {
                     in_comment = false;
                 }
             }
         }
     }
 
+    /// Returns the current token without advancing the parsing position.
+    /// 
+    /// Used for lookahead parsing to make decisions based on upcoming tokens
+    /// without consuming them from the stream.
+    /// 
+    /// # Returns
+    /// * `Some(&Token)` if there are more tokens to parse
+    /// * `None` if the end of the token stream has been reached
     pub fn peek(&self) -> Option<&Token> {
         if self.index < self.contents.len() {
             Some(&self.contents[self.index])
@@ -120,6 +162,14 @@ impl FileContents {
         }
     }
 
+    /// Returns the current token and advances the parsing position by one.
+    /// 
+    /// This is the primary method for consuming tokens during parsing.
+    /// Returns a reference to the token, which is suitable for pattern matching.
+    /// 
+    /// # Returns
+    /// * `Some(&Token)` if a token was consumed
+    /// * `None` if the end of the token stream has been reached
     pub fn next(&mut self) -> Option<&Token> {
         if self.index < self.contents.len() {
             let token = self.contents.get(self.index)?;
@@ -130,6 +180,14 @@ impl FileContents {
         }
     }
 
+    /// Returns an owned copy of the current token and advances parsing position.
+    /// 
+    /// Similar to `next()` but returns an owned Token instead of a reference.
+    /// Useful when the token needs to be stored or moved rather than just examined.
+    /// 
+    /// # Returns
+    /// * `Some(Token)` if a token was consumed
+    /// * `None` if the end of the token stream has been reached
     pub fn take(&mut self) -> Option<Token> {
         if self.index < self.contents.len() {
             let token = self.contents.get(self.index)?;
@@ -140,6 +198,10 @@ impl FileContents {
         }
     }
 
+    /// Advances the parsing position by one without returning the token.
+    /// 
+    /// Used when a token needs to be consumed but its value is not needed,
+    /// such as skipping expected punctuation like parentheses or dots.
     pub fn skip(&mut self) {
         self.index += 1;
     }
