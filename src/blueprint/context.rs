@@ -51,8 +51,8 @@ impl<'a> BlueprintExecutionContext<'a> {
         }
     }
     pub fn with_object(&self, obj: &'a Object) -> Self {
-        let mut variables = HashMap::new();
-        let mut flags = HashMap::new();
+        let mut variables = self.variables.clone();
+        let mut flags = self.flags.clone();
         variables.insert("name".to_string(), obj.name.to_string());
         if let Some(tn) = obj.table_name.as_ref() {
             variables.insert("table_name".to_string(), tn.to_string());
@@ -181,6 +181,10 @@ impl<'a> BlueprintExecutionContext<'a> {
         flags.insert(
             "datetime",
             matches!(field.field_type(), FieldType::Core(CoreType::DateTime)),
+        );
+        flags.insert(
+            "bytes",
+            matches!(field.field_type(), FieldType::Core(CoreType::Bytes)),
         );
 
         Ok(Self {

@@ -8,6 +8,7 @@
 [define string]TEXT[/define]
 [define boolean]BOOL[/define]
 [define datetime]TIMESTAMPTZ[/define]
+[define bytes]BYTEA[/define]
 
 [file]model.sql[/file]
 BEGIN;[br]

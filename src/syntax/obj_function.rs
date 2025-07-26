@@ -33,7 +33,12 @@ impl ObjectFunction {
                     Token::Literal(text) => {
                         buf.push_str(&text);
                     }
-                    _ => {}
+                    Token::NewLine => {
+                        break
+                    }
+                    _ => {
+                        return None
+                    }
                 };
             }
         }

@@ -96,6 +96,7 @@ pub struct BlueprintRenderer<'a> {
     pub config: &'a Output,
     /// Filter: differs in context, but used to reject certain builds.
     pub filter: Option<String>,
+    pub global_counters: HashMap<String, usize>,
 }
 impl<'a> BlueprintRenderer<'a> {
     /// Creates a new BlueprintRenderer with the necessary components for code generation.
@@ -117,6 +118,7 @@ impl<'a> BlueprintRenderer<'a> {
             blueprint,
             config,
             filter: None,
+            global_counters: HashMap::new(),
         }
     }
 
@@ -472,10 +474,20 @@ impl<'a> BlueprintRenderer<'a> {
             SnippetMainTokenName::Break => {
                 writer.write(&"\n");
             }
+            SnippetMainTokenName::Increment => {
+                let name = &content.details.secondary_token;
+                if let Some(glob) = self.global_counters.get_mut(name) {
+                    *glob += 1
+                } else {
+                    self.global_counters.insert(name.to_string(), 1);
+                }
+            }
             SnippetMainTokenName::Variable(var) => {
                 let mut components = var.split(".");
                 let name = components.next().unwrap();
-                if let Some(mut res) = context.variables.get(name).map(|x| x.to_string()) {
+                if let Some(glob) = self.global_counters.get(name) {
+                    writer.write(&glob.to_string());
+                } else if let Some(mut res) = context.variables.get(name).map(|x| x.to_string()) {
                     for transform in components {
                         match transform {
                             "uppercase" => res = res.to_uppercase(),

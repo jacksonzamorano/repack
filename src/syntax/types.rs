@@ -1,7 +1,7 @@
 use std::fmt::{Debug, Display};
 
 /// Represents the category of custom field types that can be referenced in schema definitions.
-/// 
+///
 /// Custom field types are user-defined types that extend beyond the built-in core types.
 /// They allow for complex data modeling by referencing other schema elements.
 #[derive(Debug, Clone, PartialEq)]
@@ -15,7 +15,7 @@ pub enum CustomFieldType {
 }
 
 /// Represents the fundamental built-in data types supported by the schema system.
-/// 
+///
 /// These are the primitive types that can be used directly in field definitions
 /// without requiring custom type definitions. Each core type maps to common
 /// data types found across programming languages and databases.
@@ -35,20 +35,22 @@ pub enum CoreType {
     DateTime,
     /// Universally Unique Identifier. 128-bit identifier for unique entity references.
     Uuid,
+    /// Byte array
+    Bytes,
 }
 impl CoreType {
     /// Parses a string literal into a CoreType enum variant.
-    /// 
+    ///
     /// This function is used during schema parsing to convert type names
     /// from the input schema into their corresponding enum variants.
-    /// 
+    ///
     /// # Arguments
     /// * `s` - The string representation of the type (e.g., "string", "int64")
-    /// 
+    ///
     /// # Returns
     /// * `Some(CoreType)` if the string matches a valid core type
     /// * `None` if the string doesn't match any known core type
-    /// 
+    ///
     /// # Examples
     /// ```
     /// assert_eq!(CoreType::from_string("string"), Some(CoreType::String));
@@ -63,6 +65,7 @@ impl CoreType {
             "boolean" => Self::Boolean,
             "datetime" => Self::DateTime,
             "uuid" => Self::Uuid,
+            "bytes" => Self::Bytes,
             _ => return None,
         })
     }
@@ -77,13 +80,14 @@ impl Display for CoreType {
             Self::Boolean => "boolean".to_string(),
             Self::DateTime => "datetime".to_string(),
             Self::Uuid => "uuid".to_string(),
+            Self::Bytes => "bytes".to_string(),
         };
         write!(f, "{res}")
     }
 }
 
 /// Represents the complete type system for fields in schema definitions.
-/// 
+///
 /// FieldType unifies both built-in core types and user-defined custom types,
 /// providing a comprehensive type system for schema modeling. Every field
 /// in an object must have a FieldType that defines its data representation.
@@ -110,14 +114,14 @@ impl Display for FieldType {
 }
 impl FieldType {
     /// Attempts to parse a string into a FieldType, checking only core types.
-    /// 
+    ///
     /// This function tries to match the input string against known core types.
     /// If no core type matches, it returns None. Custom types are resolved
     /// later during the type resolution phase of parsing.
-    /// 
+    ///
     /// # Arguments
     /// * `s` - The string representation of the type
-    /// 
+    ///
     /// # Returns
     /// * `Some(FieldType::Core(_))` if the string matches a core type
     /// * `None` if the string doesn't match any core type

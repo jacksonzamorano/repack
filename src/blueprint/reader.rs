@@ -69,6 +69,7 @@ impl<'a> BlueprintFileReader<'a> {
                                     SnippetMainTokenName::Variable(_)
                                     | SnippetMainTokenName::PlaceImports
                                     | SnippetMainTokenName::Import
+                                    | SnippetMainTokenName::Increment
                                     | SnippetMainTokenName::Break => sd.autoclose = true,
                                     _ => {}
                                 }

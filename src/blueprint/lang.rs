@@ -23,6 +23,7 @@ pub enum SnippetMainTokenName {
     PlaceImports,
     Break,
     Exec,
+    Increment,
     Variable(String),
 }
 impl SnippetMainTokenName {
@@ -44,6 +45,7 @@ impl SnippetMainTokenName {
             "imports" => Self::PlaceImports,
             "br" => Self::Break,
             "exec" => Self::Exec,
+            "increment" => Self::Increment,
             _ => Self::Variable(val.to_string()),
         }
     }
@@ -68,6 +70,7 @@ pub enum SnippetSecondaryTokenName {
     Uuid,
     DateTime,
     Boolean,
+    Bytes,
 
     Join,
     Arg,
@@ -102,6 +105,7 @@ impl SnippetSecondaryTokenName {
             CoreType::Float64 => Self::Float64,
             CoreType::Boolean => Self::Boolean,
             CoreType::DateTime => Self::DateTime,
+            CoreType::Bytes => Self::Bytes,
         }
     }
 }
