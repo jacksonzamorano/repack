@@ -1,34 +1,6 @@
-blueprint "output_config.blueprint"
-
-output markdown @test;
-output postgres @test/postgres #model #view;
-output typescript @test/typescript #model #view;
-output rust @test/rust #model #view;
-output go @test/go #model #view {
-	package main
-}
-output "md-config" @test;
-
 snippet base {
 	id uuid db:pk
 	created_date datetime db:default("NOW()")
-}
-
-configuration ApiDeployment {
-	host_ip
-	db_username
-	db_password
-}
-
-instance Production: ApiDeployment @prod {
-	host_ip "192.168.0.1"
-	db_username "admin"
-	db_password "test"
-}
-instance Staging: ApiDeployment @staging {
-	host_ip "10.0.0.1"
-	db_username "admin2"
-	db_password "test2"
 }
 
 enum UserType #model {
@@ -37,31 +9,35 @@ enum UserType #model {
 	Guest
 }
 
-record User @users #model {
-	!base
+struct User @users #model {
+	snippet:base
+
 	last_login datetime?
 	name string
 	email string
 	user_type UserType
 	subscription_id string?
 
-	select ByEmail email:string = "SELECT %fields FROM %table_name WHERE %email = $email"
+
+	query UserByEmail(emails: string[]) {
+		list
+		filter email in $emails
+		sortd last_login
+	}
+
 }
 
-record ContactInfo @contacts #model {
+aggregate UserCount User {
+	count count(id)
+
+	query UserCountByType(type: UserType) {
+		list
+		filter user_type = $type
+	}
+}
+
+
+struct Token @tokens #model {
 	!base
-	email string
-	user_id ref(User.id)
-	db:index("email")
-	db:index("user_id")
-	db:index("user_id", "id")
-}
-
-synthetic FullUser: ContactInfo #model {
-	*
-	name from(user_id.name)
-}
-
-struct UserList {
-	users User[]
+	user_id uuid ref(User.id)
 }

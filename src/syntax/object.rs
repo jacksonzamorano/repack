@@ -1,31 +1,6 @@
-use std::{collections::HashSet, fmt::format};
+use std::collections::HashSet;
 
-use super::{
-    CustomFieldType, Field, FieldType, FileContents, ObjectFunction, Query, RepackError,
-    RepackErrorKind, Token, field::FieldReferenceKind,
-};
-
-/// Defines the different categories of objects that can be defined in a schema.
-///
-/// Each object type has different capabilities, constraints, and code generation
-/// behaviors. The type determines how the object can be used and what features
-/// are available during code generation.
-#[derive(Debug, PartialEq, Clone)]
-pub enum ObjectType {
-    /// A database-backed entity that represents a table or collection.
-    /// Records support database operations, table mapping, and persistence features.
-    /// They typically map to database tables and support CRUD operations.
-    Record,
-    /// A derived object that inherits from a Record but adds additional computed fields.
-    /// Synthetic objects extend existing Records with additional functionality
-    /// while maintaining the relationship to the parent Record.
-    Synthetic,
-    /// A simple data structure without database backing.
-    /// Structs are used for data transfer objects, API models, and in-memory
-    /// data structures that don't require persistence.
-    Struct,
-}
-
+use super::{Field, FieldType, FileContents, ObjectFunction, RepackError, RepackErrorKind, Token};
 /// Represents a relationship join between two objects in the schema.
 ///
 /// ObjectJoin defines how objects are related to each other, specifying
@@ -60,8 +35,6 @@ pub struct ObjectJoin {
 /// mappings depending on its type.
 #[derive(Debug)]
 pub struct Object {
-    /// The category/type of this object (Record, Synthetic, or Struct).
-    pub object_type: ObjectType,
     /// The unique name identifier for this object used in code generation.
     pub name: String,
     /// The list of fields/properties that belong to this object.
@@ -90,10 +63,6 @@ pub struct Object {
     /// Custom functions/methods defined for this object.
     /// These generate additional methods in the target language classes.
     pub functions: Vec<ObjectFunction>,
-    /// Database join relationships to other objects.
-    /// Defines how this object relates to other entities in queries.
-    pub joins: Vec<ObjectJoin>,
-    pub queries: Vec<Query>,
 }
 impl Object {
     /// Parses an Object definition from the input file contents.
@@ -112,7 +81,7 @@ impl Object {
     ///
     /// # Panics
     /// Panics if the expected object name is missing or malformed
-    pub fn read_from_contents(typ: ObjectType, contents: &mut FileContents) -> Object {
+    pub fn read_from_contents(contents: &mut FileContents) -> Object {
         let Some(name_opt) = contents.next() else {
             panic!("Read record type, expected a name but got end of file.");
         };
@@ -129,8 +98,6 @@ impl Object {
         let mut reuse_include = Vec::new();
         let mut use_snippets = Vec::new();
         let mut functions = Vec::new();
-        let mut joins = Vec::new();
-        let mut queries = Vec::new();
 
         'header: while let Some(token) = contents.next() {
             match token {
@@ -178,81 +145,6 @@ impl Object {
                 Token::Star => {
                     reuse_all = true;
                 }
-                Token::Hat => {
-                    let Some(Token::Literal(join_name)) = contents.take() else {
-                        continue;
-                    };
-                    let Some(Token::Literal(join_type)) = contents.take() else {
-                        continue;
-                    };
-                    let Some(Token::Literal(obj_1_name)) = contents.take() else {
-                        continue;
-                    };
-                    contents.skip(); // Skip .
-                    let Some(Token::Literal(obj_1_field)) = contents.take() else {
-                        continue;
-                    };
-                    let Some(Token::Equals) = contents.take() else {
-                        continue;
-                    };
-                    let Some(Token::Literal(obj_2_name)) = contents.take() else {
-                        continue;
-                    };
-                    contents.skip(); // Skip .
-                    let Some(Token::Literal(obj_2_field)) = contents.take() else {
-                        continue;
-                    };
-
-                    if obj_1_name == "self" {
-                        joins.push(ObjectJoin {
-                            join_name,
-                            join_type,
-                            local_base: None,
-                            local_entity: None,
-                            local_field: obj_1_field,
-                            condition: "=".to_string(),
-                            foreign_entity: obj_2_name,
-                            foreign_field: obj_2_field,
-                            foreign_table: None,
-                        });
-                    } else if obj_2_name == "self" {
-                        joins.push(ObjectJoin {
-                            join_name,
-                            join_type,
-                            local_base: None,
-                            local_entity: None,
-                            local_field: obj_2_field,
-                            condition: "=".to_string(),
-                            foreign_entity: obj_1_name,
-                            foreign_field: obj_1_field,
-                            foreign_table: None,
-                        });
-                    } else if joins.iter().find(|x| x.join_name == obj_1_name).is_some() {
-                        joins.push(ObjectJoin {
-                            join_name,
-                            join_type,
-                            local_base: Some(obj_1_name),
-                            local_entity: None,
-                            local_field: obj_1_field,
-                            condition: "=".to_string(),
-                            foreign_entity: obj_2_name,
-                            foreign_field: obj_2_field,
-                            foreign_table: None,
-                        });
-                    } else if joins.iter().find(|x| x.join_name == obj_2_name).is_some() {
-                        joins.push(ObjectJoin {
-                            join_name,
-                            join_type,
-                            local_entity: None,
-                            local_base: Some(obj_2_name),
-                            local_field: obj_2_field,
-                            condition: "=".to_string(),
-                            foreign_entity: obj_1_name,
-                            foreign_field: obj_1_field,
-                            foreign_table: None,
-                        });
-                    }
-                }
                 Token::Plus => {
                     if let Some(Token::Literal(lit)) = contents.next() {
                         reuse_include.push(lit.to_string());
@@ -268,17 +160,11 @@ impl Object {
                         use_snippets.push(snippet_name);
                     }
                 }
-                Token::Query => {
-                    if let Some(query) = Query::from_contents(contents) {
-                        queries.push(query);
-                    }
-                }
                 _ => {}
             }
         }
 
         Object {
-            object_type: typ,
             name,
             fields,
             inherits,
@@ -289,8 +175,6 @@ impl Object {
             categories,
             use_snippets,
             functions,
-            joins,
-            queries,
         }
     }
 
@@ -306,55 +190,20 @@ impl Object {
     /// * `None` if the object is valid
     pub fn errors(&self) -> Option<Vec<RepackError>> {
         let mut errors = Vec::new();
-        if self.object_type == ObjectType::Record || self.object_type == ObjectType::Synthetic {
-            for field in &self.fields {
-                let Some(field_type) = &field.field_type else {
-                    errors.push(RepackError::from_field(
-                        RepackErrorKind::TypeNotResolved,
-                        self,
-                        field,
-                    ));
-                    continue;
-                };
-                if let FieldType::Custom(_, obj_type) = field_type {
-                    if *obj_type != CustomFieldType::Enum {
-                        errors.push(RepackError::from_field(
-                            RepackErrorKind::CustomTypeNotAllowed,
-                            self,
-                            field,
-                        ));
-                    }
-                }
-                if field.array {
-                    errors.push(RepackError::from_field(
-                        RepackErrorKind::ManyNotAllowed,
-                        self,
-                        field,
-                    ));
-                }
-            }
-            if self.table_name.is_none() {
-                errors.push(RepackError::from_obj(RepackErrorKind::NoTableName, self));
-            }
-            if self.fields.is_empty() {
-                errors.push(RepackError::from_obj(RepackErrorKind::NoFields, self));
-            }
-        } else if self.object_type == ObjectType::Struct {
-            if self.inherits.is_some() {
-                errors.push(RepackError::from_obj(RepackErrorKind::CannotInherit, self));
-            }
-            if self.reuse_all {
-                errors.push(RepackError::from_obj(RepackErrorKind::CannotReuse, self));
-            }
-            if !self.reuse_exclude.is_empty() {
-                errors.push(RepackError::from_obj(RepackErrorKind::CannotReuse, self));
-            }
-            if self.table_name.is_some() {
-                errors.push(RepackError::from_obj(
-                    RepackErrorKind::TableNameNotAllowed,
-                    self,
-                ));
-            }
+        if self.inherits.is_some() {
+            errors.push(RepackError::from_obj(RepackErrorKind::CannotInherit, self));
+        }
+        if self.reuse_all {
+            errors.push(RepackError::from_obj(RepackErrorKind::CannotReuse, self));
+        }
+        if !self.reuse_exclude.is_empty() {
+            errors.push(RepackError::from_obj(RepackErrorKind::CannotReuse, self));
+        }
+        if self.table_name.is_some() {
+            errors.push(RepackError::from_obj(
+                RepackErrorKind::TableNameNotAllowed,
+                self,
+            ));
         }
         let mut field_names = HashSet::new();
         for field in &self.fields {
@@ -400,30 +249,11 @@ impl Object {
             dependencies.insert(inherit.to_string());
         }
         for field in &self.fields {
-            match &field.location.reference {
-                FieldReferenceKind::FieldType(foreign_obj) => {
-                    dependencies.insert(foreign_obj.to_string());
+            match field.field_type {
+                Some(FieldType::Custom(_, _)) | None => {
+                    dependencies.insert(field.field_type_string.to_string());
                 }
-                FieldReferenceKind::ImplicitJoin(join_name) => {
-                    let Some(ref_field) = self.fields.iter().find(|field| field.name == *join_name)
-                    else {
-                        continue;
-                    };
-                    let FieldReferenceKind::FieldType(foreign_obj) = &ref_field.location.reference
-                    else {
-                        continue;
-                    };
-                    dependencies.insert(foreign_obj.to_string());
-                }
-                FieldReferenceKind::ExplicitJoin(join_name) => {
-                    let Some(entity) = self.joins.iter().find(|x| x.join_name == *join_name) else {
-                        continue;
-                    };
-                    dependencies.insert(entity.foreign_entity.to_string());
-                }
-                _ => {
-                    continue;
-                }
+                _ => {}
             }
         }
         dependencies.into_iter().collect()
@@ -445,77 +275,5 @@ impl Object {
             .iter()
             .filter(|x| x.namespace == *ns)
             .collect()
-    }
-
-    pub fn render_query(&self, query: &Query) -> Result<String, RepackError> {
-        let mut query_string = String::new();
-
-        let fields_string = self.fields.iter().map(|f| {
-            format!(
-                "{}.{} AS {}",
-                self.table_name.as_ref().unwrap(),
-                f.name,
-                f.name
-            )
-        }).collect::<Vec<_>>().join(", ");
-
-        let mut query_iter = query.query_val.chars();
-        let mut temp_var = String::new();
-        loop {
-            let chr_opt = query_iter.next();
-            if let Some(chr) = chr_opt {
-                if chr == '$' {
-                    temp_var = "$".to_string();
-                    continue;
-                } else if chr == '%' {
-                    temp_var = "%".to_string();
-                    continue;
-                } else if !chr.is_whitespace() {
-                    if temp_var.is_empty() {
-                        query_string.push(chr);
-                    } else {
-                        temp_var.push(chr);
-                    }
-                    continue;
-                }
-            }
-            if temp_var.starts_with('%') {
-                let Some(val) = (match &temp_var[1..] {
-                    "table_name" => Some(self.table_name.as_ref().unwrap().clone()),
-                    "fields" => Some(fields_string.clone()),
-                    _ => self
-                        .fields
-                        .iter()
-                        .find(|x| x.name == temp_var[1..])
-                        .map(|x| x.name.to_string()),
-                }) else {
-                    return Err(RepackError::from_query_with_msg(
-                        RepackErrorKind::QueryVariableDoesNotExist,
-                        &self,
-                        query,
-                        temp_var[1..].to_string(),
-                    ));
-                };
-
-                query_string.push_str(&val);
-            } else if temp_var.starts_with('$') {
-                let Some(idx) = &query.args.iter().position(|x| x.name == &temp_var[1..]) else {
-                    return Err(RepackError::from_query_with_msg(
-                        RepackErrorKind::QueryFieldDoesNotExist,
-                        &self,
-                        query,
-                        temp_var[1..].to_string(),
-                    ));
-                };
-                query_string.push_str(&format!("${}", idx + 1));
-            }
-            temp_var.clear();
-            query_string.push(' ');
-            if chr_opt.is_none() {
-                break;
-            }
-        }
-
-        return Ok(query_string);
     }
 }

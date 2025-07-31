@@ -1,9 +1,6 @@
-use crate::syntax::FieldReferenceKind;
-
 use super::{
     Configuration, ConfigurationInstance, CustomFieldType, Enum, FieldType, FileContents, Object,
-    ObjectJoin, ObjectType, Output, RepackError, RepackErrorKind, Snippet, Token,
-    dependancies::graph_valid, language,
+    Output, RepackError, RepackErrorKind, Snippet, Token, dependancies::graph_valid, language,
 };
 
 /// Represents the complete parsed schema with all defined entities and configurations.
@@ -57,23 +54,8 @@ impl ParseResult {
 
         while let Some(token) = contents.next() {
             match *token {
-                Token::RecordType => {
-                    objects.push(Object::read_from_contents(
-                        ObjectType::Record,
-                        &mut contents,
-                    ));
-                }
                 Token::StructType => {
-                    objects.push(Object::read_from_contents(
-                        ObjectType::Struct,
-                        &mut contents,
-                    ));
-                }
-                Token::SyntheticType => {
-                    objects.push(Object::read_from_contents(
-                        ObjectType::Synthetic,
-                        &mut contents,
-                    ));
+                    objects.push(Object::read_from_contents(&mut contents));
                 }
                 Token::EnumType => {
                     enums.push(Enum::read_from_contents(&mut contents));
@@ -167,43 +149,7 @@ impl ParseResult {
         while object_idx < objects.len() {
             let mut field_idx: usize = 0;
 
-            let mut join_idx: usize = 0;
-            while join_idx < objects[object_idx].joins.len() {
-                if objects[object_idx].joins[join_idx].foreign_table.is_some() {
-                    continue;
-                }
-                let Some(entity) = objects
-                    .iter()
-                    .find(|x| x.name == objects[object_idx].joins[join_idx].foreign_entity)
-                else {
-                    errors.push(RepackError::from_obj(
-                        RepackErrorKind::JoinFieldUnresolvable,
-                        &objects[object_idx],
-                    ));
-                    join_idx += 1;
-                    continue;
-                };
-                let Some(table_name) = entity.table_name.as_ref() else {
-                    errors.push(RepackError::from_obj(
-                        RepackErrorKind::JoinNoTableName,
-                        &objects[object_idx],
-                    ));
-                    join_idx += 1;
-                    continue;
-                };
-                objects[object_idx].joins[join_idx].foreign_table = Some(table_name.to_string());
-                join_idx += 1;
-            }
-
             if let Some(parent_obj_name) = &objects[object_idx].inherits {
-                if !matches!(&objects[object_idx].object_type, ObjectType::Synthetic) {
-                    errors.push(RepackError::from_obj(
-                        RepackErrorKind::CannotInherit,
-                        &objects[object_idx],
-                    ));
-                    object_idx += 1;
-                    continue;
-                }
                 let Some(parent_obj_idx) =
                     objects.iter().position(|obj| obj.name == *parent_obj_name)
                 else {
@@ -230,201 +176,23 @@ impl ParseResult {
                         }
                     }
                 }
-                let mut parent_joins = objects[parent_obj_idx].joins.clone();
-                objects[object_idx].joins.append(&mut parent_joins);
                 objects[object_idx].table_name = objects[parent_obj_idx].table_name.clone();
-                objects[object_idx]
-                    .fields
-                    .sort_by(|a, b| a.location.reference.cmp(&b.location.reference));
             }
 
             while field_idx < objects[object_idx].fields.len() {
-                if objects[object_idx].fields[field_idx].field_type.is_none() {
-                    match &objects[object_idx].fields[field_idx].location.reference {
-                        FieldReferenceKind::Local => {
-                            if let Some(lookup_name) =
-                                &objects[object_idx].fields[field_idx].field_type_string
-                            {
-                                if objects.iter().any(|obj| obj.name == *lookup_name) {
-                                    objects[object_idx].fields[field_idx].field_type =
-                                        Some(FieldType::Custom(
-                                            lookup_name.clone(),
-                                            CustomFieldType::Object,
-                                        ));
-                                } else if enums.iter().any(|en| en.name == *lookup_name) {
-                                    objects[object_idx].fields[field_idx].field_type =
-                                        Some(FieldType::Custom(
-                                            lookup_name.clone(),
-                                            CustomFieldType::Enum,
-                                        ));
-                                }
-                            }
-                        }
-                        FieldReferenceKind::ImplicitJoin(joining_field) => {
-                            let Some(referenced_field) = &objects[object_idx]
-                                .fields
-                                .iter()
-                                .find(|field| field.name == *joining_field)
-                            else {
-                                errors.push(RepackError::from_field_with_msg(
-                                    RepackErrorKind::JoinFieldUnresolvable,
-                                    &objects[object_idx],
-                                    &objects[object_idx].fields[field_idx],
-                                    joining_field.to_string(),
-                                ));
-                                field_idx += 1;
-                                continue;
-                            };
-                            let referenced_entity = match &referenced_field.location.reference {
-                                FieldReferenceKind::FieldType(entity_name) => {
-                                    let Some(res) =
-                                        objects.iter().find(|obj| obj.name == *entity_name)
-                                    else {
-                                        errors.push(RepackError::from_field_with_msg(
-                                            RepackErrorKind::JoinFieldUnresolvable,
-                                            &objects[object_idx],
-                                            &objects[object_idx].fields[field_idx],
-                                            joining_field.to_string(),
-                                        ));
-                                        field_idx += 1;
-                                        continue;
-                                    };
-                                    res
-                                }
-                                _ => {
-                                    errors.push(RepackError::from_field_with_msg(
-                                        RepackErrorKind::JoinFieldUnresolvable,
-                                        &objects[object_idx],
-                                        &objects[object_idx].fields[field_idx],
-                                        joining_field.to_string(),
-                                    ));
-                                    field_idx += 1;
-                                    continue;
-                                }
-                            };
-                            let Some(referenced_foreign_field) =
-                                referenced_entity.fields.iter().find(|field| {
-                                    field.name
-                                        == objects[object_idx].fields[field_idx].location.name
-                                })
-                            else {
-                                errors.push(RepackError::from_field_with_msg(
-                                    RepackErrorKind::JoinFieldUnresolvable,
-                                    &objects[object_idx],
-                                    &objects[object_idx].fields[field_idx],
-                                    joining_field.to_string(),
-                                ));
-                                field_idx += 1;
-                                continue;
-                            };
-                            let field_type = referenced_foreign_field.field_type.clone();
-                            let opt = referenced_foreign_field.optional;
-                            if matches!(objects[object_idx].object_type, ObjectType::Synthetic) {
-                                let join_name = format!("j_{}", referenced_field.name);
-                                if !objects[object_idx]
-                                    .joins
-                                    .iter()
-                                    .any(|x| x.join_name == *join_name)
-                                {
-                                    let j = ObjectJoin {
-                                        join_name,
-                                        join_type: "INNER JOIN".to_string(),
-                                        local_entity: Some(objects[object_idx].name.clone()),
-                                        local_base: objects[object_idx].table_name.clone(),
-                                        local_field: referenced_field.name.to_string(),
-                                        condition: "=".to_string(),
-                                        foreign_entity: referenced_entity.name.clone(),
-                                        foreign_table: referenced_entity.table_name.clone(),
-                                        foreign_field: referenced_field.location.name.to_string(),
-                                    };
-                                    objects[object_idx].joins.push(j);
-                                }
-                            }
-                            objects[object_idx].fields[field_idx].optional = opt;
-                            objects[object_idx].fields[field_idx].field_type = field_type
-                        }
-                        FieldReferenceKind::FieldType(joining_entity) => {
-                            let Some(referenced_entity) =
-                                objects.iter().find(|obj| obj.name == *joining_entity)
-                            else {
-                                errors.push(RepackError::from_field_with_msg(
-                                    RepackErrorKind::RefFieldUnresolvable,
-                                    &objects[object_idx],
-                                    &objects[object_idx].fields[field_idx],
-                                    joining_entity.to_string(),
-                                ));
-                                field_idx += 1;
-                                continue;
-                            };
-                            let Some(referenced_foreign_field) =
-                                referenced_entity.fields.iter().find(|field| {
-                                    field.name
-                                        == objects[object_idx].fields[field_idx].location.name
-                                })
-                            else {
-                                errors.push(RepackError::from_field_with_msg(
-                                    RepackErrorKind::RefFieldUnresolvable,
-                                    &objects[object_idx],
-                                    &objects[object_idx].fields[field_idx],
-                                    joining_entity.to_string(),
-                                ));
-                                field_idx += 1;
-                                continue;
-                            };
-                            let typ = referenced_foreign_field.field_type.clone();
-
-                            objects[object_idx].fields[field_idx].optional =
-                                referenced_foreign_field.optional;
-                            objects[object_idx].fields[field_idx].field_type = typ;
-                        }
-                        FieldReferenceKind::ExplicitJoin(join_name) => {
-                            let Some(join) = objects[object_idx]
-                                .joins
-                                .iter()
-                                .find(|x| x.join_name == *join_name)
-                            else {
-                                errors.push(RepackError::from_field_with_msg(
-                                    RepackErrorKind::UnknownExplicitJoin,
-                                    &objects[object_idx],
-                                    &objects[object_idx].fields[field_idx],
-                                    join_name.to_string(),
-                                ));
-                                field_idx += 1;
-                                continue;
-                            };
-                            let Some(foreign_entity) =
-                                objects.iter().find(|x| x.name == *join.foreign_entity)
-                            else {
-                                errors.push(RepackError::from_field_with_msg(
-                                    RepackErrorKind::JoinObjectNotFound,
-                                    &objects[object_idx],
-                                    &objects[object_idx].fields[field_idx],
-                                    join.foreign_entity.to_string(),
-                                ));
-                                field_idx += 1;
-                                continue;
-                            };
-                            let Some(field) = foreign_entity.fields.iter().find(|x| {
-                                x.name == objects[object_idx].fields[field_idx].location.name
-                            }) else {
-                                errors.push(RepackError::from_field_with_msg(
-                                    RepackErrorKind::JoinFieldNotFound,
-                                    &objects[object_idx],
-                                    &objects[object_idx].fields[field_idx],
-                                    join.foreign_field.to_string(),
-                                ));
-                                field_idx += 1;
-                                continue;
-                            };
-                            let opt = field.optional;
-                            objects[object_idx].fields[field_idx].field_type =
-                                field.field_type.clone();
-                            objects[object_idx].fields[field_idx].optional = opt;
-                        }
-                    }
+                let lookup_name = &objects[object_idx].fields[field_idx].field_type_string;
+                if objects.iter().any(|obj| obj.name == *lookup_name) {
+                    objects[object_idx].fields[field_idx].field_type = Some(FieldType::Custom(
+                        lookup_name.clone(),
+                        CustomFieldType::Object,
+                    ));
+                } else if enums.iter().any(|en| en.name == *lookup_name) {
+                    objects[object_idx].fields[field_idx].field_type = Some(FieldType::Custom(
+                        lookup_name.clone(),
+                        CustomFieldType::Enum,
+                    ));
                 }
-
-                // Ensure custom types are resolved
+                // Ensure types are resolved
                 if let Some(FieldType::Custom(object_name, _)) =
                     &objects[object_idx].fields[field_idx].field_type
                 {
@@ -441,85 +209,7 @@ impl ParseResult {
                 }
                 field_idx += 1;
             }
-
-            let mut join_idx = 0;
-            while join_idx < objects[object_idx].joins.len() {
-                if objects[object_idx].joins[join_idx].local_base.is_none()
-                    && objects[object_idx].joins[join_idx].local_entity.is_none()
-                {
-                    objects[object_idx].joins[join_idx].local_base =
-                        Some(objects[object_idx].table_name.as_ref().unwrap().clone());
-                    objects[object_idx].joins[join_idx].local_entity =
-                        Some(objects[object_idx].name.clone());
-                    join_idx += 1;
-                    continue;
-                }
-                if let Some(le) = &objects[object_idx].joins[join_idx].local_entity {
-                    if let Some(obj) = objects.iter().find(|x| x.name == *le) {
-                        if let Some(tn) = obj.table_name.clone() {
-                            objects[object_idx].joins[join_idx].local_base = Some(tn);
-                        } else {
-                            errors.push(RepackError::from_obj_with_msg(
-                                RepackErrorKind::JoinNoTableName,
-                                &objects[object_idx],
-                                le.clone(),
-                            ));
-                        }
-                    } else {
-                        errors.push(RepackError::from_obj_with_msg(
-                            RepackErrorKind::JoinObjectNotFound,
-                            &objects[object_idx],
-                            objects[object_idx].joins[join_idx]
-                                .local_base
-                                .as_ref()
-                                .unwrap()
-                                .to_string(),
-                        ));
-                    }
-                } else if let Some(lt) = &objects[object_idx].joins[join_idx].local_base {
-                    if let Some(obj) = objects.iter().find(|x| match &x.table_name {
-                        Some(val) if *val == *lt => true,
-                        _ => false,
-                    }) {
-                        objects[object_idx].joins[join_idx].local_entity = Some(obj.name.clone());
-                    }
-                }
-                join_idx += 1;
-            }
-
             object_idx += 1;
-        }
-
-        for instance in &configuration_instances {
-            let Some(config) = configuration_schemas
-                .iter()
-                .find(|cs| cs.name == instance.configuration)
-            else {
-                errors.push(RepackError::from_instance_with_msg(
-                    RepackErrorKind::UnknownConfiguration,
-                    instance,
-                    instance.configuration.to_string(),
-                ));
-                continue;
-            };
-            for field in instance.values.keys() {
-                if !config.fields.iter().any(|x| x.name == *field) {
-                    errors.push(RepackError::from_instance_with_msg(
-                        RepackErrorKind::ExtraConfigurationField,
-                        instance,
-                        field.to_string(),
-                    ));
-                }
-            }
-            for field in &config.fields {
-                if !instance.values.contains_key(&field.name) {
-                    errors.push(RepackError::from_instance_with_msg(
-                        RepackErrorKind::MissingConfigurationField,
-                        instance,
-                        field.name.to_string(),
-                    ));
-                }
-            }
         }
 
         for object in &objects {

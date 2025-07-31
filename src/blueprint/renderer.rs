@@ -8,7 +8,7 @@ use std::{
 
 use crate::{
     Console,
-    syntax::{FieldReferenceKind, Output, ParseResult, RepackError, RepackErrorKind},
+    syntax::{Output, ParseResult, RepackError, RepackErrorKind},
 };
 
 use super::{
@@ -229,19 +229,6 @@ impl<'a> BlueprintRenderer<'a> {
                             })
                             .collect()
                     }
-                    SnippetSecondaryTokenName::Join => {
-                        let Some(obj) = context.object else {
-                            return Err(RepackError::from_lang_with_msg(
-                                RepackErrorKind::CannotCreateContext,
-                                self.config,
-                                "join in non-object context.".to_string(),
-                            ));
-                        };
-                        obj.joins
-                            .iter()
-                            .map(|j| context.with_join(obj, j))
-                            .collect()
-                    }
                     SnippetSecondaryTokenName::Enum => self
                         .parse_result
                         .included_enums(&self.config.categories, &self.config.exclude)
@@ -396,42 +383,6 @@ impl<'a> BlueprintRenderer<'a> {
                         self.render_tokens(content.contents, context, writer)?;
                     }
                     return Ok(());
-                }
-            }
-            SnippetMainTokenName::Ref => {
-                if let Some(field) = context.field {
-                    if let Some(obj) = context.object {
-                        let mut u_context = context.clone();
-                        if let Some(tn) = obj.table_name.as_ref() {
-                            u_context
-                                .variables
-                                .insert("local_entity".to_string(), tn.to_string());
-                        }
-                        if let FieldReferenceKind::FieldType(entity_name) =
-                            &field.location.reference
-                        {
-                            if let Some(entity) = self
-                                .parse_result
-                                .objects
-                                .iter()
-                                .find(|x| x.name == *entity_name)
-                            {
-                                if let Some(e_tn) = entity.table_name.as_ref() {
-                                    u_context
-                                        .variables
-                                        .insert("foreign_table".to_string(), e_tn.to_string());
-                                }
-                            }
-                            u_context
-                                .variables
-                                .insert("foreign_entity".to_string(), entity_name.to_string());
-                            u_context.variables.insert(
-                                "foreign_field".to_string(),
-                                field.location.name.to_string(),
-                            );
-                            self.render_tokens(content.contents, &u_context, writer)?;
-                        };
-                    }
                 }
             }
             SnippetMainTokenName::Exec => {

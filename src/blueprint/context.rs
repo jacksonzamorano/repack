@@ -1,8 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::syntax::{
-    ConfigurationInstance, CoreType, Enum, EnumCase, Field, FieldReferenceKind, FieldType, Object,
-    ObjectJoin, ObjectType, Output, RepackError, RepackErrorKind,
+    ConfigurationInstance, Enum, EnumCase, Field, FieldType, Object, ObjectJoin, Output,
+    RepackError, RepackErrorKind,
 };
 
 use super::{Blueprint, SnippetMainTokenName, SnippetSecondaryTokenName};
@@ -52,19 +52,11 @@ impl<'a> BlueprintExecutionContext<'a> {
     }
     pub fn with_object(&self, obj: &'a Object) -> Self {
         let mut variables = self.variables.clone();
-        let mut flags = self.flags.clone();
+        let flags = self.flags.clone();
         variables.insert("name".to_string(), obj.name.to_string());
         if let Some(tn) = obj.table_name.as_ref() {
             variables.insert("table_name".to_string(), tn.to_string());
         }
-        flags.insert("record", matches!(obj.object_type, ObjectType::Record));
-        flags.insert("syn", matches!(obj.object_type, ObjectType::Synthetic));
-        flags.insert(
-            "synthetic",
-            matches!(obj.object_type, ObjectType::Synthetic),
-        );
-        flags.insert("struct", matches!(obj.object_type, ObjectType::Struct));
-        flags.insert("has_joins", !obj.joins.is_empty());
 
         Self {
             variables,
@@ -86,12 +78,11 @@ impl<'a> BlueprintExecutionContext<'a> {
         let mut variables = self.variables.clone();
         let mut flags = self.flags.clone();
 
-        let resolved_type = match field.field_type() {
+        let resolved_type = match field.field_type.as_ref().unwrap() {
             FieldType::Core(typ) => {
                 if let Some(link) = blueprint.links.get(&typ.to_string()) {
-                    writer.import(link.to_string());
+                    writer.import(link.replace("$", &typ.to_string()))
                 }
-
                 blueprint
                     .utilities
                     .get(&(
@@ -116,77 +107,15 @@ impl<'a> BlueprintExecutionContext<'a> {
             }
         };
 
-        let (name, loc) = match &field.location.reference {
-            FieldReferenceKind::Local | FieldReferenceKind::FieldType(_) => (
-                field.name.clone(),
-                obj.table_name
-                    .as_ref()
-                    .map(|x| x.to_string())
-                    .unwrap_or_default(),
-            ),
-            FieldReferenceKind::ImplicitJoin(local_field_name) => {
-                (field.location.name.clone(), format!("j_{local_field_name}"))
-            }
-            FieldReferenceKind::ExplicitJoin(jn) => (field.location.name.clone(), jn.to_string()),
-        };
-        variables.insert("ref_table".to_string(), loc);
-        variables.insert("ref_field".to_string(), name);
         variables.insert("object_name".to_string(), obj.name.to_string());
         variables.insert("name".to_string(), field.name.to_string());
         variables.insert("type".to_string(), resolved_type.to_string());
-        variables.insert("type_raw".to_string(), field.field_type().to_string());
-        flags.insert(
-            "enum",
-            matches!(
-                field.field_type(),
-                FieldType::Custom(_, crate::syntax::CustomFieldType::Enum)
-            ),
+        variables.insert(
+            "type_raw".to_string(),
+            field.field_type.as_ref().unwrap().to_string(),
         );
         flags.insert("optional", field.optional);
         flags.insert("array", field.array);
-        flags.insert(
-            "custom",
-            matches!(field.field_type(), FieldType::Custom(_, _)),
-        );
-        flags.insert(
-            "local",
-            matches!(
-                field.location.reference,
-                FieldReferenceKind::Local | FieldReferenceKind::FieldType(_)
-            ),
-        );
-        flags.insert(
-            "uuid",
-            matches!(field.field_type(), FieldType::Core(CoreType::Uuid)),
-        );
-        flags.insert(
-            "string",
-            matches!(field.field_type(), FieldType::Core(CoreType::String)),
-        );
-        flags.insert(
-            "int32",
-            matches!(field.field_type(), FieldType::Core(CoreType::Int32)),
-        );
-        flags.insert(
-            "int64",
-            matches!(field.field_type(), FieldType::Core(CoreType::Int64)),
-        );
-        flags.insert(
-            "float64",
-            matches!(field.field_type(), FieldType::Core(CoreType::Float64)),
-        );
-        flags.insert(
-            "boolean",
-            matches!(field.field_type(), FieldType::Core(CoreType::Boolean)),
-        );
-        flags.insert(
-            "datetime",
-            matches!(field.field_type(), FieldType::Core(CoreType::DateTime)),
-        );
-        flags.insert(
-            "bytes",
-            matches!(field.field_type(), FieldType::Core(CoreType::Bytes)),
-        );
 
         Ok(Self {
             variables,
@@ -197,39 +126,6 @@ impl<'a> BlueprintExecutionContext<'a> {
             func_args: None,
         })
     }
-    pub fn with_join(&self, obj: &'a Object, join: &'a ObjectJoin) -> Result<Self, RepackError> {
-        let mut variables = self.variables.clone();
-        let flags = self.flags.clone();
-
-        variables.insert("name".to_string(), join.join_name.to_string());
-        variables.insert(
-            "local_entity".to_string(),
-            join.local_base.as_ref().unwrap().to_string(),
-        );
-        variables.insert(
-            "local_base".to_string(),
-            join.local_base.as_ref().unwrap().to_string(),
-        );
-        variables.insert("ref_entity".to_string(), join.foreign_entity.to_string());
-        variables.insert("local_field".to_string(), join.local_field.to_string());
-        variables.insert("ref_field".to_string(), join.foreign_field.to_string());
-        variables.insert(
-            "ref_table".to_string(),
-            join.foreign_table.as_ref().unwrap().to_string(),
-        );
-        variables.insert("condition".to_string(), join.condition.to_string());
-        variables.insert("join_type".to_string(), join.join_type.to_string());
-
-        Ok(Self {
-            variables,
-            flags,
-            object: Some(obj),
-            field: None,
-            enm: None,
-            func_args: None,
-        })
-    }
-
     pub fn with_enum(&self, enm: &'a Enum) -> Result<Self, RepackError> {
         let mut variables = self.variables.clone();
         variables.insert("name".to_string(), enm.name.to_string());

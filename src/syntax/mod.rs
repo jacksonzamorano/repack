@@ -1,4 +1,5 @@
 mod configuration;
+mod funclike;
 mod dependancies;
 mod enums;
 mod errors;
@@ -23,9 +24,8 @@ pub use field_function::*;
 pub use instance::*;
 pub use language::Output;
 pub use obj_function::*;
-pub use object::{Object, ObjectJoin, ObjectType};
+pub use object::{Object, ObjectJoin};
 pub use parser::FileContents;
-pub use query::*;
 pub use result::ParseResult;
 pub use snippet::*;
 pub use tokens::*;

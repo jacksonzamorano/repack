@@ -1,6 +1,6 @@
 use crate::blueprint::SnippetDetails;
 
-use super::{query, ConfigurationInstance, Field, Object, Output, Query};
+use super::{ConfigurationInstance, Field, Object, Output};
 
 /// Enumeration of all possible error types that can occur during schema processing.
 ///
@@ -45,6 +45,7 @@ pub enum RepackErrorKind {
     UnknownObject,
     QueryVariableDoesNotExist,
     QueryFieldDoesNotExist,
+    QueryInvalidSyntax,
     UnknownError,
 }
 impl Default for RepackErrorKind {
@@ -93,6 +94,7 @@ impl RepackErrorKind {
             Self::UnknownError => "An unknown error occured.",
             Self::QueryVariableDoesNotExist => "Variable does not exist for query:",
             Self::QueryFieldDoesNotExist => "Field does not exist for query:",
+            Self::QueryInvalidSyntax => "Invalid query syntax.",
         }
     }
 }
@@ -177,15 +179,6 @@ impl RepackError {
         RepackError {
             error,
             specifier: format!(" ({})", obj.name),
-            error_details: Some(msg),
-            stack: Vec::new(),
-        }
-    }
-
-    pub fn from_query_with_msg(error: RepackErrorKind, obj: &Object, query: &Query, msg: String) -> RepackError {
-        RepackError {
-            error,
-            specifier: format!(" ({}.{})", obj.name, query.name),
             error_details: Some(msg),
             stack: Vec::new(),
         }
