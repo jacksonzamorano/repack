@@ -1,8 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::syntax::{
-    ConfigurationInstance, Enum, EnumCase, Field, FieldType, Object, ObjectJoin, Output,
-    RepackError, RepackErrorKind,
+    ConfigurationInstance, Enum, EnumCase, Field, FieldType, Object, Output, RepackError,
+    RepackErrorKind,
 };
 
 use super::{Blueprint, SnippetMainTokenName, SnippetSecondaryTokenName};

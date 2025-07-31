@@ -1,31 +1,6 @@
 use std::collections::HashSet;
 
 use super::{Field, FieldType, FileContents, ObjectFunction, RepackError, RepackErrorKind, Token};
-/// Represents a relationship join between two objects in the schema.
-///
-/// ObjectJoin defines how objects are related to each other, specifying
-/// the local and foreign fields that establish the relationship. This is
-/// used for generating proper foreign key relationships and join queries
-/// in the target code.
-#[derive(Debug, Clone)]
-pub struct ObjectJoin {
-    /// The name identifier for this join relationship.
-    /// Used in code generation to create meaningful method and variable names.
-    pub join_name: String,
-    pub local_entity: Option<String>,
-    pub local_base: Option<String>,
-    /// The field name in the current object that participates in the join.
-    pub local_field: String,
-    /// The join condition operator (typically "=" for equality joins).
-    pub condition: String,
-    /// The name of the target object/entity being joined to.
-    pub foreign_entity: String,
-    /// The name of the target table being joined to.
-    pub foreign_table: Option<String>,
-    /// The field name in the foreign entity that participates in the join.
-    pub foreign_field: String,
-    pub join_type: String,
-}
 
 /// Represents a complete object definition in the schema system.
 ///
