@@ -1,6 +1,6 @@
-use crate::blueprint::SnippetDetails;
+use crate::blueprint::BlueprintSnippetDetails;
 
-use super::{ConfigurationInstance, Field, Object, Output};
+use super::{Field, Object, Output};
 
 /// Enumeration of all possible error types that can occur during schema processing.
 ///
@@ -275,20 +275,7 @@ impl RepackError {
         }
     }
 
-    pub fn from_instance_with_msg(
-        error: RepackErrorKind,
-        instance: &ConfigurationInstance,
-        msg: String,
-    ) -> RepackError {
-        RepackError {
-            error,
-            specifier: format!(" ({})", instance.name),
-            error_details: Some(msg),
-            stack: Vec::new(),
-        }
-    }
-
-    pub fn add_to_stack(&mut self, snip: &SnippetDetails) {
+    pub fn add_to_stack(&mut self, snip: &BlueprintSnippetDetails) {
         self.stack
             .push(format!("\t- {} {}", snip.main_token, snip.secondary_token));
     }

@@ -1,6 +1,6 @@
-use super::SnippetDetails;
+use super::BlueprintSnippetDetails;
 use crate::{
-    blueprint::{BlueprintFileReader, FlyToken},
+    blueprint::{BlueprintFileReader, BlueprintToken},
     syntax::{CoreType, RepackError},
 };
 use std::collections::HashMap;
@@ -117,8 +117,8 @@ type SnippetIdentifier = (SnippetMainTokenName, SnippetSecondaryTokenName);
 
 #[derive(Debug)]
 pub struct SnippetReference<'a> {
-    pub details: &'a SnippetDetails,
-    pub contents: &'a [FlyToken],
+    pub details: &'a BlueprintSnippetDetails,
+    pub contents: &'a [BlueprintToken],
 }
 impl<'a> SnippetReference<'a> {
     pub fn main_token(&self) -> SnippetMainTokenName {
@@ -154,7 +154,7 @@ pub struct Blueprint {
     pub kind: BlueprintKind,
     pub links: HashMap<String, String>,
     pub utilities: HashMap<SnippetIdentifier, String>,
-    pub tokens: Vec<FlyToken>,
+    pub tokens: Vec<BlueprintToken>,
     pub snippets: HashMap<String, String>,
 }
 impl Blueprint {
@@ -173,7 +173,7 @@ impl Blueprint {
             let Some(next) = reader.next() else {
                 break;
             };
-            if let FlyToken::Snippet(snip) = &next {
+            if let BlueprintToken::Snippet(snip) = &next {
                 let (main, secondary) = (
                     SnippetMainTokenName::from_string(&snip.main_token),
                     SnippetSecondaryTokenName::from_string(&snip.secondary_token),
@@ -185,7 +185,7 @@ impl Blueprint {
                         if !snip.autoclose {
                             while let Some(in_block) = reader.next() {
                                 match &in_block {
-                                    FlyToken::Close(det) if *det == snip.main_token => {
+                                    BlueprintToken::Close(det) if *det == snip.main_token => {
                                         break;
                                     }
                                     _ => {
@@ -196,7 +196,7 @@ impl Blueprint {
                         }
                         let mut literal_string_value = snip.contents.clone();
                         for t in &participating_tokens {
-                            if let FlyToken::Literal(val) = t {
+                            if let BlueprintToken::Literal(val) = t {
                                 literal_string_value.push_str(val);
                             }
                         }
@@ -209,7 +209,7 @@ impl Blueprint {
                         if !snip.autoclose {
                             while let Some(in_block) = reader.next() {
                                 match &in_block {
-                                    FlyToken::Close(det) if *det == snip.main_token => {
+                                    BlueprintToken::Close(det) if *det == snip.main_token => {
                                         break;
                                     }
                                     _ => {
@@ -220,7 +220,7 @@ impl Blueprint {
                         } 
                         let mut literal_string_value = snip.contents.clone();
                         for t in &participating_tokens {
-                            if let FlyToken::Literal(val) = t {
+                            if let BlueprintToken::Literal(val) = t {
                                 literal_string_value.push_str(val);
                             }
                         }
@@ -232,7 +232,7 @@ impl Blueprint {
                         if !snip.autoclose {
                             while let Some(in_block) = reader.next() {
                                 match &in_block {
-                                    FlyToken::Close(det) if *det == snip.main_token => {
+                                    BlueprintToken::Close(det) if *det == snip.main_token => {
                                         break;
                                     }
                                     _ => {
@@ -243,7 +243,7 @@ impl Blueprint {
                         }
                         let mut literal_string_value = snip.contents.clone();
                         for t in &participating_tokens {
-                            if let FlyToken::Literal(val) = t {
+                            if let BlueprintToken::Literal(val) = t {
                                 literal_string_value.push_str(val);
                             }
                         }
@@ -261,9 +261,9 @@ impl Blueprint {
         let mut i = 0;
         while i + 1 < lang.tokens.len() {
             match &lang.tokens[i + 1] {
-                FlyToken::Snippet(snip) => {
+                BlueprintToken::Snippet(snip) => {
                     let autoclose = snip.autoclose;
-                    if let FlyToken::Literal(lit) = &mut lang.tokens[i] {
+                    if let BlueprintToken::Literal(lit) = &mut lang.tokens[i] {
                         if !autoclose {
                             while lit.ends_with('\n') || lit.ends_with('\t') {
                                 lit.pop();
@@ -271,8 +271,8 @@ impl Blueprint {
                         }
                     }
                 }
-                FlyToken::Close(_) => {
-                    if let FlyToken::Literal(lit) = &mut lang.tokens[i] {
+                BlueprintToken::Close(_) => {
+                    if let BlueprintToken::Literal(lit) = &mut lang.tokens[i] {
                         while lit.ends_with('\n') || lit.ends_with('\t') {
                             lit.pop();
                         }

@@ -1,5 +1,5 @@
 use super::{
-    Configuration, ConfigurationInstance, CustomFieldType, Enum, FieldType, FileContents, Object,
+    CustomFieldType, Enum, FieldType, FileContents, Object,
     Output, RepackError, RepackErrorKind, Snippet, Token, dependancies::graph_valid, language,
 };
 
@@ -18,11 +18,6 @@ pub struct ParseResult {
     pub enums: Vec<Enum>,
     /// List of external blueprint files to be loaded for code generation
     pub include_blueprints: Vec<String>,
-    /// List of configuration schemas
-    #[allow(dead_code)]
-    pub configuration_schemas: Vec<Configuration>,
-    /// List of configuration instances
-    pub configuration_instances: Vec<ConfigurationInstance>,
 }
 
 impl ParseResult {
@@ -49,8 +44,6 @@ impl ParseResult {
         let mut languages = Vec::new();
         let mut enums = Vec::new();
         let mut include_blueprints = Vec::new();
-        let mut configuration_schemas = Vec::new();
-        let mut configuration_instances = Vec::new();
 
         while let Some(token) = contents.next() {
             match *token {
@@ -77,13 +70,6 @@ impl ParseResult {
                     if let Some(Token::Literal(path)) = contents.take() {
                         include_blueprints.push(path);
                     }
-                }
-                Token::Configuration => {
-                    configuration_schemas.push(Configuration::read_from_contents(&mut contents));
-                }
-                Token::Instance => {
-                    configuration_instances
-                        .push(ConfigurationInstance::read_from_contents(&mut contents));
                 }
                 _ => {}
             }
@@ -232,8 +218,6 @@ impl ParseResult {
                 languages,
                 enums,
                 include_blueprints,
-                configuration_schemas,
-                configuration_instances,
             })
         }
     }

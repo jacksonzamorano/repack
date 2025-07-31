@@ -1,14 +1,14 @@
 use std::iter::Peekable;
 
-use crate::blueprint::FlyToken;
+use crate::blueprint::BlueprintToken;
 
-use super::{SnippetDetails, SnippetMainTokenName};
+use super::{BlueprintSnippetDetails, SnippetMainTokenName};
 
 pub struct BlueprintFileReader<'a> {
     pub reader: Peekable<std::slice::Iter<'a, u8>>,
 }
 impl<'a> BlueprintFileReader<'a> {
-    pub fn next(&mut self) -> Option<FlyToken> {
+    pub fn next(&mut self) -> Option<BlueprintToken> {
         let mut temp = String::new();
         let mut last_ignore: bool = false;
         while let Some(next) = self.reader.next() {
@@ -17,7 +17,7 @@ impl<'a> BlueprintFileReader<'a> {
             }
             if *next == b'[' {
                 if !last_ignore {
-                    let mut sd = SnippetDetails::default();
+                    let mut sd = BlueprintSnippetDetails::default();
                     if matches!(self.reader.peek(), Some(b']')) {
                         temp.push('[');
                         continue;
@@ -30,7 +30,7 @@ impl<'a> BlueprintFileReader<'a> {
                         self.reader.next();
                         for in_block_read in self.reader.by_ref() {
                             match *in_block_read as char {
-                                ']' => return Some(FlyToken::Close(temp)),
+                                ']' => return Some(BlueprintToken::Close(temp)),
                                 ' ' => {}
                                 _ => {
                                     temp.push(*in_block_read as char);
@@ -95,7 +95,7 @@ impl<'a> BlueprintFileReader<'a> {
                             }
                         }
                     }
-                    return Some(FlyToken::Snippet(sd));
+                    return Some(BlueprintToken::Snippet(sd));
                 } else {
                     temp.pop();
                 }
@@ -108,7 +108,7 @@ impl<'a> BlueprintFileReader<'a> {
                         temp.pop();
                     }
                     // End of a token, just before a block specifier.
-                    return Some(FlyToken::Literal(temp));
+                    return Some(BlueprintToken::Literal(temp));
                 }
                 _ => {
                     temp.push(*next as char);
@@ -117,7 +117,7 @@ impl<'a> BlueprintFileReader<'a> {
         }
 
         if !temp.is_empty() {
-            Some(FlyToken::Literal(temp))
+            Some(BlueprintToken::Literal(temp))
         } else {
             None
         }

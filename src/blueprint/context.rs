@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::syntax::{
-    ConfigurationInstance, Enum, EnumCase, Field, FieldType, Object, Output, RepackError,
+    Enum, EnumCase, Field, FieldType, Object, Output, RepackError,
     RepackErrorKind,
 };
 
@@ -180,21 +180,6 @@ impl<'a> BlueprintExecutionContext<'a> {
         let flags = HashMap::new();
 
         variables.insert("arg".to_string(), arg.to_string());
-
-        Ok(Self {
-            variables,
-            flags,
-            ..self.clone()
-        })
-    }
-    pub fn with_instance(&self, instance: &'a ConfigurationInstance) -> Result<Self, RepackError> {
-        let mut variables = self.variables.clone();
-        let flags = self.flags.clone();
-
-        variables.insert("name".to_string(), instance.name.to_string());
-        for (k, v) in &instance.values {
-            variables.insert(k.to_string(), v.to_string());
-        }
 
         Ok(Self {
             variables,

@@ -12,7 +12,7 @@ use crate::{
 };
 
 use super::{
-    Blueprint, BlueprintExecutionContext, FlyToken, SnippetMainTokenName, SnippetReference,
+    Blueprint, BlueprintExecutionContext, BlueprintToken, SnippetMainTokenName, SnippetReference,
     SnippetSecondaryTokenName, TokenConsumer,
 };
 
@@ -124,7 +124,7 @@ impl<'a> BlueprintRenderer<'a> {
 
     fn render_tokens<'b>(
         &mut self,
-        content: &'b [FlyToken],
+        content: &'b [BlueprintToken],
         context: &'b BlueprintExecutionContext<'b>,
         writer: &'b mut dyn TokenConsumer,
     ) -> Result<(), RepackError> {
@@ -132,11 +132,11 @@ impl<'a> BlueprintRenderer<'a> {
         while index < content.len() {
             let c = &content[index];
             match c {
-                FlyToken::Literal(lit_val) => {
+                BlueprintToken::Literal(lit_val) => {
                     writer.write(&lit_val);
                     index += 1;
                 }
-                FlyToken::Snippet(snip) => {
+                BlueprintToken::Snippet(snip) => {
                     index += 1;
                     let starting_at = index;
                     let mut embed_count = 1;
@@ -145,7 +145,7 @@ impl<'a> BlueprintRenderer<'a> {
                         while index < content.len() {
                             let in_block = &content[index];
                             match &in_block {
-                                FlyToken::Close(close) => {
+                                BlueprintToken::Close(close) => {
                                     if *close == snip.main_token {
                                         embed_count -= 1;
                                         if embed_count == 0 {
@@ -153,7 +153,7 @@ impl<'a> BlueprintRenderer<'a> {
                                         }
                                     }
                                 }
-                                FlyToken::Snippet(embedded)
+                                BlueprintToken::Snippet(embedded)
                                     if embedded.main_token == snip.main_token =>
                                 {
                                     embed_count += 1;
@@ -259,25 +259,11 @@ impl<'a> BlueprintRenderer<'a> {
                         args.iter().map(|x| context.with_func_arg(x)).collect()
                     }
                     _ => {
-                        let instances = self
-                            .parse_result
-                            .configuration_instances
-                            .iter()
-                            .filter(|cs| cs.configuration == content.details.secondary_token)
-                            .collect::<Vec<_>>();
-                        if !instances.is_empty() {
-                            instances
-                                .iter()
-                                .filter(|x| x.environment == self.filter)
-                                .map(|x| context.with_instance(x))
-                                .collect()
-                        } else {
-                            return Err(RepackError::from_lang_with_msg(
-                                RepackErrorKind::VariableNotInScope,
-                                self.config,
-                                content.details.secondary_token.to_string(),
-                            ));
-                        }
+                        return Err(RepackError::from_lang_with_msg(
+                            RepackErrorKind::VariableNotInScope,
+                            self.config,
+                            content.details.secondary_token.to_string(),
+                        ));
                     }
                 };
                 let len = iter_options.len();
