@@ -5,6 +5,10 @@ use crate::{
 };
 use std::collections::HashMap;
 
+/// Main blueprint template tokens that control template flow and content generation.
+///
+/// These tokens define the primary template constructs available in blueprint files.
+/// They control iteration, conditionals, file output, and variable substitution.
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub enum SnippetMainTokenName {
     Meta,
@@ -54,6 +58,10 @@ impl SnippetMainTokenName {
         }
     }
 }
+/// Secondary blueprint template tokens that provide context and type information.
+///
+/// These tokens are used within primary template constructs to specify details
+/// like object types, field types, metadata keys, and template parameters.
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub enum SnippetSecondaryTokenName {
     // Define
@@ -129,10 +137,20 @@ impl<'a> SnippetReference<'a> {
     }
 }
 
+/// Defines the category of blueprint and its intended purpose.
+///
+/// BlueprintKind determines which operations will use this blueprint and
+/// what type of output it generates.
 #[derive(Debug)]
 pub enum BlueprintKind {
+    /// Generates source code files (structs, interfaces, schemas, etc.)
+    /// Used by the build command to create language-specific code
     Code,
+    /// Generates configuration files (env files, docker configs, etc.)
+    /// Used by the configure command for environment-specific deployments
     Configure,
+    /// Generates documentation files (markdown, HTML, etc.)
+    /// Used by the document command to create human-readable docs
     Document,
 }
 impl BlueprintKind {
@@ -146,15 +164,27 @@ impl BlueprintKind {
     }
 }
 
+/// Represents a complete blueprint definition for code generation.
+///
+/// Blueprint contains all the template logic, type mappings, and metadata needed
+/// to generate code for a specific target language or format. Blueprints are loaded
+/// from template files and used by the renderer to produce output files.
 #[allow(dead_code)]
 #[derive(Debug)]
 pub struct Blueprint {
+    /// Unique identifier for this blueprint (e.g., "rust", "typescript")
     pub id: String,
+    /// Human-readable name for this blueprint
     pub name: String,
+    /// The blueprint category (Code, Document, or Configure)
     pub kind: BlueprintKind,
+    /// Import statements and dependencies needed for generated code
     pub links: HashMap<String, String>,
+    /// Type mappings from repack types to target language types
     pub utilities: HashMap<SnippetIdentifier, String>,
+    /// Parsed template tokens that define the generation logic
     pub tokens: Vec<BlueprintToken>,
+    /// Named code snippets for reuse within the template
     pub snippets: HashMap<String, String>,
 }
 impl Blueprint {

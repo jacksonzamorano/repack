@@ -45,19 +45,20 @@ impl Console {
 /// Defines the operational mode for the repack code generator.
 ///
 /// This enum determines what action the tool will take when executed.
-/// The behavior is determined by command-line flags passed to the application.
+/// The behavior is determined by command-line arguments passed to the application.
 enum Behavior {
-    /// Generate code files from the schema using the configured blueprints.
-    /// This is the default mode that creates output files in target languages.
+    /// Generate code files from the schema using blueprint templates.
+    /// This is the default mode that creates output files in target languages
+    /// like Rust, TypeScript, PostgreSQL, Go, and Markdown.
     Build,
     /// Remove previously generated code files, cleaning up the output directories.
-    /// Useful for starting fresh or removing outdated generated code.
+    /// Uses blueprint metadata to determine which files to delete.
     Clean,
-    /// Deploy
-    /// Build deployment files
+    /// Generate configuration files using configure-type blueprints.
+    /// Processes configuration instances for environment-specific deployments.
     Configure,
-    /// Document,
-    /// Build documentation files
+    /// Generate documentation files using document-type blueprints.
+    /// Creates human-readable documentation from schema definitions.
     Document,
 }
 
@@ -70,14 +71,18 @@ fn print_usage() {
 /// Entry point for the repack code generation tool.
 ///
 /// This function orchestrates the complete code generation process:
-/// 1. Parses command-line arguments to determine input file and behavior
-/// 2. Loads and parses the schema file with all its dependencies
-/// 3. Loads required blueprints (both core and external)
-/// 4. Generates code for each configured output target
-/// 5. Handles both build and clean operations based on flags
+/// 1. Parses command-line arguments to determine operation mode and input file
+/// 2. Loads and parses the .repack schema file with tokenization
+/// 3. Loads built-in blueprints (rust, typescript, postgres, go, markdown)
+/// 4. Loads any external blueprint files specified in the schema
+/// 5. Filters and processes outputs based on blueprint types and categories
+/// 6. Executes the requested operation (build, clean, document, or configure)
 ///
-/// The tool expects at least one argument (the input schema file) and supports
-/// the --clean flag to remove previously generated files instead of building.
+/// The tool supports four operation modes:
+/// - `repack build file.repack` - Generate code files (default)
+/// - `repack clean file.repack` - Remove generated files
+/// - `repack document file.repack` - Generate documentation
+/// - `repack configure env file.repack` - Generate configuration files
 fn main() {
     Console::begin();
     let mut task_index = 1;

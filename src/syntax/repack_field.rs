@@ -50,8 +50,8 @@ impl Field {
     /// It handles different field reference syntaxes:
     /// - Direct types: `field_name type_name`
     /// - References: `field_name ref(ObjectName.field_name)`
-    /// - Implicit joins: `field_name from(join_field.target_field)`
-    /// - Explicit joins: `field_name with(join_name.field_name)`
+    /// - Direct type references: `field_name Type`
+    /// - Foreign key references: `field_name ref(Object.field)`
     ///
     /// # Arguments
     /// * `name` - The field name as parsed from the schema

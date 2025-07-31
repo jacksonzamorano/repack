@@ -10,7 +10,7 @@ use super::{
 /// the primary input for code generation and validation processes.
 #[derive(Debug)]
 pub struct ParseResult {
-    /// All parsed object definitions (records, structs, synthetics)
+    /// All parsed object definitions (structs)
     pub objects: Vec<RepackStruct>,
     /// Output configuration definitions specifying target languages and settings
     pub languages: Vec<Output>,

@@ -15,13 +15,13 @@ pub struct RepackStruct {
     /// The list of fields/properties that belong to this object.
     pub fields: Vec<Field>,
     /// Optional parent object name for inheritance relationships.
-    /// Only available for Synthetic objects that extend Records.
+    /// Currently unused as inheritance is not yet implemented.
     pub inherits: Option<String>,
     /// Tags/categories for organizing and filtering objects during generation.
     /// Used by blueprints to selectively process certain object types.
     pub categories: Vec<String>,
-    /// Database table name override for Record objects.
-    /// If None, the object name is used as the table name.
+    /// Optional database table name for objects that map to database tables.
+    /// Used by database blueprints like PostgreSQL for table generation.
     pub table_name: Option<String>,
     /// When true, inherits all fields from the parent object.
     /// Used in combination with reuse_exclude to selectively inherit fields.
@@ -156,8 +156,8 @@ impl RepackStruct {
     /// Validates the object definition and returns any semantic errors.
     ///
     /// This method performs comprehensive validation of the object based on its type:
-    /// - Records must have table names and cannot have custom object field types
-    /// - Structs cannot inherit, reuse fields, or have table names
+    /// - Validates field names are unique within each object
+    /// - Ensures all field types are properly resolved
     /// - All objects must have unique field names and resolved field types
     ///
     /// # Returns
