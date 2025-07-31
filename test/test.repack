@@ -41,8 +41,11 @@ record User @users #model {
 	!base
 	last_login datetime?
 	name string
+	email string
 	user_type UserType
 	subscription_id string?
+
+	select ByEmail email:string = "SELECT %fields FROM %table_name WHERE %email = $email"
 }
 
 record ContactInfo @contacts #model {

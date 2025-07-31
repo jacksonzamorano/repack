@@ -1,7 +1,8 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, fmt::format};
 
 use super::{
-    field::FieldReferenceKind, CustomFieldType, Field, FieldType, FileContents, ObjectFunction, Query, RepackError, RepackErrorKind, Token
+    CustomFieldType, Field, FieldType, FileContents, ObjectFunction, Query, RepackError,
+    RepackErrorKind, Token, field::FieldReferenceKind,
 };
 
 /// Defines the different categories of objects that can be defined in a schema.
@@ -267,6 +268,11 @@ impl Object {
                         use_snippets.push(snippet_name);
                     }
                 }
+                Token::Query => {
+                    if let Some(query) = Query::from_contents(contents) {
+                        queries.push(query);
+                    }
+                }
                 _ => {}
             }
         }
@@ -439,5 +445,77 @@ impl Object {
             .iter()
             .filter(|x| x.namespace == *ns)
             .collect()
+    }
+
+    pub fn render_query(&self, query: &Query) -> Result<String, RepackError> {
+        let mut query_string = String::new();
+
+        let fields_string = self.fields.iter().map(|f| {
+            format!(
+                "{}.{} AS {}",
+                self.table_name.as_ref().unwrap(),
+                f.name,
+                f.name
+            )
+        }).collect::<Vec<_>>().join(", ");
+
+        let mut query_iter = query.query_val.chars();
+        let mut temp_var = String::new();
+        loop {
+            let chr_opt = query_iter.next();
+            if let Some(chr) = chr_opt {
+                if chr == '$' {
+                    temp_var = "$".to_string();
+                    continue;
+                } else if chr == '%' {
+                    temp_var = "%".to_string();
+                    continue;
+                } else if !chr.is_whitespace() {
+                    if temp_var.is_empty() {
+                        query_string.push(chr);
+                    } else {
+                        temp_var.push(chr);
+                    }
+                    continue;
+                }
+            }
+            if temp_var.starts_with('%') {
+                let Some(val) = (match &temp_var[1..] {
+                    "table_name" => Some(self.table_name.as_ref().unwrap().clone()),
+                    "fields" => Some(fields_string.clone()),
+                    _ => self
+                        .fields
+                        .iter()
+                        .find(|x| x.name == temp_var[1..])
+                        .map(|x| x.name.to_string()),
+                }) else {
+                    return Err(RepackError::from_query_with_msg(
+                        RepackErrorKind::QueryVariableDoesNotExist,
+                        &self,
+                        query,
+                        temp_var[1..].to_string(),
+                    ));
+                };
+
+                query_string.push_str(&val);
+            } else if temp_var.starts_with('$') {
+                let Some(idx) = &query.args.iter().position(|x| x.name == &temp_var[1..]) else {
+                    return Err(RepackError::from_query_with_msg(
+                        RepackErrorKind::QueryFieldDoesNotExist,
+                        &self,
+                        query,
+                        temp_var[1..].to_string(),
+                    ));
+                };
+                query_string.push_str(&format!("${}", idx + 1));
+            }
+            temp_var.clear();
+            query_string.push(' ');
+            if chr_opt.is_none() {
+                break;
+            }
+        }
+
+        return Ok(query_string);
     }
 }

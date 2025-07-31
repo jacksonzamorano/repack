@@ -44,10 +44,7 @@ pub enum Token {
     Convert,
     Configuration,
     Instance,
-    Select,
-    Insert,
-    Update,
-    Delete,
+    Query,
 }
 impl Token {
     /// Converts a single byte character into a Token if it matches a known symbol.
@@ -116,10 +113,7 @@ impl Token {
             "blueprint" => Token::Blueprint,
             "configuration" => Token::Configuration,
             "instance" => Token::Instance,
-            "select" => Token::Select,
-            "insert" => Token::Insert,
-            "update" => Token::Update,
-            "delete" => Token::Delete,
+            "query" => Token::Query,
 
             _ => Token::Literal(string.trim().to_string()),
         }
