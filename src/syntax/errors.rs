@@ -1,6 +1,6 @@
 use crate::blueprint::BlueprintSnippetDetails;
 
-use super::{Field, Object, Output};
+use super::{Field, RepackStruct, Output};
 
 /// Enumeration of all possible error types that can occur during schema processing.
 ///
@@ -166,7 +166,7 @@ impl RepackError {
     /// # Arguments
     /// * `error` - The type of error that occurred
     /// * `obj` - The object where the error was found
-    pub fn from_obj(error: RepackErrorKind, obj: &Object) -> RepackError {
+    pub fn from_obj(error: RepackErrorKind, obj: &RepackStruct) -> RepackError {
         RepackError {
             error,
             specifier: format!(" ({})", obj.name),
@@ -175,7 +175,7 @@ impl RepackError {
         }
     }
 
-    pub fn from_obj_with_msg(error: RepackErrorKind, obj: &Object, msg: String) -> RepackError {
+    pub fn from_obj_with_msg(error: RepackErrorKind, obj: &RepackStruct, msg: String) -> RepackError {
         RepackError {
             error,
             specifier: format!(" ({})", obj.name),
@@ -193,7 +193,7 @@ impl RepackError {
     /// * `error` - The type of error that occurred
     /// * `obj` - The object containing the problematic field
     /// * `field` - The field where the error was found
-    pub fn from_field(error: RepackErrorKind, obj: &Object, field: &Field) -> RepackError {
+    pub fn from_field(error: RepackErrorKind, obj: &RepackStruct, field: &Field) -> RepackError {
         RepackError {
             error,
             specifier: format!(" ({}.{})", obj.name, field.name),
@@ -204,7 +204,7 @@ impl RepackError {
 
     pub fn from_field_with_msg(
         error: RepackErrorKind,
-        obj: &Object,
+        obj: &RepackStruct,
         field: &Field,
         msg: String,
     ) -> RepackError {
@@ -227,7 +227,7 @@ impl RepackError {
     }
 
     #[allow(dead_code)]
-    pub fn from_lang_with_obj(error: RepackErrorKind, lang: &Output, obj: &Object) -> RepackError {
+    pub fn from_lang_with_obj(error: RepackErrorKind, lang: &Output, obj: &RepackStruct) -> RepackError {
         RepackError {
             error,
             specifier: format!(" ({} -> {})", lang.profile, obj.name),
@@ -240,7 +240,7 @@ impl RepackError {
     pub fn from_lang_with_obj_msg(
         error: RepackErrorKind,
         lang: &Output,
-        obj: &Object,
+        obj: &RepackStruct,
         msg: String,
     ) -> RepackError {
         RepackError {
@@ -254,7 +254,7 @@ impl RepackError {
     pub fn from_lang_with_obj_field_msg(
         error: RepackErrorKind,
         lang: &Output,
-        obj: &Object,
+        obj: &RepackStruct,
         field: &Field,
         msg: String,
     ) -> RepackError {

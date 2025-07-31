@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::syntax::{
-    Enum, EnumCase, Field, FieldType, Object, Output, RepackError,
+    RepackEnum, RepackEnumCase, Field, FieldType, RepackStruct, Output, RepackError,
     RepackErrorKind,
 };
 
@@ -34,9 +34,9 @@ impl TokenConsumer for String {
 pub(crate) struct BlueprintExecutionContext<'a> {
     pub variables: HashMap<String, String>,
     pub flags: HashMap<&'a str, bool>,
-    pub object: Option<&'a Object>,
+    pub object: Option<&'a RepackStruct>,
     pub field: Option<&'a Field>,
-    pub enm: Option<&'a Enum>,
+    pub enm: Option<&'a RepackEnum>,
     pub func_args: Option<&'a Vec<String>>,
 }
 impl<'a> BlueprintExecutionContext<'a> {
@@ -50,7 +50,7 @@ impl<'a> BlueprintExecutionContext<'a> {
             func_args: None,
         }
     }
-    pub fn with_object(&self, obj: &'a Object) -> Self {
+    pub fn with_object(&self, obj: &'a RepackStruct) -> Self {
         let mut variables = self.variables.clone();
         let flags = self.flags.clone();
         variables.insert("name".to_string(), obj.name.to_string());
@@ -69,7 +69,7 @@ impl<'a> BlueprintExecutionContext<'a> {
     }
     pub fn with_field(
         &self,
-        obj: &'a Object,
+        obj: &'a RepackStruct,
         field: &'a Field,
         blueprint: &'a Blueprint,
         config: &Output,
@@ -126,7 +126,7 @@ impl<'a> BlueprintExecutionContext<'a> {
             func_args: None,
         })
     }
-    pub fn with_enum(&self, enm: &'a Enum) -> Result<Self, RepackError> {
+    pub fn with_enum(&self, enm: &'a RepackEnum) -> Result<Self, RepackError> {
         let mut variables = self.variables.clone();
         variables.insert("name".to_string(), enm.name.to_string());
         Ok(Self {
@@ -138,7 +138,7 @@ impl<'a> BlueprintExecutionContext<'a> {
             func_args: None,
         })
     }
-    pub fn with_enum_case(&self, enm: &'a Enum, val: &'a EnumCase) -> Result<Self, RepackError> {
+    pub fn with_enum_case(&self, enm: &'a RepackEnum, val: &'a RepackEnumCase) -> Result<Self, RepackError> {
         let mut variables = HashMap::new();
         let flags = HashMap::new();
 

@@ -1,5 +1,5 @@
 use super::{
-    CustomFieldType, Enum, FieldType, FileContents, Object,
+    CustomFieldType, RepackEnum, FieldType, FileContents, RepackStruct,
     Output, RepackError, RepackErrorKind, Snippet, Token, dependancies::graph_valid, language,
 };
 
@@ -11,11 +11,11 @@ use super::{
 #[derive(Debug)]
 pub struct ParseResult {
     /// All parsed object definitions (records, structs, synthetics)
-    pub objects: Vec<Object>,
+    pub objects: Vec<RepackStruct>,
     /// Output configuration definitions specifying target languages and settings
     pub languages: Vec<Output>,
     /// All parsed enumeration definitions
-    pub enums: Vec<Enum>,
+    pub enums: Vec<RepackEnum>,
     /// List of external blueprint files to be loaded for code generation
     pub include_blueprints: Vec<String>,
 }
@@ -48,10 +48,10 @@ impl ParseResult {
         while let Some(token) = contents.next() {
             match *token {
                 Token::StructType => {
-                    objects.push(Object::read_from_contents(&mut contents));
+                    objects.push(RepackStruct::read_from_contents(&mut contents));
                 }
                 Token::EnumType => {
-                    enums.push(Enum::read_from_contents(&mut contents));
+                    enums.push(RepackEnum::read_from_contents(&mut contents));
                 }
                 Token::SnippetType => {
                     snippets.push(Snippet::read_from_contents(&mut contents));
@@ -234,7 +234,7 @@ impl ParseResult {
     ///
     /// # Returns
     /// A vector of object references that match the filtering criteria
-    pub fn included_objects(&self, categories: &[String], excludes: &[String]) -> Vec<&Object> {
+    pub fn included_objects(&self, categories: &[String], excludes: &[String]) -> Vec<&RepackStruct> {
         self.objects
             .iter()
             .filter(|obj| {
@@ -260,7 +260,7 @@ impl ParseResult {
     ///
     /// # Returns
     /// A vector of enum references that match the filtering criteria
-    pub fn included_enums(&self, categories: &[String], excludes: &[String]) -> Vec<&Enum> {
+    pub fn included_enums(&self, categories: &[String], excludes: &[String]) -> Vec<&RepackEnum> {
         self.enums
             .iter()
             .filter(|enm| {

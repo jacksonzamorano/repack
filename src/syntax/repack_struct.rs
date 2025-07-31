@@ -9,7 +9,7 @@ use super::{Field, FieldType, FileContents, ObjectFunction, RepackError, RepackE
 /// Each object can have fields, functions, inheritance relationships, and database
 /// mappings depending on its type.
 #[derive(Debug)]
-pub struct Object {
+pub struct RepackStruct {
     /// The unique name identifier for this object used in code generation.
     pub name: String,
     /// The list of fields/properties that belong to this object.
@@ -39,7 +39,7 @@ pub struct Object {
     /// These generate additional methods in the target language classes.
     pub functions: Vec<ObjectFunction>,
 }
-impl Object {
+impl RepackStruct {
     /// Parses an Object definition from the input file contents.
     ///
     /// This method reads the schema definition syntax and constructs a complete
@@ -56,7 +56,7 @@ impl Object {
     ///
     /// # Panics
     /// Panics if the expected object name is missing or malformed
-    pub fn read_from_contents(contents: &mut FileContents) -> Object {
+    pub fn read_from_contents(contents: &mut FileContents) -> RepackStruct {
         let Some(name_opt) = contents.next() else {
             panic!("Read record type, expected a name but got end of file.");
         };
@@ -139,7 +139,7 @@ impl Object {
             }
         }
 
-        Object {
+        RepackStruct {
             name,
             fields,
             inherits,

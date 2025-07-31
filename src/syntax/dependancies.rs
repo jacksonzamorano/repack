@@ -1,8 +1,8 @@
 use std::collections::VecDeque;
 
-use super::{Object, RepackError, RepackErrorKind};
+use super::{RepackStruct, RepackError, RepackErrorKind};
 
-pub fn graph_valid(objects: &[Object]) -> Result<(), RepackError> {
+pub fn graph_valid(objects: &[RepackStruct]) -> Result<(), RepackError> {
     let mut graph: VecDeque<Vec<String>> = VecDeque::new();
     for obj in objects.iter() {
         graph.push_back(vec![obj.name.clone()]);
