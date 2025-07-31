@@ -24,6 +24,8 @@ pub enum SnippetMainTokenName {
     Break,
     Exec,
     Increment,
+    Snippet,
+    Render,
     Variable(String),
 }
 impl SnippetMainTokenName {
@@ -46,6 +48,8 @@ impl SnippetMainTokenName {
             "br" => Self::Break,
             "exec" => Self::Exec,
             "increment" => Self::Increment,
+            "snippet" => Self::Snippet,
+            "render" => Self::Render,
             _ => Self::Variable(val.to_string()),
         }
     }
@@ -151,6 +155,7 @@ pub struct Blueprint {
     pub links: HashMap<String, String>,
     pub utilities: HashMap<SnippetIdentifier, String>,
     pub tokens: Vec<FlyToken>,
+    pub snippets: HashMap<String, String>,
 }
 impl Blueprint {
     pub fn new(mut reader: BlueprintFileReader) -> Result<Blueprint, RepackError> {
@@ -161,6 +166,7 @@ impl Blueprint {
             links: HashMap::new(),
             utilities: HashMap::new(),
             tokens: Vec::new(),
+            snippets: HashMap::new(),
         };
 
         loop {
@@ -197,6 +203,29 @@ impl Blueprint {
 
                         lang.utilities
                             .insert((main, secondary), literal_string_value);
+                    }
+                    SnippetMainTokenName::Snippet => {
+                        let mut participating_tokens = Vec::new();
+                        if !snip.autoclose {
+                            while let Some(in_block) = reader.next() {
+                                match &in_block {
+                                    FlyToken::Close(det) if *det == snip.main_token => {
+                                        break;
+                                    }
+                                    _ => {
+                                        participating_tokens.push(in_block);
+                                    }
+                                }
+                            }
+                        } 
+                        let mut literal_string_value = snip.contents.clone();
+                        for t in &participating_tokens {
+                            if let FlyToken::Literal(val) = t {
+                                literal_string_value.push_str(val);
+                            }
+                        }
+                        lang.snippets
+                            .insert(snip.secondary_token.to_string(), literal_string_value);
                     }
                     SnippetMainTokenName::Link => {
                         let mut participating_tokens = Vec::new();

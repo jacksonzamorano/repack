@@ -482,6 +482,20 @@ impl<'a> BlueprintRenderer<'a> {
                     self.global_counters.insert(name.to_string(), 1);
                 }
             }
+            SnippetMainTokenName::Render => {
+                let mut snippet_name = String::new();
+                if let Err(val) = self.render_tokens(content.contents, context, &mut snippet_name) {
+                    return Err(val);
+                }
+                if let Some(snippet) = self.blueprint.snippets.get(&snippet_name) {
+                    writer.write(snippet);
+                } else {
+                    return Err(RepackError::global(
+                        RepackErrorKind::UnknownSnippet,
+                        snippet_name.to_string(),
+                    ));
+                }
+            }
             SnippetMainTokenName::Variable(var) => {
                 let mut components = var.split(".");
                 let name = components.next().unwrap();

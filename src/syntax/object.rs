@@ -1,8 +1,7 @@
 use std::collections::HashSet;
 
 use super::{
-    CustomFieldType, Field, FieldType, FileContents, ObjectFunction, RepackError, RepackErrorKind,
-    Token, field::FieldReferenceKind,
+    field::FieldReferenceKind, CustomFieldType, Field, FieldType, FileContents, ObjectFunction, Query, RepackError, RepackErrorKind, Token
 };
 
 /// Defines the different categories of objects that can be defined in a schema.
@@ -93,6 +92,7 @@ pub struct Object {
     /// Database join relationships to other objects.
     /// Defines how this object relates to other entities in queries.
     pub joins: Vec<ObjectJoin>,
+    pub queries: Vec<Query>,
 }
 impl Object {
     /// Parses an Object definition from the input file contents.
@@ -129,6 +129,7 @@ impl Object {
         let mut use_snippets = Vec::new();
         let mut functions = Vec::new();
         let mut joins = Vec::new();
+        let mut queries = Vec::new();
 
         'header: while let Some(token) = contents.next() {
             match token {
@@ -283,6 +284,7 @@ impl Object {
             use_snippets,
             functions,
             joins,
+            queries,
         }
     }
 

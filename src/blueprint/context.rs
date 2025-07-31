@@ -134,6 +134,7 @@ impl<'a> BlueprintExecutionContext<'a> {
         variables.insert("object_name".to_string(), obj.name.to_string());
         variables.insert("name".to_string(), field.name.to_string());
         variables.insert("type".to_string(), resolved_type.to_string());
+        variables.insert("type_raw".to_string(), field.field_type().to_string());
         flags.insert(
             "enum",
             matches!(
