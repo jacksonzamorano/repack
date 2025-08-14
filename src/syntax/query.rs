@@ -1,4 +1,4 @@
-use super::{FileContents, RepackError, RepackErrorKind, Token};
+use super::{FileContents, RepackError, RepackErrorKind, RepackStruct, Token};
 
 #[derive(Debug)]
 pub struct QueryArg {
@@ -88,5 +88,61 @@ impl Query {
             contents,
             ret_type,
         });
+    }
+
+    pub fn render(&self, strct: &RepackStruct) -> Result<String, RepackError> {
+        let mut output = String::new();
+
+        let mut pos_args: Vec<String> = Vec::new();
+
+        let mut buf = String::new();
+        let mut iter = self.contents.chars();
+        while let Some(c) = iter.next() {
+            if c != ' ' {
+                buf.push(c);
+                continue;
+            }
+            if c == ' ' && !buf.starts_with('$') {
+                output.push_str(&buf);
+                output.push(' ');
+                buf.clear();
+            }
+            // We know it's a variable - let's interpolate
+            let result = match &buf[1..] {
+                "table" => strct.table_name.clone(),
+                val => {
+                    if let Some(field) = strct.fields.iter().find(|x| x.name == val) {
+                        if let Some(location) = &field.field_location {
+                            let table = if location.location == "super" {
+                                strct.table_name.as_ref().unwrap()
+                            } else {
+                                &location.location
+                            };
+                            Some(format!("{}.{}", table, location.field))
+                        } else {
+                            Some(format!(
+                                "{}.{}",
+                                strct.table_name.as_ref().unwrap(),
+                                field.name
+                            ))
+                        }
+                    } else if let Some(arg) = self.args.iter().find(|x| x.name == val) {
+                        if let Some(idx) = pos_args.iter().position(|x| *x == arg.name) {
+                            Some(format!("${}", idx))
+                        } else {
+                            pos_args.push(arg.name.clone());
+                            let idx = pos_args.len() - 1;
+                            Some(format!("${}", idx))
+                        }
+                    } else {
+                        None
+                    }
+                }
+            };
+
+            output.push_str(&result.unwrap());
+        }
+
+        return Ok(output);
     }
 }

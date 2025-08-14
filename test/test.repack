@@ -19,8 +19,8 @@ struct User @users #model {
 	subscription_id string?
 
 
-	query UserByEmail(_email string) = "SELECT $fields FROM $table WHERE $email = $_email" : one
-	query UsersByType(_typ UserType) = "SELECT $fields FROM $table WHERE $user_type = $_typ" : many
+	query UserByEmail(_email string) = "SELECT $fields FROM $locations WHERE $email = $_email" : one
+	query UsersByType(_typ UserType) = "SELECT $fields FROM $locations WHERE $user_type = $_typ" : many
 	query DeleteUserById(_id uuid) = "DELETE FROM $table WHERE $id = $_id"
 }
 
