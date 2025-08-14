@@ -130,31 +130,22 @@ impl FileContents {
                     }
                 }
                 if !in_comment {
-                    match Token::from_byte_pair(byte, *iter.peek().unwrap_or(&b'0')) {
-                        Some(combined) => {
+                    match Token::from_byte(byte) {
+                        Some(token) => {
                             if !buf.is_empty() {
                                 self.contents.push(Token::from_string(&buf));
                                 buf.clear();
                             }
-                            self.contents.push(combined);
+                            self.contents.push(token);
                         }
-                        None => match Token::from_byte(byte) {
-                            Some(token) => {
-                                if !buf.is_empty() {
-                                    self.contents.push(Token::from_string(&buf));
-                                    buf.clear();
-                                }
-                                self.contents.push(token);
+                        None => {
+                            if !byte.is_ascii_whitespace() {
+                                buf.push(byte as char);
+                            } else if !buf.is_empty() {
+                                self.contents.push(Token::from_string(&buf));
+                                buf.clear();
                             }
-                            None => {
-                                if !byte.is_ascii_whitespace() {
-                                    buf.push(byte as char);
-                                } else if !buf.is_empty() {
-                                    self.contents.push(Token::from_string(&buf));
-                                    buf.clear();
-                                }
-                            }
-                        },
+                        }
                     }
                 } else if byte == b'\n' || byte == b'\r' {
                     in_comment = false;
