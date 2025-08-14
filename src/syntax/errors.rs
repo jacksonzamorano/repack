@@ -43,8 +43,7 @@ pub enum RepackErrorKind {
     ExtraConfigurationField,
     UnknownLink,
     UnknownObject,
-    QueryVariableDoesNotExist,
-    QueryFieldDoesNotExist,
+    QueryArgInvalidSyntax,
     QueryInvalidSyntax,
     SyntaxError,
     UnknownError,
@@ -93,10 +92,9 @@ impl RepackErrorKind {
                 "Attempted to resolve this dependancy but the object couldn't be found: "
             }
             Self::UnknownError => "An unknown error occured.",
-            Self::QueryVariableDoesNotExist => "Variable does not exist for query:",
-            Self::QueryFieldDoesNotExist => "Field does not exist for query:",
             Self::SyntaxError => "Error when parsing ",
             Self::QueryInvalidSyntax => "Invalid query syntax.",
+            Self::QueryArgInvalidSyntax => "Invalid query argument syntax.",
         }
     }
 }

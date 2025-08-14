@@ -22,16 +22,7 @@ pub enum Token {
     At,
     Colon,
     Semicolon,
-    LessThan,
-    LessThanOrEqual,
-    GreaterThan,
-    GreaterThanOrEqual,
-    NotEqual,
     Equal,
-    Set,
-    In,
-    Nil,
-    Not,
 
     Literal(String),
     OutputType,
@@ -80,23 +71,10 @@ impl Token {
             b'@' => Some(Token::At),
             b':' => Some(Token::Colon),
             b';' => Some(Token::Semicolon),
-            b'>' => Some(Token::GreaterThan),
-            b'<' => Some(Token::LessThan),
-            b'=' => Some(Token::Set),
             b'+' => Some(Token::Plus),
             b'-' => Some(Token::Minus),
             _ => None,
         }
-    }
-
-    pub fn from_byte_pair(byte: u8, next: u8) -> Option<Token> {
-        Some(match (byte, next) {
-            (b'>', b'=') => Token::GreaterThanOrEqual,
-            (b'<', b'=') => Token::LessThanOrEqual,
-            (b'!', b'=') => Token::NotEqual,
-            (b'=', b'=') => Token::Equal,
-            _ => return None,
-        })
     }
 
     pub fn to_char(&self) -> Option<char> {

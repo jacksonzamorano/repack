@@ -237,6 +237,13 @@ impl FileContents {
         }
     }
 
+    pub fn take_colon(&mut self) -> bool {
+        match self.take() {
+            Some(Token::Colon) => true,
+            _ => false,
+        }
+    }
+
     pub fn take_line(&mut self) -> String {
         let mut val = String::new();
         loop {
