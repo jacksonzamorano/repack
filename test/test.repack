@@ -1,3 +1,10 @@
+blueprint "debug.blueprint"
+output debug @test;
+output postgres @test;
+output go @test {
+	package main
+}
+
 snippet base {
 	id uuid db:pk
 	created_date datetime db:default("NOW()")
@@ -31,5 +38,9 @@ struct Token @tokens #model {
 }
 
 struct UserWithToken: User {
+	join(t Token) = "INNER JOIN $name ON $super.id = $t.user_id"
 	user_id super.id
+	token_value t.token_value
+
+	query UserToken(_id uuid) = "SELECT $fields FROM $locations WHERE $user_id = $_id" : many
 }

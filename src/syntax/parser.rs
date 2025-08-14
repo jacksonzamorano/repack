@@ -214,10 +214,7 @@ impl FileContents {
     }
 
     pub fn take_colon(&mut self) -> bool {
-        match self.take() {
-            Some(Token::Colon) => true,
-            _ => false,
-        }
+        matches!(self.take(), Some(Token::Colon))
     }
 
     /// Advances the parsing position by one without returning the token.

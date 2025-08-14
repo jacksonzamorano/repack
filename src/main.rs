@@ -18,23 +18,23 @@ impl Console {
     }
     fn update_ct(i: usize, n: usize, title: &str) {
         print!("\x1B[1A");
-        print!("\r\x1B[2K[{}/{}] {:<width$}\n", i, n, title, width = WIDTH);
+        print!("\r\x1B[2K[{i}/{n}] {title:<WIDTH$}\n");
         std::io::Write::flush(&mut std::io::stdout()).unwrap();
     }
     fn update_msg(msg: &str) {
-        print!("\r\x1B[2K  {:<width$}", msg, width = WIDTH);
+        print!("\r\x1B[2K  {msg:<WIDTH$}");
         std::io::Write::flush(&mut std::io::stdout()).unwrap();
     }
     fn finalize() {
         println!()
     }
     fn error(message: &str) {
-        print!("\n{}", message);
+        print!("\n{message}");
         std::io::Write::flush(&mut std::io::stdout()).unwrap();
     }
     fn ask_confirmation() -> bool {
         let mut input = String::new();
-        if let Err(_) = std::io::stdin().read_line(&mut input) {
+        if std::io::stdin().read_line(&mut input).is_err() {
             return false;
         }
         print!("\x1B[1A");
@@ -154,21 +154,21 @@ fn main() {
                     if !matches!(bp.kind, blueprint::BlueprintKind::Configure) {
                         return None;
                     }
-                    return Some(("Building", lng, bp));
+                    Some(("Building", lng, bp))
                 }
                 Behavior::Build => {
                     if !matches!(bp.kind, blueprint::BlueprintKind::Code) {
                         return None;
                     }
-                    return Some(("Building", lng, bp));
+                    Some(("Building", lng, bp))
                 }
                 Behavior::Document => {
                     if !matches!(bp.kind, blueprint::BlueprintKind::Document) {
                         return None;
                     }
-                    return Some(("Documenting", lng, bp));
+                    Some(("Documenting", lng, bp))
                 }
-                Behavior::Clean => return Some(("Cleaning", lng, bp)),
+                Behavior::Clean => Some(("Cleaning", lng, bp)),
             }
         })
         .collect::<Vec<_>>();

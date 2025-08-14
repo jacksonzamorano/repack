@@ -19,7 +19,7 @@ impl QueryArg {
                 query_name.to_string(),
             )
         })?;
-        return Ok(QueryArg { name, typ });
+        Ok(QueryArg { name, typ })
     }
 }
 
@@ -82,33 +82,128 @@ impl Query {
             }
         }
 
-        return Ok(Query {
+        Ok(Query {
             name,
             args,
             contents,
             ret_type,
-        });
+        })
     }
 
-    pub fn render(&self, strct: &RepackStruct) -> Result<String, RepackError> {
+    pub fn render(
+        &self,
+        strct: &RepackStruct,
+        other_structs: &[RepackStruct],
+    ) -> Result<String, RepackError> {
         let mut output = String::new();
 
         let mut pos_args: Vec<String> = Vec::new();
 
         let mut buf = String::new();
         let mut iter = self.contents.chars();
-        while let Some(c) = iter.next() {
-            if c != ' ' {
-                buf.push(c);
+        let mut ct = true;
+        loop {
+            if let Some(c) = iter.next() {
+                if c != ' ' {
+                    buf.push(c);
+                    continue;
+                }
+                if c == ' ' && !buf.starts_with('$') {
+                    output.push_str(&buf);
+                    output.push(' ');
+                    buf.clear();
+                }
+            } else {
+                ct = false
+            };
+            if buf.len() < 2 {
                 continue;
-            }
-            if c == ' ' && !buf.starts_with('$') {
-                output.push_str(&buf);
-                output.push(' ');
-                buf.clear();
             }
             // We know it's a variable - let's interpolate
             let result = match &buf[1..] {
+                "fields" => {
+                    let mut field_strings = Vec::<String>::new();
+                    for field in &strct.fields {
+                        if let Some(location) = &field.field_location {
+                            let table = if location.location == "super" {
+                                strct.table_name.as_ref().unwrap()
+                            } else {
+                                &location.location
+                            };
+                            field_strings
+                                .push(format!("{}.{} AS {}", table, location.field, field.name))
+                        } else {
+                            field_strings.push(format!(
+                                "{}.{} AS {}",
+                                strct.table_name.as_ref().unwrap(),
+                                field.name,
+                                field.name
+                            ))
+                        }
+                    }
+                    Some(field_strings.join(", "))
+                }
+                "locations" => {
+                    let mut locations = Vec::<String>::new();
+                    locations.push(strct.table_name.clone().unwrap());
+                    for join in &strct.joins {
+                        let mut join_string = String::new();
+                        let mut template_string_iter = join.contents.chars();
+                        let mut join_string_temp = String::new();
+                        let mut join_ct = true;
+                        let mut last_char = ' ';
+                        loop {
+                            if let Some(tc) = template_string_iter.next() {
+                                if tc == '$' || !join_string_temp.is_empty() {
+                                    if tc != ' ' && tc != '.' {
+                                        join_string_temp.push(tc);
+                                        continue;
+                                    }
+                                    last_char = tc;
+                                } else {
+                                    join_string.push(tc);
+                                    continue;
+                                }
+                            } else {
+                                join_ct = false
+                            }
+
+                            if join_string_temp.len() > 1 {
+                                let replace = match &join_string_temp[1..] {
+                                    "name" => {
+                                        let fe = other_structs
+                                            .iter()
+                                            .find(|x| x.name == join.foreign_entity)
+                                            .unwrap();
+                                        // ^ This is safe to unwrap because we've already done the
+                                        // checking.
+                                        Some(format!("{} {}", fe.table_name.clone().unwrap(), join.name))
+                                    }
+                                    "super" => Some(strct.table_name.clone().unwrap()),
+                                    tn => {
+                                        if tn == join.name {
+                                            Some(tn.to_string())
+                                        } else {
+                                            None
+                                        }
+                                    }
+                                };
+                                join_string_temp.clear();
+                                join_string.push_str(&replace.unwrap());
+                                if !join_ct {
+                                    break;
+                                }
+                                join_string.push(last_char);
+                            }
+
+                            if !join_ct {
+                                break;
+                            }
+                        }
+                        locations.push(join_string);
+                    }
+                    Some(locations.join(" "))
+                }
                 "table" => strct.table_name.clone(),
                 val => {
                     if let Some(field) = strct.fields.iter().find(|x| x.name == val) {
@@ -128,21 +223,27 @@ impl Query {
                         }
                     } else if let Some(arg) = self.args.iter().find(|x| x.name == val) {
                         if let Some(idx) = pos_args.iter().position(|x| *x == arg.name) {
-                            Some(format!("${}", idx))
+                            Some(format!("${}", idx + 1))
                         } else {
                             pos_args.push(arg.name.clone());
-                            let idx = pos_args.len() - 1;
-                            Some(format!("${}", idx))
+                            let idx = pos_args.len();
+                            Some(format!("${idx}"))
                         }
                     } else {
-                        None
+                        Some(format!("[err: {val}]"))
                     }
                 }
             };
+            buf.clear();
 
             output.push_str(&result.unwrap());
+            if !ct {
+                break;
+            }
+            output.push(' ');
         }
+        output.push(';');
 
-        return Ok(output);
+        Ok(output)
     }
 }

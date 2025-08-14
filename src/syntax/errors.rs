@@ -1,6 +1,6 @@
 use crate::blueprint::BlueprintSnippetDetails;
 
-use super::{Field, RepackStruct, Output};
+use super::{Field, Output, RepackStruct};
 
 /// Enumeration of all possible error types that can occur during schema processing.
 ///
@@ -11,24 +11,11 @@ use super::{Field, RepackStruct, Output};
 #[repr(u32)]
 pub enum RepackErrorKind {
     CircularDependancy,
-    RefFieldUnresolvable,
-    JoinFieldUnresolvable,
     ParentObjectDoesNotExist,
-    TableNameNotAllowed,
-    NoTableName,
-    CannotReuse,
-    CannotInherit,
-    NoFields,
-    ManyNotAllowed,
-    CustomTypeNotAllowed,
     CustomTypeNotDefined,
     TypeNotResolved,
     SnippetNotFound,
     DuplicateFieldNames,
-    UnknownExplicitJoin,
-    JoinObjectNotFound,
-    JoinFieldNotFound,
-    JoinNoTableName,
     CannotCreateContext,
     FunctionInvalidSyntax,
     TypeNotSupported,
@@ -38,15 +25,14 @@ pub enum RepackErrorKind {
     UnknownSnippet,
     VariableNotInScope,
     InvalidVariableModifier,
-    UnknownConfiguration,
-    MissingConfigurationField,
-    ExtraConfigurationField,
     UnknownLink,
     UnknownObject,
     QueryArgInvalidSyntax,
     QueryInvalidSyntax,
     InvalidSuper,
     FieldNotOnSuper,
+    InvalidJoin,
+    FieldNotOnJoin,
     SyntaxError,
     UnknownError,
 }
@@ -59,25 +45,12 @@ impl RepackErrorKind {
     pub fn as_string(&self) -> &'static str {
         match self {
             Self::CircularDependancy => "This definition creates a circular dependancy with:",
-            Self::RefFieldUnresolvable => "Could not resolve the 'ref' reference:",
-            Self::JoinFieldUnresolvable => "Could not resolve the 'from' reference:",
             Self::ParentObjectDoesNotExist => "Parent object couldn't be found:",
-            Self::TableNameNotAllowed => "Table name isn't allowed in this context.",
-            Self::NoTableName => "Table name is required in this context.",
-            Self::CannotReuse => "Reuse is not available in this context.",
-            Self::CannotInherit => "Inherit is not available in this context.",
-            Self::NoFields => "No fields were found in this object.",
-            Self::ManyNotAllowed => "Arrays aren't allowed in this context.",
-            Self::CustomTypeNotAllowed => "Custom types are not available in this context.",
             Self::TypeNotSupported => "Type is not allowed:",
             Self::CustomTypeNotDefined => "The custom type cannot be resolved:",
             Self::TypeNotResolved => "This type couldn't be resolved.",
             Self::SnippetNotFound => "Expected to use snippet, but it couldn't be found:",
             Self::DuplicateFieldNames => "A field already exists with this name.",
-            Self::UnknownExplicitJoin => "Unknown explicit join:",
-            Self::JoinObjectNotFound => "Tried to join but the object was not found:",
-            Self::JoinFieldNotFound => "Tried to join but the field was not found:",
-            Self::JoinNoTableName => "Table name is required in a join, this entity does not: ",
             Self::CannotCreateContext => "Cannot create a context:",
             Self::FunctionInvalidSyntax => "Function syntax is not vaild:",
             Self::CannotRead => "Cannot read the file:",
@@ -85,10 +58,7 @@ impl RepackErrorKind {
             Self::SnippetNotClosed => "Block was not closed:",
             Self::VariableNotInScope => "Variable was not found in scope:",
             Self::InvalidVariableModifier => "Unknown variable modifier specified:",
-            Self::UnknownConfiguration => "Unknown configuration:",
             Self::UnknownSnippet => "Specified snippet does not exist:",
-            Self::MissingConfigurationField => "Expected configuration field but it wasn't found:",
-            Self::ExtraConfigurationField => "An extra configuration field was found:",
             Self::UnknownLink => "Requested import but no link was defined for ",
             Self::UnknownObject => {
                 "Attempted to resolve this dependancy but the object couldn't be found: "
@@ -99,6 +69,8 @@ impl RepackErrorKind {
             Self::QueryArgInvalidSyntax => "Invalid query argument syntax.",
             Self::InvalidSuper => "Cannot use super without an inheritance.",
             Self::FieldNotOnSuper => "Field does not exist in this super.",
+            Self::InvalidJoin => "Joined entity not found.",
+            Self::FieldNotOnJoin => "Field does not exist in this join.",
         }
     }
 }
@@ -179,7 +151,11 @@ impl RepackError {
         }
     }
 
-    pub fn from_obj_with_msg(error: RepackErrorKind, obj: &RepackStruct, msg: String) -> RepackError {
+    pub fn from_obj_with_msg(
+        error: RepackErrorKind,
+        obj: &RepackStruct,
+        msg: String,
+    ) -> RepackError {
         RepackError {
             error,
             specifier: format!(" ({})", obj.name),
@@ -231,7 +207,11 @@ impl RepackError {
     }
 
     #[allow(dead_code)]
-    pub fn from_lang_with_obj(error: RepackErrorKind, lang: &Output, obj: &RepackStruct) -> RepackError {
+    pub fn from_lang_with_obj(
+        error: RepackErrorKind,
+        lang: &Output,
+        obj: &RepackStruct,
+    ) -> RepackError {
         RepackError {
             error,
             specifier: format!(" ({} -> {})", lang.profile, obj.name),

@@ -86,6 +86,7 @@ pub enum SnippetSecondaryTokenName {
 
     Join,
     Arg,
+    Query,
 
     Arbitrary(String),
 }
@@ -105,6 +106,7 @@ impl SnippetSecondaryTokenName {
             "join" => Self::Join,
             "arg" => Self::Arg,
             "debug" => Self::Debug,
+            "query" => Self::Query,
             _ => Self::Arbitrary(val.to_string()),
         }
     }

@@ -10,6 +10,7 @@
 [define datetime]time.Time[/define]
 [link uuid]import "github.com/google/uuid"[/link]
 [link datetime]import "time"[/link]
+[link sql]import "database/sql"[/link]
 
 [file]model.go[/file]
 package [package];
@@ -31,5 +32,11 @@ type [name] struct {
 	[each field][br]
 	[name.titlecase] [if optional]*[/if][if array]\[][/if][type] `json:"[name]"`
 	[/each][br]
+}
+
+[each query][br]
+[import sql]
+func [name](db *sql.DB, [each arg][name] [type][if sep],[/if][/each]) {
+	rows, err := db.Query("[query]", [each arg][name][/each])
 }
 [/each]

@@ -5,6 +5,59 @@ use super::{
     query::Query,
 };
 
+#[derive(Debug)]
+pub struct RepackStructJoin {
+    pub name: String,
+    pub contents: String,
+    pub foreign_entity: String,
+}
+impl RepackStructJoin {
+    pub fn parse(contents: &mut FileContents) -> Result<RepackStructJoin, RepackError> {
+        if !matches!(contents.take(), Some(Token::OpenParen)) {
+            return Err(RepackError::global(
+                RepackErrorKind::SyntaxError,
+                "Expected to get a join descriptor.".to_string(),
+            ));
+        }
+        let Some(name) = contents.take_literal() else {
+            return Err(RepackError::global(
+                RepackErrorKind::SyntaxError,
+                "Expected to get a join name.".to_string(),
+            ));
+        };
+        let Some(foreign_entity) = contents.take_literal() else {
+            return Err(RepackError::global(
+                RepackErrorKind::SyntaxError,
+                "Expected to get a join foreign entity.".to_string(),
+            ));
+        };
+        if !matches!(contents.take(), Some(Token::CloseParen)) {
+            return Err(RepackError::global(
+                RepackErrorKind::SyntaxError,
+                "Expected to close the join descriptor.".to_string(),
+            ));
+        }
+        if !matches!(contents.take(), Some(Token::Equal)) {
+            return Err(RepackError::global(
+                RepackErrorKind::SyntaxError,
+                "Expected an '=' to mark the start of a join predicate.".to_string(),
+            ));
+        }
+        let Some(contents) = contents.take_literal() else {
+            return Err(RepackError::global(
+                RepackErrorKind::SyntaxError,
+                "Expected to get a join query.".to_string(),
+            ));
+        };
+
+        Ok(RepackStructJoin {
+            name,
+            contents,
+            foreign_entity,
+        })
+    }
+}
+
 /// Represents a complete object definition in the schema system.
 ///
 /// Object is the core building block of the schema, containing all the metadata
@@ -33,6 +86,7 @@ pub struct RepackStruct {
     /// These generate additional methods in the target language classes.
     pub functions: Vec<ObjectFunction>,
     pub queries: Vec<Query>,
+    pub joins: Vec<RepackStructJoin>,
 }
 impl RepackStruct {
     /// Parses an Object definition from the input file contents.
@@ -66,6 +120,7 @@ impl RepackStruct {
         let mut use_snippets = Vec::new();
         let mut functions = Vec::new();
         let mut queries = Vec::new();
+        let mut joins = Vec::new();
 
         'header: while let Some(token) = contents.next() {
             match token {
@@ -104,21 +159,21 @@ impl RepackStruct {
                             {
                                 functions.push(func);
                             }
+                        } else if let Some(field) = Field::from_contents(lit.to_string(), contents) {
+                            fields.push(field);
                         } else {
-                            if let Some(field) = Field::from_contents(lit.to_string(), contents) {
-                                fields.push(field);
-                            } else {
-                                panic!("Cannot parse field in {}", name);
-                            }
+                            panic!("Cannot parse field in {name}");
                         }
                     }
                 }
-                Token::Query => {
-                    match Query::parse(&name, contents) {
-                        Ok(q) => queries.push(q),
-                        Err(e) => panic!("{:?}", e)
-                    }
-                }
+                Token::Join => match RepackStructJoin::parse(contents) {
+                    Ok(j) => joins.push(j),
+                    Err(e) => panic!("{}", e.into_string()),
+                },
+                Token::Query => match Query::parse(&name, contents) {
+                    Ok(q) => queries.push(q),
+                    Err(e) => panic!("{}", e.into_string()),
+                },
                 Token::Exclamation => {
                     if let Some(Token::Literal(snippet_name)) = contents.take() {
                         use_snippets.push(snippet_name);
@@ -137,6 +192,7 @@ impl RepackStruct {
             use_snippets,
             functions,
             queries,
+            joins,
         }
     }
 

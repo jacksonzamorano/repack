@@ -1,0 +1,26 @@
+[meta id]debug[/meta]
+[meta name]Testing for Development[/meta]
+
+[define int32]32-bit integer[/define]
+[define int64]64-bit integer[/define]
+[define datetime]Timestamp[/define]
+[define string]String[/define]
+[define boolean]Boolean[/define]
+[define uuid]UUID v4[/define]
+
+[file]debug.md[/file]
+
+[each object]
+# [name]
+[br][br]
+## Queries
+[br][each query]
+### [name][br]
+#### Query:
+`[query]`[br]
+#### Arguments:
+[each arg][br]
+- [name]: [type]
+[/each][br]
+[/each]
+[br][/each]

@@ -25,3 +25,4 @@ pub use result::ParseResult;
 pub use snippet::*;
 pub use tokens::*;
 pub use types::*;
+pub use query::*;

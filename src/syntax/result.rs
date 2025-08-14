@@ -151,14 +151,14 @@ impl ParseResult {
             }
 
             while field_idx < objects[object_idx].fields.len() {
-                dbg!(&objects[object_idx].fields[field_idx]);
                 if let Some(ext) = &objects[object_idx].fields[field_idx].field_location {
                     // This comes from a join or a super.
                     if ext.location == "super" {
                         let Some(sup) = &objects[object_idx].inherits else {
-                            errors.push(RepackError::from_obj(
+                            errors.push(RepackError::from_field(
                                 RepackErrorKind::InvalidSuper,
                                 &objects[object_idx],
+                                &objects[object_idx].fields[field_idx],
                             ));
                             field_idx += 1;
                             continue;
@@ -180,7 +180,47 @@ impl ParseResult {
                         objects[object_idx].fields[field_idx].field_type =
                             objects[sup_idx].fields[*foreign_pos].field_type.clone();
                     } else {
-                        // TODO: Resolve JOIN!
+                        let Some(join_idx) = &objects[object_idx]
+                            .joins
+                            .iter()
+                            .position(|x| x.name == ext.location)
+                        else {
+                            errors.push(RepackError::from_field(
+                                RepackErrorKind::InvalidJoin,
+                                &objects[object_idx],
+                                &objects[object_idx].fields[field_idx],
+                            ));
+                            field_idx += 1;
+                            continue;
+                        };
+                        let Some(joined_entity_idx) = &objects.iter().position(|x| {
+                            x.name == objects[object_idx].joins[*join_idx].foreign_entity
+                        }) else {
+                            errors.push(RepackError::from_field(
+                                RepackErrorKind::InvalidJoin,
+                                &objects[object_idx],
+                                &objects[object_idx].fields[field_idx],
+                            ));
+                            field_idx += 1;
+                            continue;
+                        };
+                        let Some(joined_field_idx) = &objects[*joined_entity_idx]
+                            .fields
+                            .iter()
+                            .position(|x| x.name == ext.field)
+                        else {
+                            errors.push(RepackError::from_field(
+                                RepackErrorKind::FieldNotOnJoin,
+                                &objects[object_idx],
+                                &objects[object_idx].fields[field_idx],
+                            ));
+                            field_idx += 1;
+                            continue;
+                        };
+                        objects[object_idx].fields[field_idx].field_type =
+                            objects[*joined_entity_idx].fields[*joined_field_idx]
+                                .field_type
+                                .clone();
                     }
                 } else {
                     // This is just a custom type, let's resolve it.

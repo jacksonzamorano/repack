@@ -1,8 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::syntax::{
-    RepackEnum, RepackEnumCase, Field, FieldType, RepackStruct, Output, RepackError,
-    RepackErrorKind,
+    CoreType, Field, FieldType, Output, ParseResult, Query, QueryArg, RepackEnum, RepackEnumCase,
+    RepackError, RepackErrorKind, RepackStruct,
 };
 
 use super::{Blueprint, SnippetMainTokenName, SnippetSecondaryTokenName};
@@ -30,7 +30,7 @@ impl TokenConsumer for String {
     fn import_point(&mut self) {}
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub(crate) struct BlueprintExecutionContext<'a> {
     pub variables: HashMap<String, String>,
     pub flags: HashMap<&'a str, bool>,
@@ -38,6 +38,7 @@ pub(crate) struct BlueprintExecutionContext<'a> {
     pub field: Option<&'a Field>,
     pub enm: Option<&'a RepackEnum>,
     pub func_args: Option<&'a Vec<String>>,
+    pub query: Option<&'a Query>,
 }
 impl<'a> BlueprintExecutionContext<'a> {
     pub fn new() -> BlueprintExecutionContext<'a> {
@@ -48,6 +49,7 @@ impl<'a> BlueprintExecutionContext<'a> {
             field: None,
             enm: None,
             func_args: None,
+            query: None,
         }
     }
     pub fn with_object(&self, obj: &'a RepackStruct) -> Self {
@@ -62,9 +64,7 @@ impl<'a> BlueprintExecutionContext<'a> {
             variables,
             flags,
             object: Some(obj),
-            field: None,
-            enm: None,
-            func_args: None,
+            ..Default::default()
         }
     }
     pub fn with_field(
@@ -122,9 +122,56 @@ impl<'a> BlueprintExecutionContext<'a> {
             flags,
             object: Some(obj),
             field: Some(field),
-            enm: None,
-            func_args: None,
+            ..Default::default()
         })
+    }
+    pub fn with_query(
+        &self,
+        obj: &'a RepackStruct,
+        q: &'a Query,
+        result: &'a ParseResult,
+    ) -> Result<Self, RepackError> {
+        let mut new = self.clone();
+        new.variables
+            .insert("query".to_string(), q.render(obj, &result.objects)?);
+        new.variables.insert("name".to_string(), q.name.to_string());
+        new.query = Some(q);
+
+        Ok(new)
+    }
+    pub fn with_query_arg(
+        &self,
+        arg: &'a QueryArg,
+        blueprint: &'a Blueprint,
+        writer: &mut dyn TokenConsumer,
+    ) -> Result<Self, RepackError> {
+        let mut new = self.clone();
+        new.variables.insert("name".to_string(), arg.name.to_string());
+        let resolved_type = match CoreType::from_string(&arg.typ) {
+            Some(typ) => {
+                if let Some(link) = blueprint.links.get(&typ.to_string()) {
+                    writer.import(link.replace("$", &typ.to_string()))
+                }
+                blueprint
+                    .utilities
+                    .get(&(
+                        SnippetMainTokenName::TypeDef,
+                        SnippetSecondaryTokenName::from_type(&typ),
+                    ))
+                    .ok_or_else(|| {
+                        RepackError::global(RepackErrorKind::TypeNotSupported, typ.to_string())
+                    })?
+            }
+            None => {
+                if let Some(link) = blueprint.links.get("custom") {
+                    writer.import(link.replace("$", &arg.typ))
+                }
+                &arg.typ
+            }
+        };
+        new.variables.insert("type".to_string(), resolved_type.to_string());
+
+        Ok(new)
     }
     pub fn with_enum(&self, enm: &'a RepackEnum) -> Result<Self, RepackError> {
         let mut variables = self.variables.clone();
@@ -132,13 +179,15 @@ impl<'a> BlueprintExecutionContext<'a> {
         Ok(Self {
             variables,
             flags: HashMap::new(),
-            object: None,
-            field: None,
             enm: Some(enm),
-            func_args: None,
+            ..Default::default()
         })
     }
-    pub fn with_enum_case(&self, enm: &'a RepackEnum, val: &'a RepackEnumCase) -> Result<Self, RepackError> {
+    pub fn with_enum_case(
+        &self,
+        enm: &'a RepackEnum,
+        val: &'a RepackEnumCase,
+    ) -> Result<Self, RepackError> {
         let mut variables = HashMap::new();
         let flags = HashMap::new();
 
@@ -152,10 +201,7 @@ impl<'a> BlueprintExecutionContext<'a> {
         Ok(Self {
             variables,
             flags,
-            object: None,
-            field: None,
-            enm: None,
-            func_args: None,
+            ..Default::default()
         })
     }
     pub fn with_func_args(&self, args: &'a Vec<String>) -> Result<Self, RepackError> {

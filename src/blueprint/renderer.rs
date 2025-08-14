@@ -229,6 +229,19 @@ impl<'a> BlueprintRenderer<'a> {
                             })
                             .collect()
                     }
+                    SnippetSecondaryTokenName::Query => {
+                        let Some(obj) = context.object else {
+                            return Err(RepackError::from_lang_with_msg(
+                                RepackErrorKind::CannotCreateContext,
+                                self.config,
+                                "field in non-object context.".to_string(),
+                            ));
+                        };
+                        obj.queries
+                            .iter()
+                            .map(|field| context.with_query(obj, field, self.parse_result))
+                            .collect()
+                    }
                     SnippetSecondaryTokenName::Enum => self
                         .parse_result
                         .included_enums(&self.config.categories, &self.config.exclude)
@@ -249,14 +262,21 @@ impl<'a> BlueprintRenderer<'a> {
                             .collect()
                     }
                     SnippetSecondaryTokenName::Arg => {
-                        let Some(args) = context.func_args else {
+                        if let Some(args) = context.func_args {
+                            args.iter().map(|x| context.with_func_arg(x)).collect()
+                        } else if let Some(query) = context.query {
+                            query
+                                .args
+                                .iter()
+                                .map(|x| context.with_query_arg(x, self.blueprint, writer))
+                                .collect()
+                        } else {
                             return Err(RepackError::from_lang_with_msg(
                                 RepackErrorKind::CannotCreateContext,
                                 self.config,
                                 "args in non-func context".to_string(),
                             ));
-                        };
-                        args.iter().map(|x| context.with_func_arg(x)).collect()
+                        }
                     }
                     _ => {
                         return Err(RepackError::from_lang_with_msg(
@@ -373,7 +393,7 @@ impl<'a> BlueprintRenderer<'a> {
             }
             SnippetMainTokenName::Exec => {
                 let mut exec_reader = String::new();
-                self.render_tokens(content.contents, &context, &mut exec_reader)?;
+                self.render_tokens(content.contents, context, &mut exec_reader)?;
                 Console::update_msg(&format!(
                     "{} would like to run a command. [y/N]",
                     self.blueprint.name
@@ -421,9 +441,7 @@ impl<'a> BlueprintRenderer<'a> {
             }
             SnippetMainTokenName::Render => {
                 let mut snippet_name = String::new();
-                if let Err(val) = self.render_tokens(content.contents, context, &mut snippet_name) {
-                    return Err(val);
-                }
+                self.render_tokens(content.contents, context, &mut snippet_name)?;
                 if let Some(snippet) = self.blueprint.snippets.get(&snippet_name) {
                     writer.write(snippet);
                 } else {

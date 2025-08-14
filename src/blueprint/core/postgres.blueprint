@@ -14,12 +14,7 @@
 BEGIN;[br]
 
 [eachr object]
-[if record][br]
 DROP TABLE IF EXISTS [table_name];
-[/if]
-[if syn][br]
-DROP VIEW IF EXISTS [name];
-[/if]
 [/eachr]
 
 [each enum][br]
@@ -31,7 +26,6 @@ CREATE TYPE [name] AS ENUM([each case]'[value]'[if sep], [/if][/each]);
 [/each]
 
 [each object]
-[if record][br][br]
 CREATE TABLE [table_name] (
 [each field][br]
 	[name] [type][ifn optional] NOT NULL[/ifn][func db.default] DEFAULT [0][/func]
@@ -46,19 +40,5 @@ CREATE TABLE [table_name] (
 [/each][br]
 );
 [func db.index][br]CREATE INDEX ON [table_name] ([each arg][arg][if sep], [/if][/each]);[/func]
-[/if]
-
-[if syn][br][br]
-CREATE VIEW [name] AS
-SELECT
-[each field][br]
-	[ref_table].[ref_field] AS [name][if sep],[/if]
-[/each][br]
-FROM [table_name]
-[each join][br]
-INNER JOIN [ref_table] [name] ON [local_entity].[local_field] = [name].[ref_field]
-[/each];
-[/if]
-[/each]
-
+[br][br][/each]
 [br][br]COMMIT;
