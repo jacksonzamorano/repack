@@ -26,8 +26,6 @@ pub enum Token {
 
     Literal(String),
     OutputType,
-    RecordType,
-    SyntheticType,
     StructType,
     SnippetType,
     EnumType,
@@ -111,12 +109,7 @@ impl Token {
     /// A Token representing either a keyword or a literal string
     pub fn from_string(string: &str) -> Token {
         match string.trim() {
-            "not" => Token::Not,
-            "nil" => Token::Nil,
-            "in" => Token::In,
             "output" => Token::OutputType,
-            "record" => Token::RecordType,
-            "synthetic" => Token::SyntheticType,
             "struct" => Token::StructType,
             "where" => Token::Where,
             "import" => Token::Import,
