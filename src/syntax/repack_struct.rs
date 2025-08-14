@@ -117,19 +117,6 @@ impl RepackStruct {
                         }
                     }
                 }
-                Token::Star => {
-                    reuse_all = true;
-                }
-                Token::Plus => {
-                    if let Some(Token::Literal(lit)) = contents.next() {
-                        reuse_include.push(lit.to_string());
-                    }
-                }
-                Token::Minus => {
-                    if let Some(Token::Literal(lit)) = contents.next() {
-                        reuse_exclude.push(lit.to_string());
-                    }
-                }
                 Token::Exclamation => {
                     if let Some(Token::Literal(snippet_name)) = contents.take() {
                         use_snippets.push(snippet_name);

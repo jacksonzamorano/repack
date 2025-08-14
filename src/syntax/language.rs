@@ -75,11 +75,6 @@ impl Output {
         if !empty {
             while let Some(token) = contents.next() {
                 match token {
-                    Token::Minus => {
-                        if let Some(Token::Literal(lit)) = contents.next() {
-                            exclude.push(lit.to_string());
-                        }
-                    }
                     Token::Literal(lit) => {
                         let key = lit.to_string();
                         let value = match contents.next() {

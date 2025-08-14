@@ -14,18 +14,24 @@ pub enum Token {
     Period,
     Comma,
     Plus,
+    Minus,
     Pound,
     NewLine,
     Question,
-    Star,
     Exclamation,
     At,
     Colon,
-    Minus,
     Semicolon,
-    Ampersand,
-    Equals,
-    Hat,
+    LessThan,
+    LessThanOrEqual,
+    GreaterThan,
+    GreaterThanOrEqual,
+    NotEqual,
+    Equal,
+    Set,
+    In,
+    Nil,
+    Not,
 
     Literal(String),
     OutputType,
@@ -39,6 +45,11 @@ pub enum Token {
     With,
     Blueprint,
     Query,
+    Insert,
+    Except,
+    Update,
+    One,
+    Many,
 }
 impl Token {
     /// Converts a single byte character into a Token if it matches a known symbol.
@@ -62,22 +73,53 @@ impl Token {
             b'}' => Some(Token::CloseBrace),
             b'.' => Some(Token::Period),
             b',' => Some(Token::Comma),
-            b'+' => Some(Token::Plus),
             b'#' => Some(Token::Pound),
             b'?' => Some(Token::Question),
             b'\n' => Some(Token::NewLine),
-            b'*' => Some(Token::Star),
             b'!' => Some(Token::Exclamation),
             b'@' => Some(Token::At),
             b':' => Some(Token::Colon),
-            b'-' => Some(Token::Minus),
             b';' => Some(Token::Semicolon),
-            b'&' => Some(Token::Ampersand),
-            b'=' => Some(Token::Equals),
-            b'^' => Some(Token::Hat),
+            b'>' => Some(Token::GreaterThan),
+            b'<' => Some(Token::LessThan),
+            b'=' => Some(Token::Set),
+            b'+' => Some(Token::Plus),
+            b'-' => Some(Token::Minus),
             _ => None,
         }
     }
+
+    pub fn from_byte_pair(byte: u8, next: u8) -> Option<Token> {
+        Some(match (byte, next) {
+            (b'>', b'=') => Token::GreaterThanOrEqual,
+            (b'<', b'=') => Token::LessThanOrEqual,
+            (b'!', b'=') => Token::NotEqual,
+            (b'=', b'=') => Token::Equal,
+            _ => return None,
+        })
+    }
+
+    pub fn to_char(&self) -> Option<char> {
+        match self {
+            Self::OpenParen => Some('('),
+            Self::CloseParen => Some(')'),
+            Self::OpenBracket => Some('['),
+            Self::CloseBracket => Some(']'),
+            Self::OpenBrace => Some('{'),
+            Self::CloseBrace => Some('}'),
+            Self::Period => Some('.'),
+            Self::Comma => Some(','),
+            Self::Pound => Some('#'),
+            Self::Question => Some('?'),
+            Self::NewLine => Some('\n'),
+            Self::Exclamation => Some('!'),
+            Self::At => Some('@'),
+            Self::Colon => Some(':'),
+            Self::Equal => Some('='),
+            _ => None,
+        }
+    }
+
     /// Converts a string into a Token, checking for keywords first.
     ///
     /// This method recognizes schema keywords (like "record", "enum", "output")
@@ -91,6 +133,9 @@ impl Token {
     /// A Token representing either a keyword or a literal string
     pub fn from_string(string: &str) -> Token {
         match string.trim() {
+            "not" => Token::Not,
+            "nil" => Token::Nil,
+            "in" => Token::In,
             "output" => Token::OutputType,
             "record" => Token::RecordType,
             "synthetic" => Token::SyntheticType,
@@ -102,6 +147,11 @@ impl Token {
             "with" => Token::With,
             "blueprint" => Token::Blueprint,
             "query" => Token::Query,
+            "insert" => Token::Insert,
+            "update" => Token::Update,
+            "except" => Token::Except,
+            "one" => Token::One,
+            "many" => Token::Many,
 
             _ => Token::Literal(string.trim().to_string()),
         }

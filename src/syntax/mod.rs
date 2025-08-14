@@ -1,8 +1,8 @@
 mod dependancies;
 mod errors;
-mod funclike;
 mod language;
 mod parser;
+mod query;
 mod repack_enum;
 mod repack_field;
 mod repack_field_function;

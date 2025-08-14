@@ -19,25 +19,18 @@ struct User @users #model {
 	subscription_id string?
 
 
-	query UserByEmail(emails: string[]) {
-		list
-		filter email in $emails
-		sortd last_login
-	}
+	query UserByEmail(_email string) = "SELECT $fields FROM $table WHERE $email = $_email" -> item
+	query UsersByType(_typ UserType) = "SELECT $fields FROM $table WHERE $user_type = $_typ" -> list
+	query DeleteUserById(_id uuid) = "DELETE FROM $table WHERE $id = $_id"
 
+	insert SaveUser except (last_login, subscription_id)
+	update UpdateUserLogin (last_login)
 }
-
-aggregate UserCount User {
-	count count(id)
-
-	query UserCountByType(type: UserType) {
-		list
-		filter user_type = $type
-	}
-}
-
 
 struct Token @tokens #model {
 	!base
 	user_id uuid ref(User.id)
+	token_value uuid
+
+	insert (user_id, token_value)
 }

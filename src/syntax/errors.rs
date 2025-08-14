@@ -46,6 +46,7 @@ pub enum RepackErrorKind {
     QueryVariableDoesNotExist,
     QueryFieldDoesNotExist,
     QueryInvalidSyntax,
+    SyntaxError,
     UnknownError,
 }
 impl Default for RepackErrorKind {
@@ -94,6 +95,7 @@ impl RepackErrorKind {
             Self::UnknownError => "An unknown error occured.",
             Self::QueryVariableDoesNotExist => "Variable does not exist for query:",
             Self::QueryFieldDoesNotExist => "Field does not exist for query:",
+            Self::SyntaxError => "Error when parsing ",
             Self::QueryInvalidSyntax => "Invalid query syntax.",
         }
     }
