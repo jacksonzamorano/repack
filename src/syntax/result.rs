@@ -1,6 +1,6 @@
 use super::{
-    CustomFieldType, RepackEnum, FieldType, FileContents, RepackStruct,
-    Output, RepackError, RepackErrorKind, Snippet, Token, dependancies::graph_valid, language,
+    CustomFieldType, FieldType, FileContents, Output, RepackEnum, RepackError, RepackErrorKind,
+    RepackStruct, Snippet, Token, dependancies::graph_valid, language,
 };
 
 /// Represents the complete parsed schema with all defined entities and configurations.
@@ -147,36 +147,55 @@ impl ParseResult {
                     object_idx += 1;
                     continue;
                 };
-
-                let copy = objects[parent_obj_idx].fields.clone();
-                if objects[object_idx].reuse_all {
-                    for c in copy {
-                        if !objects[object_idx].reuse_exclude.contains(&c.name) {
-                            objects[object_idx].fields.push(c);
-                        }
-                    }
-                } else {
-                    for c in copy {
-                        if objects[object_idx].reuse_include.contains(&c.name) {
-                            objects[object_idx].fields.push(c);
-                        }
-                    }
-                }
                 objects[object_idx].table_name = objects[parent_obj_idx].table_name.clone();
             }
 
             while field_idx < objects[object_idx].fields.len() {
-                let lookup_name = &objects[object_idx].fields[field_idx].field_type_string;
-                if objects.iter().any(|obj| obj.name == *lookup_name) {
-                    objects[object_idx].fields[field_idx].field_type = Some(FieldType::Custom(
-                        lookup_name.clone(),
-                        CustomFieldType::Object,
-                    ));
-                } else if enums.iter().any(|en| en.name == *lookup_name) {
-                    objects[object_idx].fields[field_idx].field_type = Some(FieldType::Custom(
-                        lookup_name.clone(),
-                        CustomFieldType::Enum,
-                    ));
+                dbg!(&objects[object_idx].fields[field_idx]);
+                if let Some(ext) = &objects[object_idx].fields[field_idx].field_location {
+                    // This comes from a join or a super.
+                    if ext.location == "super" {
+                        let Some(sup) = &objects[object_idx].inherits else {
+                            errors.push(RepackError::from_obj(
+                                RepackErrorKind::InvalidSuper,
+                                &objects[object_idx],
+                            ));
+                            field_idx += 1;
+                            continue;
+                        };
+                        let sup_idx = objects.iter().position(|x| x.name == *sup).unwrap();
+                        let Some(foreign_pos) = &objects[sup_idx]
+                            .fields
+                            .iter()
+                            .position(|x| x.name == ext.field)
+                        else {
+                            errors.push(RepackError::from_field(
+                                RepackErrorKind::InvalidSuper,
+                                &objects[object_idx],
+                                &objects[object_idx].fields[field_idx],
+                            ));
+                            field_idx += 1;
+                            continue;
+                        };
+                        objects[object_idx].fields[field_idx].field_type =
+                            objects[sup_idx].fields[*foreign_pos].field_type.clone();
+                    } else {
+                        // TODO: Resolve JOIN!
+                    }
+                } else {
+                    // This is just a custom type, let's resolve it.
+                    let lookup_name = &objects[object_idx].fields[field_idx].field_type_string;
+                    if objects.iter().any(|obj| obj.name == *lookup_name) {
+                        objects[object_idx].fields[field_idx].field_type = Some(FieldType::Custom(
+                            lookup_name.clone(),
+                            CustomFieldType::Object,
+                        ));
+                    } else if enums.iter().any(|en| en.name == *lookup_name) {
+                        objects[object_idx].fields[field_idx].field_type = Some(FieldType::Custom(
+                            lookup_name.clone(),
+                            CustomFieldType::Enum,
+                        ));
+                    }
                 }
                 // Ensure types are resolved
                 if let Some(FieldType::Custom(object_name, _)) =
@@ -234,7 +253,11 @@ impl ParseResult {
     ///
     /// # Returns
     /// A vector of object references that match the filtering criteria
-    pub fn included_objects(&self, categories: &[String], excludes: &[String]) -> Vec<&RepackStruct> {
+    pub fn included_objects(
+        &self,
+        categories: &[String],
+        excludes: &[String],
+    ) -> Vec<&RepackStruct> {
         self.objects
             .iter()
             .filter(|obj| {

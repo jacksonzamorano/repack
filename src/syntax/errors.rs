@@ -45,6 +45,8 @@ pub enum RepackErrorKind {
     UnknownObject,
     QueryArgInvalidSyntax,
     QueryInvalidSyntax,
+    InvalidSuper,
+    FieldNotOnSuper,
     SyntaxError,
     UnknownError,
 }
@@ -95,6 +97,8 @@ impl RepackErrorKind {
             Self::SyntaxError => "Error when parsing ",
             Self::QueryInvalidSyntax => "Invalid query syntax.",
             Self::QueryArgInvalidSyntax => "Invalid query argument syntax.",
+            Self::InvalidSuper => "Cannot use super without an inheritance.",
+            Self::FieldNotOnSuper => "Field does not exist in this super.",
         }
     }
 }

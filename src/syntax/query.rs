@@ -1,5 +1,6 @@
 use super::{FileContents, RepackError, RepackErrorKind, Token};
 
+#[derive(Debug)]
 pub struct QueryArg {
     pub name: String,
     pub typ: String,
@@ -12,12 +13,6 @@ impl QueryArg {
                 query_name.to_string(),
             )
         })?;
-        if !reader.take_colon() {
-            return Err(RepackError::global(
-                RepackErrorKind::QueryArgInvalidSyntax,
-                name.to_string(),
-            ));
-        }
         let typ = reader.take_literal().ok_or_else(|| {
             RepackError::global(
                 RepackErrorKind::QueryArgInvalidSyntax,
@@ -28,12 +23,14 @@ impl QueryArg {
     }
 }
 
+#[derive(Debug)]
 pub enum QueryReturn {
     None,
     One,
     Many,
 }
 
+#[derive(Debug)]
 pub struct Query {
     pub name: String,
     pub args: Vec<QueryArg>,
@@ -41,7 +38,7 @@ pub struct Query {
     pub ret_type: QueryReturn,
 }
 impl Query {
-    fn parse(obj_name: &str, reader: &mut FileContents) -> Result<Query, RepackError> {
+    pub fn parse(obj_name: &str, reader: &mut FileContents) -> Result<Query, RepackError> {
         let name = reader.take_literal().ok_or_else(|| {
             RepackError::global(RepackErrorKind::QueryInvalidSyntax, obj_name.to_string())
         })?;
@@ -53,12 +50,17 @@ impl Query {
                     Some(Token::Literal(_)) => {
                         args.push(QueryArg::parse(&name, reader)?);
                     }
-                    Some(Token::CloseParen) => break,
-                    _ => {}
+                    Some(Token::CloseParen) => {
+                        reader.skip();
+                        break;
+                    }
+                    _ => {
+                        reader.skip();
+                    }
                 }
             }
         }
-        if !matches!(reader.peek(), Some(Token::Equal)) {
+        if !matches!(reader.take(), Some(Token::Equal)) {
             return Err(RepackError::global(
                 RepackErrorKind::QueryInvalidSyntax,
                 obj_name.to_string(),

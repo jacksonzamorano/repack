@@ -10,7 +10,7 @@ enum UserType #model {
 }
 
 struct User @users #model {
-	snippet:base
+	!base
 
 	last_login datetime?
 	name string
@@ -19,18 +19,17 @@ struct User @users #model {
 	subscription_id string?
 
 
-	query UserByEmail(_email string) = "SELECT $fields FROM $table WHERE $email = $_email" -> item
-	query UsersByType(_typ UserType) = "SELECT $fields FROM $table WHERE $user_type = $_typ" -> list
+	query UserByEmail(_email string) = "SELECT $fields FROM $table WHERE $email = $_email" : one
+	query UsersByType(_typ UserType) = "SELECT $fields FROM $table WHERE $user_type = $_typ" : many
 	query DeleteUserById(_id uuid) = "DELETE FROM $table WHERE $id = $_id"
-
-	insert SaveUser except (last_login, subscription_id)
-	update UpdateUserLogin (last_login)
 }
 
 struct Token @tokens #model {
 	!base
 	user_id uuid ref(User.id)
 	token_value uuid
+}
 
-	insert (user_id, token_value)
+struct UserWithToken: User {
+	user_id super.id
 }

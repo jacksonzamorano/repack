@@ -34,6 +34,7 @@ pub enum Token {
     With,
     Blueprint,
     Query,
+    Join,
     Insert,
     Except,
     Update,
@@ -71,27 +72,7 @@ impl Token {
             b';' => Some(Token::Semicolon),
             b'+' => Some(Token::Plus),
             b'-' => Some(Token::Minus),
-            _ => None,
-        }
-    }
-
-    pub fn to_char(&self) -> Option<char> {
-        match self {
-            Self::OpenParen => Some('('),
-            Self::CloseParen => Some(')'),
-            Self::OpenBracket => Some('['),
-            Self::CloseBracket => Some(']'),
-            Self::OpenBrace => Some('{'),
-            Self::CloseBrace => Some('}'),
-            Self::Period => Some('.'),
-            Self::Comma => Some(','),
-            Self::Pound => Some('#'),
-            Self::Question => Some('?'),
-            Self::NewLine => Some('\n'),
-            Self::Exclamation => Some('!'),
-            Self::At => Some('@'),
-            Self::Colon => Some(':'),
-            Self::Equal => Some('='),
+            b'=' => Some(Token::Equal),
             _ => None,
         }
     }
@@ -123,6 +104,7 @@ impl Token {
             "except" => Token::Except,
             "one" => Token::One,
             "many" => Token::Many,
+            "join" => Token::Join,
 
             _ => Token::Literal(string.trim().to_string()),
         }

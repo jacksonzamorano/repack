@@ -170,21 +170,6 @@ impl FileContents {
         }
     }
 
-    pub fn peek_2(&self) -> (Option<&Token>, Option<&Token>) {
-        (
-            self.contents.get(self.index),
-            self.contents.get(self.index + 1),
-        )
-    }
-
-    pub fn peek_3(&self) -> (Option<&Token>, Option<&Token>, Option<&Token>) {
-        (
-            self.contents.get(self.index),
-            self.contents.get(self.index + 1),
-            self.contents.get(self.index + 2),
-        )
-    }
-
     /// Returns the current token and advances the parsing position by one.
     ///
     /// This is the primary method for consuming tokens during parsing.
@@ -235,33 +220,12 @@ impl FileContents {
         }
     }
 
-    pub fn take_line(&mut self) -> String {
-        let mut val = String::new();
-        loop {
-            let Some(tkn) = self.take() else { break };
-            match tkn {
-                Token::NewLine => break,
-                Token::Literal(lit) => val.push_str(&lit),
-                _ => {
-                    if let Some(tkn_val) = tkn.to_char() {
-                        val.push(tkn_val);
-                    }
-                }
-            }
-        }
-        val
-    }
-
     /// Advances the parsing position by one without returning the token.
     ///
     /// Used when a token needs to be consumed but its value is not needed,
     /// such as skipping expected punctuation like parentheses or dots.
     pub fn skip(&mut self) {
         self.index += 1;
-    }
-
-    pub fn consume(&mut self, n: usize) {
-        self.index += n;
     }
 
     #[allow(dead_code)]

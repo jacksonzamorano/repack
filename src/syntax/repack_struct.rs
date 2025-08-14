@@ -1,6 +1,9 @@
 use std::collections::HashSet;
 
-use super::{Field, FieldType, FileContents, ObjectFunction, RepackError, RepackErrorKind, Token};
+use super::{
+    Field, FieldType, FileContents, ObjectFunction, RepackError, RepackErrorKind, Token,
+    query::Query,
+};
 
 /// Represents a complete object definition in the schema system.
 ///
@@ -23,21 +26,13 @@ pub struct RepackStruct {
     /// Optional database table name for objects that map to database tables.
     /// Used by database blueprints like PostgreSQL for table generation.
     pub table_name: Option<String>,
-    /// When true, inherits all fields from the parent object.
-    /// Used in combination with reuse_exclude to selectively inherit fields.
-    pub reuse_all: bool,
-    /// List of field names to exclude when reuse_all is true.
-    /// Allows fine-grained control over inheritance.
-    pub reuse_exclude: Vec<String>,
-    /// List of specific field names to include from the parent object.
-    /// Alternative to reuse_all for selective inheritance.
-    pub reuse_include: Vec<String>,
     /// Names of code snippets to include in the generated code.
     /// Snippets provide custom code injection points for specialized logic.
     pub use_snippets: Vec<String>,
     /// Custom functions/methods defined for this object.
     /// These generate additional methods in the target language classes.
     pub functions: Vec<ObjectFunction>,
+    pub queries: Vec<Query>,
 }
 impl RepackStruct {
     /// Parses an Object definition from the input file contents.
@@ -68,11 +63,9 @@ impl RepackStruct {
         let mut categories = Vec::new();
         let mut inherits = None;
         let mut table_name = None;
-        let mut reuse_all = false;
-        let mut reuse_exclude = Vec::new();
-        let mut reuse_include = Vec::new();
         let mut use_snippets = Vec::new();
         let mut functions = Vec::new();
+        let mut queries = Vec::new();
 
         'header: while let Some(token) = contents.next() {
             match token {
@@ -111,10 +104,19 @@ impl RepackStruct {
                             {
                                 functions.push(func);
                             }
-                        } else if let Some(field) = Field::from_contents(lit.to_string(), contents)
-                        {
-                            fields.push(field);
+                        } else {
+                            if let Some(field) = Field::from_contents(lit.to_string(), contents) {
+                                fields.push(field);
+                            } else {
+                                panic!("Cannot parse field in {}", name);
+                            }
                         }
+                    }
+                }
+                Token::Query => {
+                    match Query::parse(&name, contents) {
+                        Ok(q) => queries.push(q),
+                        Err(e) => panic!("{:?}", e)
                     }
                 }
                 Token::Exclamation => {
@@ -131,12 +133,10 @@ impl RepackStruct {
             fields,
             inherits,
             table_name,
-            reuse_all,
-            reuse_exclude,
-            reuse_include,
             categories,
             use_snippets,
             functions,
+            queries,
         }
     }
 
@@ -152,21 +152,6 @@ impl RepackStruct {
     /// * `None` if the object is valid
     pub fn errors(&self) -> Option<Vec<RepackError>> {
         let mut errors = Vec::new();
-        if self.inherits.is_some() {
-            errors.push(RepackError::from_obj(RepackErrorKind::CannotInherit, self));
-        }
-        if self.reuse_all {
-            errors.push(RepackError::from_obj(RepackErrorKind::CannotReuse, self));
-        }
-        if !self.reuse_exclude.is_empty() {
-            errors.push(RepackError::from_obj(RepackErrorKind::CannotReuse, self));
-        }
-        if self.table_name.is_some() {
-            errors.push(RepackError::from_obj(
-                RepackErrorKind::TableNameNotAllowed,
-                self,
-            ));
-        }
         let mut field_names = HashSet::new();
         for field in &self.fields {
             if field_names.contains(&field.name) {
@@ -212,7 +197,7 @@ impl RepackStruct {
         }
         for field in &self.fields {
             match field.field_type {
-                Some(FieldType::Custom(_, _)) | None => {
+                Some(FieldType::Custom(_, super::CustomFieldType::Object)) | None => {
                     dependencies.insert(field.field_type_string.to_string());
                 }
                 _ => {}

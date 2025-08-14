@@ -46,7 +46,7 @@ impl Output {
         let mut location = None;
         let mut options = HashMap::new();
         let mut categories = Vec::new();
-        let mut exclude = Vec::new();
+        let exclude = Vec::new();
 
         let mut empty = false;
         while let Some(token) = contents.next() {

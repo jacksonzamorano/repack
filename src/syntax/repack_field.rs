@@ -1,5 +1,11 @@
 use super::{FieldFunction, FieldType, FileContents, Token};
 
+#[derive(Debug, Clone)]
+pub struct FieldExternalLocation {
+    pub location: String,
+    pub field: String,
+}
+
 /// Represents a single field definition within an object.
 ///
 /// Field contains all the metadata needed to generate code for a single
@@ -13,6 +19,8 @@ pub struct Field {
     /// The original string representation of the field type from the schema
     /// Used for error reporting and debugging; None for computed fields
     pub field_type_string: String,
+    /// The location of this field, if it's external
+    pub field_location: Option<FieldExternalLocation>,
     /// The resolved type information for this field
     /// None during initial parsing, resolved during type checking phase
     pub field_type: Option<FieldType>,
@@ -62,8 +70,30 @@ impl Field {
     /// * `None` if the field definition is malformed
     pub fn from_contents(name: String, contents: &mut FileContents) -> Option<Field> {
         let type_token = contents.take()?;
+        let next_token = contents.peek()?;
+        let mut field_location: Option<FieldExternalLocation> = None;
         let field_type_loc: (Option<FieldType>, String) = match type_token {
-            Token::Literal(literal) => (FieldType::from_string(&literal), literal.clone()),
+            Token::Literal(literal) => {
+                match next_token {
+                    Token::Period => {
+                        contents.skip(); //  Read next_token officially
+                        let foriegn_field = contents.take_literal()?;
+                        field_location = Some(FieldExternalLocation {
+                            location: literal,
+                            field: foriegn_field,
+                        });
+                        (
+                            None,
+                            format!(
+                                "{}.{}",
+                                field_location.as_ref().unwrap().location,
+                                field_location.as_ref().unwrap().field
+                            ),
+                        )
+                    }
+                    _ => (FieldType::from_string(&literal), literal.clone()),
+                }
+            }
             _ => {
                 return None;
             }
@@ -112,6 +142,7 @@ impl Field {
             field_type_string: field_type_loc.1,
             optional,
             array: is_many,
+            field_location,
             functions,
         })
     }
