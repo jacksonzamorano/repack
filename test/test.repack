@@ -30,6 +30,8 @@ struct User @users #model {
 	query UserByEmail(_email string) = "SELECT $fields FROM $locations WHERE $email = $_email" : one
 	query UsersByType(_typ UserType) = "SELECT $fields FROM $locations WHERE $user_type = $_typ" : many
 	query DeleteUserById(_id uuid) = "DELETE FROM $table WHERE $id = $_id"
+
+	insert CreateUser (name, email, user_type) : one
 }
 
 struct Token @tokens #model {

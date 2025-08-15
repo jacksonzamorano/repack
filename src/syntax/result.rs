@@ -254,6 +254,20 @@ impl ParseResult {
                 }
                 field_idx += 1;
             }
+
+            let mut autoq_idx = 0;
+            while autoq_idx < strcts[object_idx].autoqueries.len() {
+                match strcts[object_idx].autoqueries[autoq_idx].into_query(&strcts[object_idx]) {
+                    Ok(val) => {
+                        strcts[object_idx].queries.push(val);
+                    }
+                    Err(e) => {
+                        errors.push(e)
+                    }
+                }
+                autoq_idx += 1;
+            }
+
             object_idx += 1;
         }
 

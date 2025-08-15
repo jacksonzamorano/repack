@@ -23,7 +23,7 @@ impl QueryArg {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum QueryReturn {
     None,
     One,
@@ -102,22 +102,32 @@ impl Query {
         let mut buf = String::new();
         let mut iter = self.contents.chars();
         let mut ct = true;
+        let mut last_c = ' ';
         loop {
             if let Some(c) = iter.next() {
-                if c != ' ' {
+                if c.is_alphabetic() || c == '_' || c == '$' {
                     buf.push(c);
                     continue;
                 }
-                if c == ' ' && !buf.starts_with('$') {
+                if !(c.is_alphabetic() || c == '_' || c == '$') && !buf.starts_with('$') {
                     output.push_str(&buf);
-                    output.push(' ');
+                    output.push(c);
                     buf.clear();
+                    continue;
                 }
+                last_c = c;
             } else {
                 ct = false
             };
             if buf.len() < 2 {
+                if !ct {
+                    break;
+                }
                 continue;
+            }
+            if !buf.starts_with("$") {
+                output.push_str(&buf);
+                break;
             }
             // We know it's a variable - let's interpolate
             let result = match &buf[1..] {
@@ -253,10 +263,118 @@ impl Query {
             if !ct {
                 break;
             }
-            output.push(' ');
+            output.push(last_c);
         }
         output.push(';');
 
         Ok(output)
+    }
+}
+
+#[derive(Debug)]
+pub enum AutoQueryType {
+    Insert,
+    Update,
+}
+
+#[derive(Debug)]
+pub struct AutoQuery {
+    pub query_type: AutoQueryType,
+    pub name: String,
+    pub args: Vec<String>,
+    pub ret_type: QueryReturn,
+}
+
+impl AutoQuery {
+    pub fn parse(
+        query_type: AutoQueryType,
+        obj_name: &str,
+        reader: &mut FileContents,
+    ) -> Result<AutoQuery, RepackError> {
+        let name = reader.take_literal().ok_or_else(|| {
+            RepackError::global(RepackErrorKind::QueryInvalidSyntax, obj_name.to_string())
+        })?;
+        let mut args = Vec::<String>::new();
+        let mut ret_type = QueryReturn::None;
+        if matches!(reader.peek(), Some(Token::OpenParen)) {
+            loop {
+                match reader.peek() {
+                    Some(Token::Literal(_)) => {
+                        args.push(reader.take_literal().unwrap());
+                    }
+                    Some(Token::CloseParen) => {
+                        reader.skip();
+                        break;
+                    }
+                    _ => {
+                        reader.skip();
+                    }
+                }
+            }
+        }
+        if reader.take_colon() {
+            match reader.take() {
+                Some(Token::One) => ret_type = QueryReturn::One,
+                Some(Token::Many) => ret_type = QueryReturn::Many,
+                _ => {
+                    return Err(RepackError::global(
+                        RepackErrorKind::QueryInvalidSyntax,
+                        obj_name.to_string(),
+                    ));
+                }
+            }
+        }
+
+        Ok(AutoQuery {
+            query_type,
+            name,
+            args,
+            ret_type,
+        })
+    }
+
+    pub fn into_query(&self, strct: &RepackStruct) -> Result<Query, RepackError> {
+        Ok(match self.query_type {
+            AutoQueryType::Insert => {
+                let mut args = Vec::<QueryArg>::new();
+                let mut output = "WITH $table AS (INSERT INTO $table (".to_string();
+                let mut query_interpolate = String::new();
+                for (idx, selected_field) in self.args.iter().enumerate() {
+                    let Some(matching_field) =
+                        strct.fields.iter().find(|x| x.name == *selected_field)
+                    else {
+                        panic!("Field not found in struct.");
+                    };
+                    output.push_str(&selected_field);
+                    query_interpolate.push_str(&format!("$__{}", selected_field));
+
+                    args.push(QueryArg {
+                        name: format!("__{}", selected_field),
+                        typ: matching_field.field_type.as_ref().unwrap().to_string(),
+                    });
+                    if idx + 1 != self.args.len() {
+                        query_interpolate.push_str(", ");
+                        output.push_str(", ");
+                    }
+                }
+                output.push_str(&format!(
+                    ") VALUES ({}) RETURNING *) AS {} SELECT $fields FROM $locations",
+                    query_interpolate,
+                    strct.table_name.as_ref().unwrap()
+                ));
+                Query {
+                    args,
+                    name: self.name.clone(),
+                    ret_type: self.ret_type.clone(),
+                    contents: output,
+                }
+            }
+            _ => Query {
+                args: Vec::new(),
+                name: self.name.clone(),
+                ret_type: self.ret_type.clone(),
+                contents: String::new(),
+            },
+        })
     }
 }

@@ -48,7 +48,7 @@ func [name](db *sql.DB, [each arg][name] [type], [/each][trim], [/trim])
 	[if returns_many]
 	values := make(\[][struct_name], 0)[br]
 	[/if]
-	rows, err := db.Query("[query]", [each arg][name][/each])
+	rows, err := db.Query("[query]", [each arg][name], [/each][trim], [/trim])
 	if err != nil {[br]
 		[if returns_none]
 		return err

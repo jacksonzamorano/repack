@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
 use super::{
-    Field, FieldType, FileContents, ObjectFunction, RepackError, RepackErrorKind, Token,
-    query::Query,
+    AutoQuery, AutoQueryType, Field, FieldType, FileContents, ObjectFunction, RepackError,
+    RepackErrorKind, Token, query::Query,
 };
 
 #[derive(Debug)]
@@ -87,6 +87,7 @@ pub struct RepackStruct {
     pub functions: Vec<ObjectFunction>,
     pub queries: Vec<Query>,
     pub joins: Vec<RepackStructJoin>,
+    pub autoqueries: Vec<AutoQuery>,
 }
 impl RepackStruct {
     /// Parses an Object definition from the input file contents.
@@ -121,6 +122,7 @@ impl RepackStruct {
         let mut functions = Vec::new();
         let mut queries = Vec::new();
         let mut joins = Vec::new();
+        let mut autoqueries = Vec::new();
 
         'header: while let Some(token) = contents.next() {
             match token {
@@ -159,7 +161,8 @@ impl RepackStruct {
                             {
                                 functions.push(func);
                             }
-                        } else if let Some(field) = Field::from_contents(lit.to_string(), contents) {
+                        } else if let Some(field) = Field::from_contents(lit.to_string(), contents)
+                        {
                             fields.push(field);
                         } else {
                             panic!("Cannot parse field in {name}");
@@ -179,6 +182,18 @@ impl RepackStruct {
                         use_snippets.push(snippet_name);
                     }
                 }
+                Token::Insert => match AutoQuery::parse(AutoQueryType::Insert, &name, contents) {
+                    Ok(i) => {
+                        autoqueries.push(i);
+                    }
+                    Err(e) => panic!("{}", e.into_string()),
+                },
+                Token::Update => match AutoQuery::parse(AutoQueryType::Update, &name, contents) {
+                    Ok(i) => {
+                        autoqueries.push(i);
+                    }
+                    Err(e) => panic!("{}", e.into_string()),
+                },
                 _ => {}
             }
         }
@@ -193,6 +208,7 @@ impl RepackStruct {
             functions,
             queries,
             joins,
+            autoqueries,
         }
     }
 
