@@ -1,293 +1,759 @@
-# Repack Language & Blueprint Specification
+# Repack: Schema-Driven Code Generation
 
-Authoritative specification for the Repack schema language ("Repack") and the Blueprint templating language. This document omits roadmap, marketing, and non-speculative content.
+Welcome to Repack! 🚀 This powerful tool lets you define your data models once and generate code for multiple languages and platforms. Think of it as a universal translator for your data structures - write your schema in Repack's simple syntax, create blueprints for your target languages, and let Repack handle the rest.
 
-## 1. Repack Schema Language
+## Quick Start
 
-### 1.1 Lexical Elements
-Identifiers: /[A-Za-z_][A-Za-z0-9_]*/
-Strings: double-quoted sequences preserving inner content.
-Comments: // to end-of-line.
-Whitespace: insignificant except inside string literals.
+Here's a taste of what Repack can do:
 
-### 1.2 Keywords
-Reserved (recognized as tokens):
-- output
-- struct
-- enum
-- snippet
-- import
-- blueprint
-- query
-- insert
-- update
-- one
-- many
-- join
+**1. Define your schema (`.repack` file):**
+```repack
+enum UserType {
+    Admin
+    User  
+    Guest
+}
 
-Deprecated (tokenized but not part of public spec): where, with, except.
+struct User @users {
+    id uuid
+    name string
+    email string
+    user_type UserType
+    created_date datetime
+}
+```
 
-### 1.3 Primitive Types
-string, int64, int32, float64, boolean, datetime, uuid, bytes
+**2. Choose your outputs:**
+```repack
+output typescript @src/types;
+output postgres @database;
+```
 
-### 1.4 Type Shapes
-Exactly four canonical shapes:
-- T (required scalar)
-- T? (optional scalar)
-- T[] (required array)
-- T[]? (optional array)  // Array marker precedes optional marker.
+**3. Get generated code automatically!**
 
-### 1.5 Field Forms
-fieldName TypeShape
-fieldName External.Location( )?  (See 1.9) where External.Location can itself be array/optional with suffixes.
+## Table of Contents
 
-### 1.6 Object Kinds
-struct Name [: Parent]? [@table]? [#category]* { ... }
-- Inheritance: single parent; table name inherited automatically.
-- Categories: arbitrary tags used for output filtering.
-- @table: associates table name with struct for query/table output.
+- [Core Concepts](#core-concepts)
+- [Repack Language Reference](#repack-language-reference)
+  - [Data Types](#data-types)
+  - [Structs](#structs)
+  - [Enums](#enums)
+  - [Fields](#fields)
+  - [Queries](#queries)
+  - [Inheritance](#inheritance)
+  - [Snippets](#snippets)
+- [Blueprint Language Reference](#blueprint-language-reference)
+  - [Template Syntax](#template-syntax)
+  - [Variables](#variables)
+  - [Control Flow](#control-flow)
+  - [File Generation](#file-generation)
+- [Complete Examples](#complete-examples)
+- [Best Practices](#best-practices)
 
-### 1.7 Enums
-enum Name [#category]* { CaseA CaseB ... }
-Enum cases optionally may have explicit string value by writing a second literal on the same line: CaseA "custom".
+## Core Concepts
 
-### 1.8 Snippets
-snippet Name { fields / functions }
-Included inside struct body with: !snippetName (single token after '!'). Fields/functions merged in-place prior to dependency resolution.
+Repack consists of two complementary languages:
 
-### 1.9 External Field References
-Syntax: fieldName OtherStruct.otherField
-Special location name "super" indicates the parent struct when using inheritance.
-During resolution the referenced field's resolved type is copied.
+- **Repack Schema Language**: Define your data structures, relationships, and database queries
+- **Blueprint Template Language**: Create templates that generate code from your schemas
 
-### 1.10 Functions (Field / Struct)
-Syntax inside a struct body or after a field definition:
-namespace:funcName(arg1, arg2)
-Parentheses optional if zero args.
-Parsed as Literal(namespace) Colon Literal(funcName) [OpenParen args CloseParen]. Stored with namespace, name, arg list.
+The workflow is simple:
+1. Write `.repack` files defining your data models
+2. Use existing blueprints or create custom `.blueprint` templates  
+3. Run Repack to generate code in any language you need
 
-### 1.11 Joins
-join(name ForeignStruct) = predicateTemplate
-- name: local join alias
-- ForeignStruct: referenced struct name
-- predicateTemplate: literal captured token sequence (single literal token) possibly containing interpolation variables:
-  - $name => "<foreign_table> <joinAlias>"
-  - $super => parent table name (when inheritance used)
-  - $joinAlias => emits joinAlias
-Used to build $locations expansion (see 1.13). Query builder expands joins into location clause segments.
+## Repack Language Reference
 
-### 1.12 Queries
-Queries attach to a struct. Three forms:
-1. Manual:
-   query Name(argName type ...)= SQLLiteral [: one|many]?
-2. Auto Insert:
-   insert Name(field1, field2, ...) [: one|many]?  // Generates WITH $table AS (INSERT ... RETURNING *) SELECT $fields FROM $locations
-3. Auto Update:
-   update Name(argName type ...)= Fragment [: one|many]? // Fragment inserted after UPDATE $table; becomes WITH $table AS (UPDATE $table Fragment RETURNING *) SELECT $fields FROM $locations
-Return annotation semantics:
-- omitted => returns_none
-- : one => returns_one
-- : many => returns_many
-Arguments create positional parameters during interpolation.
+### Data Types
 
-### 1.13 Query Interpolation Variables
-Within query contents (after parsing, before emission):
-- $fields: comma-separated "<table>.<col> AS <alias>" entries for all fields, respecting external locations and db:as alias functions.
-- $locations: base table plus each join expanded from join predicates.
-- $table: the struct's table name.
-- $fieldName / $#fieldName: field reference; isolated variant ($#) emits only column, non-isolated emits qualified form (table.column) considering join/super mapping.
-- $argName: converted to positional $1,$2,... in order of first appearance.
-Unknown interpolation yields [err: name].
+Repack provides a comprehensive type system with built-in primitives and custom types.
 
-### 1.14 Inheritance
-struct Child: Parent { ... }
-- Parent must precede or be resolvable; its @table propagates to child.
-- External reference syntax super.field references parent's field.
+#### Primitive Types
 
-### 1.15 Validation & Resolution Steps
-1. Parse declarations.
-2. Expand snippet inclusions.
-3. Reorder structs to satisfy dependency ordering.
-4. Resolve inheritance table propagation.
-5. Resolve external field references (super or join alias) & copy types.
-6. Resolve custom field types (structs, enums).
-7. Generate auto queries (insert/update) into struct query list.
-8. Accumulate errors (duplicate fields, unresolved types, invalid references, etc.).
+| Type | Description | Example Usage |
+|------|-------------|---------------|
+| `string` | UTF-8 text | `name string` |
+| `int32` | 32-bit signed integer | `count int32` |
+| `int64` | 64-bit signed integer | `big_number int64` |
+| `float64` | 64-bit floating point | `price float64` |
+| `boolean` | True/false value | `is_active boolean` |
+| `datetime` | Timestamp | `created_date datetime` |
+| `uuid` | Universally unique identifier | `id uuid` |
+| `bytes` | Byte array | `file_data bytes` |
 
-### 1.16 Output Configuration
-output blueprintId @location [#category]* [!excludeName]* [key=value]*;
-- profile (blueprintId) must match loaded blueprint id.
-- Categories filter included structs/enums (logical OR). Empty categories => include all.
-- Exclusions remove named structs/enums.
-- key=value options become initial variables in blueprint context.
+#### Type Modifiers
 
-### 1.17 Imports / Blueprints
-import "path/or/pattern*"  (relative to current file root; * loads all .repack files in folder)
-blueprint path/to/file.blueprint (queued for later loading)
+| Modifier | Syntax | Description |
+|----------|--------|-------------|
+| Optional | `type?` | Field can be null/undefined |
+| Array | `type[]` | Field is a collection |
+| Optional Array | `type[]?` | Array itself can be null |
 
-### 1.18 Error Codes
-Error kinds (E#### codes map to enum order):
-- CircularDependancy
-- ParentObjectDoesNotExist
-- CustomTypeNotDefined
-- TypeNotResolved
-- SnippetNotFound
-- DuplicateFieldNames
-- CannotCreateContext
-- FunctionInvalidSyntax
-- TypeNotSupported
-- CannotRead
-- CannotWrite
-- SnippetNotClosed
-- UnknownSnippet
-- VariableNotInScope
-- InvalidVariableModifier
-- UnknownLink
-- UnknownObject
-- QueryArgInvalidSyntax
-- QueryInvalidSyntax
-- InvalidSuper
-- FieldNotOnSuper
-- InvalidJoin
-- FieldNotOnJoin
-- SyntaxError
-- ProcessExecutionFailed (NEW: Process execution failed during blueprint rendering)
-- PathNotValid (NEW: Path could not be converted to string representation) 
-- ParseIncomplete (NEW: Parsing failed due to missing expected tokens)
-- FieldNotFound (NEW: Field could not be found in struct during query processing)
-- UnknownError
+**Examples:**
+```repack
+struct Product {
+    id uuid                    // Required UUID
+    name string               // Required string
+    description string?       // Optional string
+    tags string[]            // Required array of strings
+    images string[]?         // Optional array of strings
+    price float64            // Required number
+}
+```
 
-## 2. Blueprint Templating Language
-Blueprints define target generation via bracketed directives.
+### Structs
 
-### 2.1 Token Forms
-General block: [main secondary optional_inline_contents] ... [/main]
-Auto-close tokens (no closing tag): variable, imports, import, increment, br.
-Escaping: prefix '[' with '\\' to treat literally.
+Structs are the core building blocks representing entities in your system.
 
-### 2.2 Main Tokens
-meta, file, if, ifn, each, eachr, define, func, nfunc, join, ref, link, import, trim, imports, br, exec, increment, snippet, render, variable (any unrecognized main token treated as variable reference), plus internal typedef (define) and TypeDef handling.
-(Note: join/ref main tokens are currently parsed; rendering branch for join iteration not implemented intentionally.)
+#### Basic Syntax
 
-### 2.3 Secondary Tokens
-id, name, kind, struct, field, enum, case, debug, arg, query, join, and any primitive type names (string,int32,int64,float64,boolean,datetime,uuid,bytes). Others become Arbitrary.
+```repack
+struct EntityName [@table_name] [: ParentStruct] [#category]* {
+    // fields, queries, and functions
+}
+```
 
-### 2.4 Iteration
-[each struct] ... [/each]
-[each field] ... [/each] (requires struct context)
-[each enum] ... [/each]
-[each case] ... [/each] (requires enum context)
-[each query] ... [/each] (requires struct context)
-[each arg] ... [/each] (inside func or query arg context)
-Reverse order: eachr (same secondary semantics).
-Each iteration sets flag sep = true on all but last element (useful for commas).
+#### Struct Components
 
-### 2.5 Conditionals
-[if flag]...[/if] executes if context.flags[flag]==true.
-[ifn flag] inverse.
-Flags defined:
-- queries (struct has queries)
-- optional, array (field modifiers)
-- returns_many, returns_one, returns_none (query return type)
-- has_args (function invocation context)
-- sep (iteration separator helper)
+| Component | Purpose | Example |
+|-----------|---------|---------|
+| `@table_name` | Database table mapping | `@users` |
+| `: ParentStruct` | Inheritance | `: BaseEntity` |
+| `#category` | Organization/filtering | `#model` |
 
-### 2.6 Variables
-[name], [table_name], [struct_name], [type], [type_raw], [enum_name], [value], [query], numeric indices for function args ([0], [1], ...), [arg] inside arg iteration.
-Transform modifiers via dotted suffix: uppercase, lowercase, titlecase, camelcase, split_period_first, split_period_last, split_dash_first, split_dash_last.
+**Complete Example:**
+```repack
+struct User @users : BaseEntity #model #api {
+    name string
+    email string  
+    is_admin boolean
+    
+    query GetByEmail(_email string) = "SELECT $fields FROM $locations WHERE $email = $_email" : one
+}
+```
 
-### 2.7 Imports
-[link key]content[/link] defines link mapping.
-[import key] places import (deduped per file).
-[imports] designates insertion point for all collected imports for current file (emitted with surrounding blank lines; each import on its own line).
+### Enums
 
-### 2.8 File Selection
-[file]filename[/file] or [file] sets currently active output file (filename may be built from nested variables rendered inside block contents if inline contents empty and body present).
+Enums define fixed sets of possible values.
 
-### 2.9 Snippets & Render
-[snippet name] ... [/snippet] defines reusable inline snippet (captured literal content only, no nested variable expansion at definition time; expanded at [render]).
-[render]snippetName[/render] inserts snippet literal.
+#### Basic Syntax
 
-### 2.10 Functions
-[func ns.name] body [/func] executes body once per matching struct or field function with that namespace/name. Inside body: [each arg] iterates argument strings; numeric variables 0..N and flag has_args available.
-[nfunc ns.name] executes body if no matching function exists in current field/struct context.
+```repack
+enum EnumName [#category]* {
+    ValueA ["custom_string"]
+    ValueB ["another_string"]
+    ValueC
+}
+```
 
-### 2.11 Query Context
-Within [each query] iteration, [query] variable contains fully rendered SQL (with interpolation expansion and trailing semicolon); flags returns_many / returns_one / returns_none set; [each arg] yields query args in order.
+#### Enum Features
 
-### 2.12 Trimming / Breaks / Increment
-[trim]content[/trim] deletes matching trailing content from most recent write (used to remove last commas / separators).
-[br] inserts newline.
-[increment counterName] increments named global counter; referencing [counterName] outputs numeric value.
+| Feature | Description | Example |
+|---------|-------------|---------|
+| Implicit Values | Uses the case name as value | `Admin` → `"Admin"` |
+| Custom Values | Override with custom string | `Admin "ADMIN_USER"` |
+| Categories | Group enums for filtering | `#status` |
 
-### 2.13 Exec
-[exec]shell script here[/exec] prompts user (y/N) before executing script via sh -s. Output suppressed except errors.
+**Examples:**
+```repack
+// Simple enum
+enum Status {
+    Active
+    Inactive
+    Pending
+}
 
-### 2.14 Variable Resolution Errors
-Unknown variable => VariableNotInScope error.
-Unknown modifier => InvalidVariableModifier.
-Unknown link => UnknownLink.
-Unknown snippet at render => UnknownSnippet.
+// Enum with custom values
+enum UserRole #auth {
+    Admin "ADMIN_USER"
+    Editor "EDITOR_USER"  
+    Viewer "VIEWER_USER"
+}
+```
 
-### 2.15 Type Definitions
-[define primitive]TargetType[/define] maps primitive to blueprint-local representation (used during field/query arg rendering).
-[link primitive] may supply import template (with $ placeholder replaced by primitive name).
-Custom (non-primitive) types use [link custom] pattern with $ substituted for type name if present.
+### Fields
 
-## 3. Grammar (EBNF Summary)
+Fields define the properties of your structs.
 
-Schema := { Declaration }
-Declaration := StructDecl | EnumDecl | SnippetDecl | OutputDecl | ImportDecl | BlueprintDecl
-StructDecl := 'struct' Ident [':' Ident] [TableOpt] { Category } '{' StructBody '}'
-EnumDecl := 'enum' Ident { Category } '{' EnumBody '}'
-SnippetDecl := 'snippet' Ident '{' SnippetBody '}'
-OutputDecl := 'output' Ident [LocationOpt] { Category } { Exclusion } { Option } ';'
-ImportDecl := 'import' StringLiteral
-BlueprintDecl := 'blueprint' StringLiteral
-TableOpt := '@' Ident
-Category := '#' Ident
-Exclusion := '!' Ident
-LocationOpt := '@' PathLike
-Option := Ident '=' Ident
-StructBody := { StructItem }
-StructItem := FieldDecl | FunctionDecl | SnippetUse | QueryDecl | AutoInsertDecl | AutoUpdateDecl | JoinDecl
-FieldDecl := Ident FieldTypeSpec FieldFunctions NewLine
-FieldTypeSpec := (Ident ['.' Ident]) ArrayOpt OptOpt
-ArrayOpt := '[]'?  // Represented as '[' ']' tokens.
-OptOpt := '?'?
-SnippetUse := '!' Ident
-FunctionDecl := Namespace ':' Ident ['(' ArgList ')']
-FieldFunctions := { FunctionDecl }
-ArgList := Ident { ',' Ident }
-QueryDecl := 'query' Ident ['(' QueryArgList ')'] '=' StringLiteral [ReturnType]
-QueryArgList := QueryArg { QueryArg }
-QueryArg := Ident Ident
-AutoInsertDecl := 'insert' Ident ['(' Ident { ',' Ident } ')'] [ReturnType]
-AutoUpdateDecl := 'update' Ident ['(' QueryArgList ')'] '=' StringLiteral [ReturnType]
-JoinDecl := 'join' '(' Ident Ident ')' '=' StringLiteral
-ReturnType := ':' ('one' | 'many')
-EnumBody := { EnumCase }
-EnumCase := Ident [Ident]
-SnippetBody := { FieldDecl | FunctionDecl }
+#### Field Types
 
-## 4. Implementation Notes
-- Tokenization treats strings as single Literal tokens (contents without quotes).
-- Query / update fragments store contents as single literal; update fragment internally rewrites '$' to '$#' to force isolated interpolation for user-provided fragments.
-- Snippet expansion occurs before dependency ordering and type resolution.
-- Auto insert/update queries transformed into full manual queries prior to query rendering contexts.
-- Joins influence only $locations string; no direct iteration directive currently used in core blueprints.
+| Field Type | Syntax | Description |
+|------------|--------|-------------|
+| Direct | `name Type` | Standard field |
+| External Reference | `name Other.field` | Reference to another struct's field |
+| Parent Reference | `name super.field` | Reference to inherited field |
 
-## 5. Differences vs Internal Tokens
-Internal tokens where/with/except exist for historical reasons but are not part of public syntax surface and should not be used.
+#### Field Functions
 
-## 6. Error Handling Contract
-Parsing stops only after full pass; aggregated errors returned. Each error formatted: [E####] (profile -> context) message details stack. Blueprint snippet nesting adds contextual stack lines.
+Fields can have attached functions that modify behavior:
 
-## 7. Security Considerations
-[exec] execution requires explicit interactive confirmation to mitigate unintended script execution.
+```repack
+struct User {
+    id uuid db:pk                                    // Database primary key
+    email string db:unique                           // Database unique constraint  
+    full_name string db:as("first_name || ' ' || last_name")  // Computed field
+    created_date datetime db:default("NOW()")       // Default value
+}
+```
 
-## 8. Determinism
-Blueprint rendering order follows token sequence; import collection is per-file and order-insensitive (HashSet) but emitted unsorted; consumers should not rely on ordering of imports.
+**Common Field Functions:**
 
----
-End of specification.
+| Namespace | Function | Purpose | Example |
+|-----------|----------|---------|---------|
+| `db` | `pk` | Primary key | `db:pk` |
+| `db` | `unique` | Unique constraint | `db:unique` |
+| `db` | `default(value)` | Default value | `db:default("NOW()")` |
+| `db` | `as(expression)` | Computed field | `db:as("LOWER(email)")` |
+
+### Queries
+
+Repack supports three types of queries for database operations.
+
+#### Query Types Comparison
+
+| Type | Purpose | Syntax | Return Options |
+|------|---------|--------|----------------|
+| Manual | Custom SQL | `query Name(args) = "SQL" : return_type` | `:one`, `:many`, none |
+| Auto Insert | Generated INSERT | `insert Name(field1, field2) : return_type` | `:one`, `:many`, none |
+| Auto Update | Generated UPDATE | `update Name(args) = "SET clause" : return_type` | `:one`, `:many`, none |
+
+#### Query Interpolation Variables
+
+Repack provides powerful query interpolation:
+
+| Variable | Description | Example Output |
+|----------|-------------|----------------|
+| `$fields` | All struct fields with aliases | `users.id AS id, users.name AS name` |
+| `$locations` | Table name with joins | `users INNER JOIN tokens t ON ...` |
+| `$table` | Primary table name | `users` |
+| `$fieldName` | Qualified field reference | `users.email` |
+| `$#fieldName` | Unqualified field reference | `email` |
+| `$argName` | Parameter placeholder | `$1`, `$2`, etc. |
+
+**Query Examples:**
+```repack
+struct User @users {
+    id uuid
+    name string
+    email string
+    
+    // Manual query
+    query GetByEmail(_email string) = "SELECT $fields FROM $locations WHERE $email = $_email" : one
+    
+    // Auto insert
+    insert CreateUser(id, name, email) : one
+    
+    // Auto update  
+    update UpdateEmail(_id uuid, _email string) = "SET $email = $_email WHERE $id = $_id" : one
+}
+```
+
+### Inheritance
+
+Repack supports single inheritance for sharing common fields.
+
+```repack
+struct BaseEntity {
+    id uuid
+    created_date datetime
+    updated_date datetime
+}
+
+struct User : BaseEntity @users {
+    name string
+    email string
+    
+    // Reference parent field
+    user_id super.id
+}
+```
+
+**Inheritance Rules:**
+- Child inherits parent's table name (if any)
+- Use `super.field` to reference parent fields
+- Only single inheritance is supported
+
+### Snippets
+
+Snippets provide reusable field collections.
+
+#### Defining Snippets
+
+```repack
+snippet Timestamps {
+    created_date datetime db:default("NOW()")
+    updated_date datetime db:default("NOW()")
+}
+
+snippet Identifiable {
+    id uuid db:pk
+}
+```
+
+#### Using Snippets
+
+```repack
+struct User @users {
+    !Identifiable    // Includes id field
+    !Timestamps      // Includes created_date and updated_date
+    
+    name string
+    email string
+}
+```
+
+**Key Benefits:**
+- Reduce duplication across structs
+- Ensure consistency of common patterns
+- Easy to maintain shared functionality
+
+### Advanced Features
+
+#### Joins
+
+Define relationships between structs for complex queries:
+
+```repack
+struct UserWithTokens : User {
+    join(t Token) = "INNER JOIN $name ON $super.id = $t.user_id"
+    
+    token_value t.token_value
+    
+    query GetUserTokens(_id uuid) = "SELECT $fields FROM $locations WHERE $user_id = $_id" : many
+}
+```
+
+#### Categories and Filtering
+
+Use categories to organize and filter your schema:
+
+```repack
+struct User #model #api {
+    // This struct has both 'model' and 'api' categories
+}
+
+enum Status #enums {
+    // This enum has the 'enums' category
+}
+
+// Generate only structs with 'api' category
+output typescript @types #api;
+```
+
+## Blueprint Language Reference
+
+Blueprints are templates that transform your Repack schemas into target language code.
+
+### Template Syntax
+
+Blueprints use bracketed directives: `[directive]content[/directive]`
+
+#### Auto-Closing vs Block Directives
+
+| Type | Syntax | Purpose |
+|------|--------|---------|
+| Auto-closing | `[variable]` | Insert single values |
+| Block | `[directive]...[/directive]` | Control flow and iteration |
+
+### Variables
+
+Access schema data through variables:
+
+#### Core Variables
+
+| Variable | Context | Description |
+|----------|---------|-------------|
+| `[name]` | Any | Entity name |
+| `[type]` | Field | Field type |
+| `[table_name]` | Struct | Database table name |
+| `[value]` | Enum case | Enum case value |
+| `[query]` | Query | Rendered SQL |
+
+#### Variable Modifiers
+
+Transform variable output with dot notation:
+
+| Modifier | Effect | Example |
+|----------|--------|---------|
+| `uppercase` | ALL CAPS | `[name.uppercase]` |
+| `lowercase` | all lowercase | `[name.lowercase]` |
+| `titlecase` | Title Case | `[name.titlecase]` |
+| `camelcase` | camelCase | `[name.camelcase]` |
+
+**Example:**
+```blueprint
+// Input: user_profile
+[name.titlecase]     // → User Profile
+[name.camelcase]     // → userProfile
+[name.uppercase]     // → USER_PROFILE
+```
+
+### Control Flow
+
+#### Iteration
+
+| Directive | Purpose | Context Required |
+|-----------|---------|------------------|
+| `[each struct]` | Loop through structs | Global |
+| `[each field]` | Loop through fields | Inside struct |
+| `[each enum]` | Loop through enums | Global |
+| `[each case]` | Loop through enum cases | Inside enum |
+| `[each query]` | Loop through queries | Inside struct |
+
+**Example:**
+```blueprint
+[each struct]
+export interface [name] {
+[each field]
+    [name]: [type];
+[/each]
+}
+[/each]
+```
+
+#### Conditionals
+
+| Directive | Purpose | Usage |
+|-----------|---------|-------|
+| `[if flag]` | Execute if true | `[if optional]` |
+| `[ifn flag]` | Execute if false | `[ifn returns_none]` |
+
+**Available Flags:**
+
+| Flag | Context | When True |
+|------|---------|-----------|
+| `optional` | Field | Field is optional |
+| `array` | Field | Field is array |
+| `returns_one` | Query | Query returns single result |
+| `returns_many` | Query | Query returns multiple results |
+| `returns_none` | Query | Query returns no results |
+| `sep` | Iteration | Not the last item (for commas) |
+
+### File Generation
+
+#### File Directives
+
+| Directive | Purpose | Example |
+|-----------|---------|---------|
+| `[file]name[/file]` | Set output file | `[file][name].ts[/file]` |
+| `[imports]` | Import insertion point | Place where imports appear |
+
+#### Import System
+
+```blueprint
+// Define import template
+[link custom]import type { $ } from './$'[/link]
+
+// Import will be auto-generated when custom types are used
+[imports]  // Imports appear here
+
+export interface User {
+    profile: UserProfile;  // This triggers the import
+}
+```
+
+### Type Definitions
+
+Map Repack types to target language types:
+
+```blueprint
+[define string]string[/define]
+[define int64]number[/define]  
+[define boolean]boolean[/define]
+[define uuid]string[/define]
+```
+
+### Complete Blueprint Examples
+
+#### TypeScript Interface Generator
+
+```blueprint
+[meta id]typescript[/meta]
+[meta name]TypeScript Interfaces[/meta]
+
+[define string]string[/define]
+[define int64]number[/define]
+[define boolean]boolean[/define]
+[link custom]import type { $ } from './$'[/link]
+
+[each struct]
+[file][name].ts[/file]
+[imports]
+
+export interface [name] {
+[each field]
+    [name][if optional]?[/if]: [type][if array][][\if];
+[/each]
+}
+[/each]
+
+[file]index.ts[/file]
+[each struct]
+export type { [name] } from './[name]';
+[/each]
+```
+
+#### SQL Schema Generator
+
+```blueprint
+[meta id]postgres[/meta]
+[meta name]PostgreSQL Schema[/meta]
+
+[define string]TEXT[/define]
+[define int64]BIGINT[/define]
+[define boolean]BOOLEAN[/define]
+[define uuid]UUID[/define]
+[define datetime]TIMESTAMPTZ[/define]
+
+[file]schema.sql[/file]
+BEGIN;
+
+[each enum]
+CREATE TYPE [name] AS ENUM([each case]'[value]'[if sep], [/if][/each]);
+[/each]
+
+[each struct]
+CREATE TABLE [table_name] (
+[each field]
+    [name] [type][ifn optional] NOT NULL[/ifn][if sep],[/if]
+[/each]
+);
+[/each]
+
+COMMIT;
+```
+
+## Complete Examples
+
+### E-commerce System
+
+**Schema Definition (`ecommerce.repack`):**
+
+```repack
+blueprint "typescript.blueprint"
+blueprint "postgres.blueprint"
+
+output typescript @src/types;
+output postgres @database;
+
+snippet BaseEntity {
+    id uuid db:pk
+    created_date datetime db:default("NOW()")
+    updated_date datetime db:default("NOW()")
+}
+
+enum OrderStatus #enums {
+    Pending
+    Processing  
+    Shipped
+    Delivered
+    Cancelled
+}
+
+enum UserRole #enums {
+    Customer
+    Admin
+    Moderator
+}
+
+struct User @users #model {
+    !BaseEntity
+    
+    email string db:unique
+    first_name string
+    last_name string
+    role UserRole db:default("'Customer'")
+    
+    // Computed field
+    full_name string db:as("first_name || ' ' || last_name")
+    
+    query GetByEmail(_email string) = "SELECT $fields FROM $locations WHERE $email = $_email" : one
+    query GetAdmins() = "SELECT $fields FROM $locations WHERE $role = 'Admin'" : many
+    
+    insert CreateUser(id, email, first_name, last_name) : one
+    update UpdateName(_id uuid, _first string, _last string) = "SET first_name = $_first, last_name = $_last WHERE $id = $_id" : one
+}
+
+struct Product @products #model {
+    !BaseEntity
+    
+    name string
+    description string?
+    price float64
+    inventory_count int32
+    is_active boolean db:default("true")
+    
+    query GetActive() = "SELECT $fields FROM $locations WHERE $is_active = true" : many
+    query SearchByName(_name string) = "SELECT $fields FROM $locations WHERE $name ILIKE '%' || $_name || '%'" : many
+    
+    insert CreateProduct(id, name, price, inventory_count) : one
+}
+
+struct Order @orders #model {
+    !BaseEntity
+    
+    user_id uuid
+    status OrderStatus db:default("'Pending'")
+    total_amount float64
+    
+    // External field reference
+    user_email User.email
+    
+    query GetByUser(_user_id uuid) = "SELECT $fields FROM $locations WHERE $user_id = $_user_id ORDER BY created_date DESC" : many
+    query GetByStatus(_status OrderStatus) = "SELECT $fields FROM $locations WHERE $status = $_status" : many
+    
+    insert CreateOrder(id, user_id, total_amount) : one
+    update UpdateStatus(_id uuid, _status OrderStatus) = "SET $status = $_status WHERE $id = $_id"
+}
+
+struct OrderItem @order_items #model {
+    !BaseEntity
+    
+    order_id uuid
+    product_id uuid  
+    quantity int32
+    unit_price float64
+    
+    // Computed total
+    line_total float64 db:as("quantity * unit_price")
+    
+    query GetByOrder(_order_id uuid) = "SELECT $fields FROM $locations WHERE $order_id = $_order_id" : many
+}
+
+// Join example - Orders with user information
+struct OrderWithUser : Order {
+    join(u User) = "INNER JOIN $name ON $super.user_id = $u.id"
+    
+    user_name u.full_name
+    user_email u.email
+    
+    query GetOrdersWithUsers() = "SELECT $fields FROM $locations ORDER BY created_date DESC" : many
+}
+```
+
+This schema generates:
+
+1. **TypeScript interfaces** with proper typing
+2. **PostgreSQL schema** with tables, constraints, and indexes  
+3. **Database functions** for common operations
+4. **Type-safe query builders**
+
+### Blog System
+
+**Schema Definition (`blog.repack`):**
+
+```repack
+snippet Auditable {
+    created_date datetime db:default("NOW()")  
+    updated_date datetime db:default("NOW()")
+    created_by uuid
+    updated_by uuid?
+}
+
+enum PostStatus {
+    Draft
+    Published
+    Archived
+}
+
+struct Author @authors {
+    id uuid db:pk
+    !Auditable
+    
+    name string
+    email string db:unique
+    bio string?
+    website string?
+    
+    query GetByEmail(_email string) = "SELECT $fields FROM $locations WHERE $email = $_email" : one
+}
+
+struct Category @categories {
+    id uuid db:pk
+    !Auditable
+    
+    name string db:unique
+    slug string db:unique
+    description string?
+    
+    query GetBySlug(_slug string) = "SELECT $fields FROM $locations WHERE $slug = $_slug" : one
+}
+
+struct Post @posts {
+    id uuid db:pk
+    !Auditable
+    
+    title string
+    slug string db:unique
+    content string
+    excerpt string?
+    status PostStatus db:default("'Draft'")
+    published_date datetime?
+    
+    author_id uuid
+    category_id uuid
+    
+    // External references
+    author_name Author.name
+    category_name Category.name
+    
+    query GetPublished() = "SELECT $fields FROM $locations WHERE $status = 'Published' ORDER BY published_date DESC" : many
+    query GetByAuthor(_author_id uuid) = "SELECT $fields FROM $locations WHERE $author_id = $_author_id" : many
+    query GetByCategory(_category_id uuid) = "SELECT $fields FROM $locations WHERE $category_id = $_category_id" : many
+    
+    insert CreatePost(id, title, slug, content, author_id, category_id) : one
+    update Publish(_id uuid) = "SET status = 'Published', published_date = NOW() WHERE $id = $_id"
+}
+
+struct Tag @tags {
+    id uuid db:pk
+    name string db:unique
+    color string?
+}
+
+struct PostTag @post_tags {
+    post_id uuid
+    tag_id uuid
+    
+    query GetTagsByPost(_post_id uuid) = "SELECT $fields FROM $locations WHERE $post_id = $_post_id" : many
+    query GetPostsByTag(_tag_id uuid) = "SELECT $fields FROM $locations WHERE $tag_id = $_tag_id" : many
+}
+```
+
+## Best Practices
+
+### Blueprint Development
+
+1. **Start simple**: Begin with basic templates and add complexity gradually
+2. **Handle edge cases**: Use conditionals for optional fields and special cases
+3. **Maintain consistency**: Establish naming conventions in your templates
+4. **Test thoroughly**: Verify generated code with various schema combinations
+
+### Project Structure
+
+```
+project/
+├── schemas/
+│   ├── user.repack
+│   ├── product.repack
+│   └── order.repack
+├── blueprints/
+│   ├── typescript.blueprint
+│   ├── postgres.blueprint
+│   └── docs.blueprint  
+├── generated/
+│   ├── types/
+│   ├── database/
+│   └── docs/
+└── repack.config
+```
+
+### Blueprint Debugging
+
+1. **Use debug blueprint**: Create simple debug templates to inspect data
+2. **Check variable scope**: Ensure variables are available in current context
+3. **Validate conditionals**: Test flag conditions with debug output
+4. **Verify imports**: Ensure import templates are correctly defined
+
+Happy coding with Repack! 🎉
+
