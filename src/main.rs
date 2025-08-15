@@ -1,7 +1,7 @@
 use std::{io::Write, path::PathBuf, process::exit};
 
 use blueprint::BlueprintRenderer;
-use syntax::{FileContents, ParseResult};
+use syntax::{FileContents, ParseResult, RepackError, RepackErrorKind};
 
 use crate::blueprint::BlueprintStore;
 
@@ -19,18 +19,18 @@ impl Console {
     fn update_ct(i: usize, n: usize, title: &str) {
         print!("\x1B[1A");
         print!("\r\x1B[2K[{i}/{n}] {title:<WIDTH$}\n");
-        std::io::Write::flush(&mut std::io::stdout()).unwrap();
+        let _ = std::io::Write::flush(&mut std::io::stdout());
     }
     fn update_msg(msg: &str) {
         print!("\r\x1B[2K  {msg:<WIDTH$}");
-        std::io::Write::flush(&mut std::io::stdout()).unwrap();
+        let _ = std::io::Write::flush(&mut std::io::stdout());
     }
     fn finalize() {
         println!()
     }
     fn error(message: &str) {
         print!("\n{message}");
-        std::io::Write::flush(&mut std::io::stdout()).unwrap();
+        let _ = std::io::Write::flush(&mut std::io::stdout());
     }
     fn ask_confirmation() -> bool {
         let mut input = String::new();
@@ -54,12 +54,6 @@ enum Behavior {
     /// Remove previously generated code files, cleaning up the output directories.
     /// Uses blueprint metadata to determine which files to delete.
     Clean,
-    /// Generate configuration files using configure-type blueprints.
-    /// Processes configuration instances for environment-specific deployments.
-    Configure,
-    /// Generate documentation files using document-type blueprints.
-    /// Creates human-readable documentation from schema definitions.
-    Document,
 }
 
 fn print_usage() {
@@ -92,14 +86,10 @@ fn main() {
         print_usage();
     }
 
-    let (command, filter, file) = match (args.get(1), args.get(2), args.get(3)) {
-        (Some(file), None, None) => (Behavior::Build, None, file),
-        (Some(arg), Some(file), None) if arg == "build" => (Behavior::Build, None, file),
-        (Some(arg), Some(file), None) if arg == "clean" => (Behavior::Clean, None, file),
-        (Some(arg), Some(file), None) if arg == "document" => (Behavior::Document, None, file),
-        (Some(arg), Some(filter), Some(file)) if arg == "configure" => {
-            (Behavior::Configure, Some(filter.to_string()), file)
-        }
+    let (command, file) = match (args.get(1), args.get(2)) {
+        (Some(file), None) => (Behavior::Build, file),
+        (Some(arg), Some(file)) if arg == "build" => (Behavior::Build, file),
+        (Some(arg), Some(file)) if arg == "clean" => (Behavior::Clean, file),
         _ => {
             print_usage();
             return;
@@ -131,17 +121,19 @@ fn main() {
         path.pop();
         path.push(add);
         if store.load_file(&path).is_err() {
-            panic!(
-                "Could not load external library '{}'",
-                path.to_str().unwrap()
+            let path_str = path.to_str().unwrap_or("<invalid path>");
+            Console::error(
+                &RepackError::global(RepackErrorKind::CannotRead, path_str.to_string())
+                    .into_string(),
             );
+            exit(1);
         }
     }
 
     let outputs = parse_result
         .languages
         .iter()
-        .filter_map(|lng| {
+        .map(|lng| {
             let Some(bp) = store.blueprint(&lng.profile) else {
                 Console::error(&format!(
                     "[{}] Could not find this blueprint. Have you imported it?",
@@ -150,25 +142,8 @@ fn main() {
                 exit(2)
             };
             match command {
-                Behavior::Configure => {
-                    if !matches!(bp.kind, blueprint::BlueprintKind::Configure) {
-                        return None;
-                    }
-                    Some(("Building", lng, bp))
-                }
-                Behavior::Build => {
-                    if !matches!(bp.kind, blueprint::BlueprintKind::Code) {
-                        return None;
-                    }
-                    Some(("Building", lng, bp))
-                }
-                Behavior::Document => {
-                    if !matches!(bp.kind, blueprint::BlueprintKind::Document) {
-                        return None;
-                    }
-                    Some(("Documenting", lng, bp))
-                }
-                Behavior::Clean => Some(("Cleaning", lng, bp)),
+                Behavior::Build => ("Building", lng, bp),
+                Behavior::Clean => ("Cleaning", lng, bp),
             }
         })
         .collect::<Vec<_>>();
@@ -183,19 +158,13 @@ fn main() {
         );
         let mut builder = BlueprintRenderer::new(&parse_result, bp, output);
         match command {
-            Behavior::Build | Behavior::Document => match builder.build(None) {
+            Behavior::Build => match builder.build(None) {
                 Ok(_) => {}
                 Err(e) => {
                     Console::error(&e.into_string());
                 }
             },
             Behavior::Clean => match builder.clean() {
-                Ok(_) => {}
-                Err(e) => {
-                    Console::error(&e.into_string());
-                }
-            },
-            Behavior::Configure => match builder.build(filter.clone()) {
                 Ok(_) => {}
                 Err(e) => {
                     Console::error(&e.into_string());

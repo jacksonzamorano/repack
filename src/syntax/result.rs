@@ -48,13 +48,22 @@ impl ParseResult {
         while let Some(token) = contents.next() {
             match *token {
                 Token::StructType => {
-                    strcts.push(RepackStruct::read_from_contents(&mut contents));
+                    match RepackStruct::read_from_contents(&mut contents) {
+                        Ok(s) => strcts.push(s),
+                        Err(e) => return Err(vec![e]),
+                    }
                 }
                 Token::EnumType => {
-                    enums.push(RepackEnum::read_from_contents(&mut contents));
+                    match RepackEnum::read_from_contents(&mut contents) {
+                        Ok(e) => enums.push(e),
+                        Err(e) => return Err(vec![e]),
+                    }
                 }
                 Token::SnippetType => {
-                    snippets.push(Snippet::read_from_contents(&mut contents));
+                    match Snippet::read_from_contents(&mut contents) {
+                        Ok(s) => snippets.push(s),
+                        Err(e) => return Err(vec![e]),
+                    }
                 }
                 Token::OutputType => {
                     if let Some(language) = language::Output::from_contents(&mut contents) {
@@ -163,7 +172,13 @@ impl ParseResult {
                             field_idx += 1;
                             continue;
                         };
-                        let sup_idx = strcts.iter().position(|x| x.name == *sup).unwrap();
+                        let Some(sup_idx) = strcts.iter().position(|x| x.name == *sup) else {
+                            return Err(vec![RepackError::from_field(
+                                RepackErrorKind::ParentObjectDoesNotExist,
+                                &strcts[object_idx],
+                                &strcts[object_idx].fields[field_idx],
+                            )]);
+                        };
                         let Some(foreign_pos) = &strcts[sup_idx]
                             .fields
                             .iter()
@@ -257,7 +272,7 @@ impl ParseResult {
 
             let mut autoq_idx = 0;
             while autoq_idx < strcts[object_idx].autoinsertqueries.len() {
-                match strcts[object_idx].autoinsertqueries[autoq_idx].into_query(&strcts[object_idx]) {
+                match strcts[object_idx].autoinsertqueries[autoq_idx].to_query(&strcts[object_idx]) {
                     Ok(val) => {
                         strcts[object_idx].queries.push(val);
                     }
@@ -269,7 +284,7 @@ impl ParseResult {
             } 
             autoq_idx = 0;
             while autoq_idx < strcts[object_idx].autoupdatequeries.len() {
-                match strcts[object_idx].autoupdatequeries[autoq_idx].into_query() {
+                match strcts[object_idx].autoupdatequeries[autoq_idx].to_query() {
                     Ok(val) => {
                         strcts[object_idx].queries.push(val);
                     }

@@ -34,7 +34,8 @@ pub enum SnippetMainTokenName {
     Variable(String),
 }
 impl SnippetMainTokenName {
-    pub(crate) fn from_string(val: &str) -> SnippetMainTokenName { // Unknown tokens become Variable(.) allowing [name.transform]
+    pub(crate) fn from_string(val: &str) -> SnippetMainTokenName {
+        // Unknown tokens become Variable(.) allowing [name.transform]
         match val {
             "meta" => Self::Meta,
             "if" => Self::If,
@@ -141,33 +142,6 @@ impl<'a> SnippetReference<'a> {
     }
 }
 
-/// Defines the category of blueprint and its intended purpose.
-///
-/// BlueprintKind determines which operations will use this blueprint and
-/// what type of output it generates.
-#[derive(Debug)]
-pub enum BlueprintKind {
-    /// Generates source code files (structs, interfaces, schemas, etc.)
-    /// Used by the build command to create language-specific code
-    Code,
-    /// Generates configuration files (env files, docker configs, etc.)
-    /// Used by the configure command for environment-specific deployments
-    Configure,
-    /// Generates documentation files (markdown, HTML, etc.)
-    /// Used by the document command to create human-readable docs
-    Document,
-}
-impl BlueprintKind {
-    pub fn from_string(x: &str) -> BlueprintKind {
-        match x {
-            "code" => Self::Code,
-            "configure" => Self::Configure,
-            "document" => Self::Document,
-            _ => panic!("Unknown blueprint kind {x}"),
-        }
-    }
-}
-
 /// Represents a complete blueprint definition for code generation.
 ///
 /// Blueprint contains all the template logic, type mappings, and metadata needed
@@ -180,8 +154,6 @@ pub struct Blueprint {
     pub id: String,
     /// Human-readable name for this blueprint
     pub name: String,
-    /// The blueprint category (Code, Document, or Configure)
-    pub kind: BlueprintKind,
     /// Import statements and dependencies needed for generated code
     pub links: HashMap<String, String>,
     /// Type mappings from repack types to target language types
@@ -196,7 +168,6 @@ impl Blueprint {
         let mut lang = Blueprint {
             id: String::new(),
             name: String::new(),
-            kind: BlueprintKind::Code,
             links: HashMap::new(),
             utilities: HashMap::new(),
             tokens: Vec::new(),
@@ -251,7 +222,7 @@ impl Blueprint {
                                     }
                                 }
                             }
-                        } 
+                        }
                         let mut literal_string_value = snip.contents.clone();
                         for t in &participating_tokens {
                             if let BlueprintToken::Literal(val) = t {
@@ -328,13 +299,6 @@ impl Blueprint {
             .get(&(SnippetMainTokenName::Meta, SnippetSecondaryTokenName::Name))
         {
             lang.name = name.clone();
-        }
-
-        if let Some(kind) = lang
-            .utilities
-            .get(&(SnippetMainTokenName::Meta, SnippetSecondaryTokenName::Kind))
-        {
-            lang.kind = BlueprintKind::from_string(kind)
         }
 
         if lang

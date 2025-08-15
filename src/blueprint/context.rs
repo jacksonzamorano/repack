@@ -35,9 +35,9 @@ impl TokenConsumer for String {
             if let Some(cutoff) = self.char_indices().rev().find_map(|(idx, _)| {
                 del_ct += 1;
                 if del_ct == len {
-                    return Some(idx);
+                    Some(idx)
                 } else {
-                    return None;
+                    None
                 }
             }) {
                 self.truncate(cutoff);
@@ -98,7 +98,8 @@ impl<'a> BlueprintExecutionContext<'a> {
         let mut variables = self.variables.clone();
         let mut flags = self.flags.clone();
 
-        let resolved_type = match field.field_type.as_ref().unwrap() {
+        let resolved_type = match field.field_type.as_ref() {
+            Some(field_type) => match field_type {
             FieldType::Core(typ) => {
                 if let Some(link) = blueprint.links.get(&typ.to_string()) {
                     writer.import(link.replace("$", &typ.to_string()))
@@ -125,6 +126,14 @@ impl<'a> BlueprintExecutionContext<'a> {
                 }
                 typ
             }
+            }
+            None => {
+                return Err(RepackError::from_field(
+                    RepackErrorKind::TypeNotResolved,
+                    obj,
+                    field
+                ));
+            }
         };
 
         variables.insert("struct_name".to_string(), obj.name.to_string());
@@ -132,7 +141,7 @@ impl<'a> BlueprintExecutionContext<'a> {
         variables.insert("type".to_string(), resolved_type.to_string());
         variables.insert(
             "type_raw".to_string(),
-            field.field_type.as_ref().unwrap().to_string(),
+            field.field_type.as_ref().unwrap_or(&FieldType::Core(crate::syntax::CoreType::String)).to_string(),
         );
         flags.insert("optional", field.optional);
         flags.insert("array", field.array);

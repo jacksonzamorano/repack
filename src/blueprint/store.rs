@@ -64,7 +64,7 @@ impl BlueprintStore {
         let mut file = File::open(path).map_err(|_| {
             RepackError::global(
                 RepackErrorKind::CannotRead,
-                path.to_str().unwrap().to_string(),
+                path.to_str().unwrap_or("<invalid path>").to_string(),
             )
         })?;
         let mut contents = vec![];

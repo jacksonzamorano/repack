@@ -108,12 +108,18 @@ impl RepackStruct {
     ///
     /// # Panics
     /// Panics if the expected object name is missing or malformed
-    pub fn read_from_contents(contents: &mut FileContents) -> RepackStruct {
+    pub fn read_from_contents(contents: &mut FileContents) -> Result<RepackStruct, RepackError> {
         let Some(name_opt) = contents.next() else {
-            panic!("Read record type, expected a name but got end of file.");
+            return Err(RepackError::global(
+                RepackErrorKind::ParseIncomplete,
+                "struct name".to_string()
+            ));
         };
         let Token::Literal(name_ref) = name_opt else {
-            panic!("Read record type, expected a name but got {name_opt:?}");
+            return Err(RepackError::global(
+                RepackErrorKind::ParseIncomplete,
+                format!("{name_opt:?}")
+            ));
         };
         let name = name_ref.to_string();
         let mut fields = Vec::new();
@@ -168,17 +174,20 @@ impl RepackStruct {
                         {
                             fields.push(field);
                         } else {
-                            panic!("Cannot parse field in {name}");
+                            return Err(RepackError::global(
+                                RepackErrorKind::ParseIncomplete,
+                                format!("field in {name}")
+                            ));
                         }
                     }
                 }
                 Token::Join => match RepackStructJoin::parse(contents) {
                     Ok(j) => joins.push(j),
-                    Err(e) => panic!("{}", e.into_string()),
+                    Err(e) => return Err(e),
                 },
                 Token::Query => match Query::parse(&name, contents) {
                     Ok(q) => queries.push(q),
-                    Err(e) => panic!("{}", e.into_string()),
+                    Err(e) => return Err(e),
                 },
                 Token::Exclamation => {
                     if let Some(Token::Literal(snippet_name)) = contents.take() {
@@ -189,19 +198,19 @@ impl RepackStruct {
                     Ok(i) => {
                         autoinsertqueries.push(i);
                     }
-                    Err(e) => panic!("{}", e.into_string()),
+                    Err(e) => return Err(e),
                 },
                 Token::Update => match AutoUpdateQuery::parse(&name, contents) {
                     Ok(i) => {
                         autoupdatequeries.push(i);
                     }
-                    Err(e) => panic!("{}", e.into_string()),
+                    Err(e) => return Err(e),
                 },
                 _ => {}
             }
         }
 
-        RepackStruct {
+        Ok(RepackStruct {
             name,
             fields,
             inherits,
@@ -213,7 +222,7 @@ impl RepackStruct {
             joins,
             autoinsertqueries,
             autoupdatequeries,
-        }
+        })
     }
 
     /// Validates the object definition and returns any semantic errors.

@@ -81,9 +81,9 @@ impl TokenConsumer for BlueprintBuildResult {
             if let Some(cutoff) = latest_du.char_indices().rev().find_map(|(idx, _)| {
                 del_ct += 1;
                 if del_ct == len {
-                    return Some(idx);
+                    Some(idx)
                 } else {
-                    return None;
+                    None
                 }
             }) {
                 latest_du.truncate(cutoff);
@@ -439,11 +439,21 @@ impl<'a> BlueprintRenderer<'a> {
                         .stdout(Stdio::null())
                         .stderr(Stdio::inherit())
                         .spawn()
-                        .unwrap();
+                        .map_err(|e| RepackError::global(
+                            RepackErrorKind::ProcessExecutionFailed,
+                            e.to_string()
+                        ))?;
                     if let Some(stdin) = exec.stdin.as_mut() {
-                        stdin.write_all(exec_reader.as_bytes()).unwrap();
+                        stdin.write_all(exec_reader.as_bytes())
+                            .map_err(|e| RepackError::global(
+                                RepackErrorKind::ProcessExecutionFailed,
+                                e.to_string()
+                            ))?;
                     }
-                    exec.wait().unwrap();
+                    exec.wait().map_err(|e| RepackError::global(
+                        RepackErrorKind::ProcessExecutionFailed,
+                        e.to_string()
+                    ))?;
                 }
             }
             SnippetMainTokenName::PlaceImports => {
@@ -490,7 +500,10 @@ impl<'a> BlueprintRenderer<'a> {
             }
             SnippetMainTokenName::Variable(var) => {
                 let mut components = var.split(".");
-                let name = components.next().unwrap();
+                let name = components.next().ok_or_else(|| RepackError::global(
+                    RepackErrorKind::ParseIncomplete,
+                    format!("variable '{var}'")
+                ))?;
                 if let Some(glob) = self.global_counters.get(name) {
                     writer.write(&glob.to_string());
                 } else if let Some(mut res) = context.variables.get(name).map(|x| x.to_string()) {
@@ -536,11 +549,11 @@ impl<'a> BlueprintRenderer<'a> {
                                     .join("")
                             }
                             "split_period_first" => {
-                                res = res.split(".").next().unwrap().to_string()
+                                res = res.split(".").next().unwrap_or("").to_string()
                             }
-                            "split_period_last" => res = res.split(".").last().unwrap().to_string(),
-                            "split_dash_first" => res = res.split("-").next().unwrap().to_string(),
-                            "split_dash_last" => res = res.split("-").last().unwrap().to_string(),
+                            "split_period_last" => res = res.split(".").last().unwrap_or("").to_string(),
+                            "split_dash_first" => res = res.split("-").next().unwrap_or("").to_string(),
+                            "split_dash_last" => res = res.split("-").last().unwrap_or("").to_string(),
                             _ => {
                                 return Err(RepackError::from_lang_with_msg(
                                     RepackErrorKind::InvalidVariableModifier,
@@ -584,7 +597,10 @@ impl<'a> BlueprintRenderer<'a> {
                 .insert(opt.0.to_string(), opt.1.to_string());
         }
         _ = &self.render_tokens(&self.blueprint.tokens, &context, &mut files)?;
-        let mut path = current_dir().unwrap();
+        let mut path = current_dir().map_err(|_| RepackError::global(
+            RepackErrorKind::PathNotValid,
+            String::new()
+        ))?;
         if let Some(loc) = &self.config.location {
             path.push(loc);
         }
@@ -637,7 +653,10 @@ impl<'a> BlueprintRenderer<'a> {
             &BlueprintExecutionContext::new(),
             &mut files,
         )?;
-        let mut path = current_dir().unwrap();
+        let mut path = current_dir().map_err(|_| RepackError::global(
+            RepackErrorKind::PathNotValid,
+            String::new()
+        ))?;
         if let Some(loc) = &self.config.location {
             path.push(loc);
         }

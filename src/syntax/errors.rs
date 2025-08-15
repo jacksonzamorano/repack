@@ -34,6 +34,10 @@ pub enum RepackErrorKind {
     InvalidJoin,
     FieldNotOnJoin,
     SyntaxError,
+    ProcessExecutionFailed,
+    PathNotValid,
+    ParseIncomplete,
+    FieldNotFound,
     UnknownError,
 }
 impl Default for RepackErrorKind {
@@ -71,6 +75,10 @@ impl RepackErrorKind {
             Self::FieldNotOnSuper => "Field does not exist in this super.",
             Self::InvalidJoin => "Joined entity not found.",
             Self::FieldNotOnJoin => "Field does not exist in this join.",
+            Self::ProcessExecutionFailed => "Process execution failed:",
+            Self::PathNotValid => "Path could not be converted to string:",
+            Self::ParseIncomplete => "Parsing failed, expected token not found:",
+            Self::FieldNotFound => "Field could not be found:",
         }
     }
 }

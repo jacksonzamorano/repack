@@ -36,11 +36,9 @@ impl Output {
     /// # Returns
     /// An Output instance with all parsed configuration options
     pub fn from_contents(contents: &mut FileContents) -> Option<Output> {
-        let Some(name_opt) = contents.next() else {
-            panic!("Read record type, expected a name but got end of file.");
-        };
+        let name_opt = contents.next()?;
         let Token::Literal(name_ref) = name_opt else {
-            panic!("Read record type, expected a name but got {name_opt:?}");
+            return None;
         };
         let output_language = name_ref.to_string();
         let mut location = None;
@@ -103,7 +101,6 @@ impl Output {
     }
 
     pub fn errors(&self) -> Vec<RepackError> {
-        
         // if OutputProfile::from_keyword(&self.profile).is_none() {
         //     errors.push(RepackError::from_lang(
         //         RepackErrorKind::UnknownLanguage,

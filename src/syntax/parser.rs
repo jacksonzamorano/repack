@@ -21,7 +21,10 @@ impl FileContents {
     pub fn empty() -> Self {
         FileContents {
             contents: Vec::new(),
-            root: env::current_dir().unwrap().to_str().unwrap().to_string(),
+            root: env::current_dir()
+                .ok()
+                .and_then(|p| p.to_str().map(|s| s.to_string()))
+                .unwrap_or_else(|| ".".to_string()),
             index: 0,
         }
     }
@@ -41,7 +44,7 @@ impl FileContents {
         path.pop();
         let mut contents = FileContents {
             contents: Vec::new(),
-            root: path.to_str().unwrap().to_string(),
+            root: path.to_str().unwrap_or(".").to_string(),
             index: 0,
         };
         contents.add(filename);
@@ -64,7 +67,7 @@ impl FileContents {
             let Ok(mut folder_contents) = fs::read_dir(&path) else {
                 println!(
                     "[EXIT] Unable to load requested folder '{}'",
-                    path.to_str().unwrap()
+                    path.to_str().unwrap_or("<invalid path>")
                 );
                 exit(5);
             };
@@ -72,13 +75,17 @@ impl FileContents {
                 let path = file.path();
                 if let Some(extension) = path.extension() {
                     if extension == "repack" {
-                        self.add(path.to_str().unwrap());
+                        if let Some(path_str) = path.to_str() {
+                            self.add(path_str);
+                        }
                     }
                 }
             }
         } else {
             path.push(filename);
-            self.add(path.to_str().unwrap())
+            if let Some(path_str) = path.to_str() {
+                self.add(path_str);
+            }
         }
     }
 

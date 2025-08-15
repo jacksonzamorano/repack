@@ -91,6 +91,7 @@ impl Query {
     }
 
     /// Renders the query contents into a finalized SQL string with positional parameters.
+    /// Unrecognized variables render as [err: name]. A trailing semicolon is appended.
     ///
     /// Interpolation rules:
     /// - $fields => comma list of table-qualified columns with AS aliases.
@@ -98,7 +99,6 @@ impl Query {
     /// - $table => base table name.
     /// - $name / $#name => field reference (qualified vs isolated column name).
     /// - $argName => replaced with next positional parameter index ($1,$2,... in first appearance order).
-    /// Unrecognized variables render as [err: name]. A trailing semicolon is appended.
     pub fn render(
         &self,
         strct: &RepackStruct,
@@ -118,7 +118,7 @@ impl Query {
                     buf.push(c);
                     continue;
                 }
-                if !(c.is_alphabetic() || c == '_' || c == '$' || c == '#') && !buf.starts_with('$') {
+                if !(c.is_alphabetic() || c == '_' || c == '$' || c == '#' || buf.starts_with('$')) {
                     output.push_str(&buf);
                     output.push(c);
                     buf.clear();
@@ -140,7 +140,10 @@ impl Query {
             }
             let mut isolated = false;
             let mut target = &buf[1..];
-            let next = target.chars().next().unwrap();
+            let next = target.chars().next().ok_or_else(|| RepackError::global(
+                RepackErrorKind::ParseIncomplete,
+                format!("query variable '{buf}'")
+            ))?;
             if next == '#' {
                 target = &buf[2..];
                 isolated = true;
@@ -152,28 +155,29 @@ impl Query {
                     for field in &strct.fields {
                         if let Some(location) = &field.field_location {
                             let table = if location.location == "super" {
-                                strct.table_name.as_ref().unwrap()
+                                strct.table_name.as_ref().ok_or_else(|| RepackError::from_obj(
+                                    RepackErrorKind::ParentObjectDoesNotExist,
+                                    strct
+                                ))?
                             } else {
                                 &location.location
                             };
                             field_strings
                                 .push(format!("{}.{} AS {}", table, location.field, field.name))
+                        } else if let Some(alias) = field.function("db", "as") {
+                            let def = String::new();
+                            field_strings.push(format!(
+                                "{} AS {}",
+                                alias.args.first().unwrap_or(&def),
+                                field.name
+                            ))
                         } else {
-                            if let Some(alias) = field.function("db", "as") {
-                                let def = String::new();
-                                field_strings.push(format!(
-                                    "{} AS {}",
-                                    alias.args.first().unwrap_or(&def),
-                                    field.name
-                                ))
-                            } else {
-                                field_strings.push(format!(
-                                    "{}.{} AS {}",
-                                    strct.table_name.as_ref().unwrap(),
-                                    field.name,
-                                    field.name
-                                ))
-                            }
+                            field_strings.push(format!(
+                                "{}.{} AS {}",
+                                strct.table_name.as_ref().unwrap(),
+                                field.name,
+                                field.name
+                            ))
                         }
                     }
                     Some(field_strings.join(", "))
@@ -257,16 +261,14 @@ impl Query {
                             } else {
                                 Some(format!("{}.{}", table, location.field))
                             }
+                        } else if isolated {
+                            Some(field.name.clone())
                         } else {
-                            if isolated {
-                                Some(field.name.clone())
-                            } else {
-                                Some(format!(
-                                    "{}.{}",
-                                    strct.table_name.as_ref().unwrap(),
-                                    field.name
-                                ))
-                            }
+                            Some(format!(
+                                "{}.{}",
+                                strct.table_name.as_ref().unwrap(),
+                                field.name
+                            ))
                         }
                     } else if let Some(arg) = self.args.iter().find(|x| x.name == val) {
                         if let Some(idx) = pos_args.iter().position(|x| *x == arg.name) {
@@ -348,21 +350,31 @@ impl AutoInsertQuery {
         })
     }
 
-    pub fn into_query(&self, strct: &RepackStruct) -> Result<Query, RepackError> {
+    pub fn to_query(&self, strct: &RepackStruct) -> Result<Query, RepackError> {
         let mut args = Vec::<QueryArg>::new();
         let mut output = "WITH $table AS (INSERT INTO $table (".to_string();
         let mut query_interpolate = String::new();
         for (idx, selected_field) in self.args.iter().enumerate() {
             let Some(matching_field) = strct.fields.iter().find(|x| x.name == *selected_field)
             else {
-                panic!("Field not found in struct.");
+                return Err(RepackError::from_obj_with_msg(
+                    RepackErrorKind::FieldNotFound,
+                    strct,
+                    selected_field.to_string()
+                ));
             };
-            output.push_str(&selected_field);
-            query_interpolate.push_str(&format!("$__{}", selected_field));
+            output.push_str(selected_field);
+            query_interpolate.push_str(&format!("$__{selected_field}"));
 
             args.push(QueryArg {
-                name: format!("__{}", selected_field),
-                typ: matching_field.field_type.as_ref().unwrap().to_string(),
+                name: format!("__{selected_field}"),
+                typ: matching_field.field_type.as_ref()
+                    .ok_or_else(|| RepackError::from_field(
+                        RepackErrorKind::TypeNotResolved,
+                        strct,
+                        matching_field
+                    ))?
+                    .to_string(),
             });
             if idx + 1 != self.args.len() {
                 query_interpolate.push_str(", ");
@@ -445,7 +457,7 @@ impl AutoUpdateQuery {
         })
     }
 
-    pub fn into_query(&self) -> Result<Query, RepackError> {
+    pub fn to_query(&self) -> Result<Query, RepackError> {
         let nested_contents = format!("WITH $table AS (UPDATE $table {} RETURNING *) SELECT $fields FROM $locations", self.contents);
         Ok(Query {
             args: self.args.clone(),

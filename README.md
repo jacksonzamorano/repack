@@ -151,6 +151,10 @@ Error kinds (E#### codes map to enum order):
 - InvalidJoin
 - FieldNotOnJoin
 - SyntaxError
+- ProcessExecutionFailed (NEW: Process execution failed during blueprint rendering)
+- PathNotValid (NEW: Path could not be converted to string representation) 
+- ParseIncomplete (NEW: Parsing failed due to missing expected tokens)
+- FieldNotFound (NEW: Field could not be found in struct during query processing)
 - UnknownError
 
 ## 2. Blueprint Templating Language

@@ -1,4 +1,4 @@
-use super::{FileContents, Token};
+use super::{FileContents, Token, RepackError, RepackErrorKind};
 
 #[derive(Debug)]
 pub struct RepackEnumCase {
@@ -35,12 +35,18 @@ impl RepackEnum {
     ///
     /// # Panics
     /// Panics if the expected enum name is missing or malformed
-    pub fn read_from_contents(contents: &mut FileContents) -> RepackEnum {
+    pub fn read_from_contents(contents: &mut FileContents) -> Result<RepackEnum, RepackError> {
         let Some(name_opt) = contents.next() else {
-            panic!("Read enum name, expected a name but got end of file.");
+            return Err(RepackError::global(
+                RepackErrorKind::ParseIncomplete,
+                "enum name".to_string()
+            ));
         };
         let Token::Literal(name_ref) = name_opt else {
-            panic!("Read enum name, expected a name but got {name_opt:?}");
+            return Err(RepackError::global(
+                RepackErrorKind::ParseIncomplete,
+                format!("{name_opt:?}")
+            ));
         };
         let name = name_ref.to_string();
         let mut options = Vec::new();
@@ -77,10 +83,10 @@ impl RepackEnum {
             }
         }
 
-        RepackEnum {
+        Ok(RepackEnum {
             name,
             categories,
             options,
-        }
+        })
     }
 }
