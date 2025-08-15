@@ -21,6 +21,7 @@ use super::{
 /// DeliveryUnit allows the rendering system to handle both regular text content
 /// and special placeholders like import statements that need to be processed
 /// and positioned correctly in the final output.
+#[derive(Debug)]
 enum DeliveryUnit {
     /// Regular text content to be written directly to the output file
     Text(String),
@@ -47,6 +48,9 @@ impl TokenConsumer for BlueprintBuildResult {
         self.current_file_name = Some(filename.to_string());
     }
     fn write(&mut self, value: &dyn AsRef<str>) {
+        if value.as_ref().is_empty() {
+            return;
+        }
         if let Some(file) = &self.current_file_name {
             if let Some(current) = self.contents.get_mut(file) {
                 current.push(DeliveryUnit::Text(value.as_ref().to_string()));
@@ -55,6 +59,34 @@ impl TokenConsumer for BlueprintBuildResult {
                     file.to_string(),
                     vec![DeliveryUnit::Text(value.as_ref().to_string())],
                 );
+            }
+        }
+    }
+    fn delete_trailing(&mut self, value: &dyn AsRef<str>) {
+        let Some(filename) = &self.current_file_name else {
+            return;
+        };
+        let Some(latest_file) = self.contents.get_mut(filename) else {
+            return;
+        };
+        let Some(latest_du) = latest_file.iter_mut().rev().find_map(|x| match x {
+            DeliveryUnit::Text(t) => Some(t),
+            _ => None,
+        }) else {
+            return;
+        };
+        if latest_du.ends_with(value.as_ref()) {
+            let mut del_ct = 0;
+            let len = value.as_ref().chars().count();
+            if let Some(cutoff) = latest_du.char_indices().rev().find_map(|(idx, _)| {
+                del_ct += 1;
+                if del_ct == len {
+                    return Some(idx);
+                } else {
+                    return None;
+                }
+            }) {
+                latest_du.truncate(cutoff);
             }
         }
     }
@@ -416,6 +448,11 @@ impl<'a> BlueprintRenderer<'a> {
             }
             SnippetMainTokenName::PlaceImports => {
                 writer.import_point();
+            }
+            SnippetMainTokenName::Trim => {
+                let mut trim_contents = String::new();
+                self.render_tokens(content.contents, context, &mut trim_contents)?;
+                writer.delete_trailing(&trim_contents);
             }
             SnippetMainTokenName::Import => {
                 if let Some(import) = self.blueprint.links.get(&content.details.secondary_token) {

@@ -27,8 +27,9 @@ export interface [name] {
 export type [name] = 
 
 [each case]
-'[name]'[if sep] | [/if]
+'[name]' | 
 [/each]
+[trim] | [/trim]
 
 [/each]
 

@@ -24,6 +24,7 @@ pub enum SnippetMainTokenName {
     Ref,
     Link,
     Import,
+    Trim,
     PlaceImports,
     Break,
     Exec,
@@ -54,6 +55,7 @@ impl SnippetMainTokenName {
             "increment" => Self::Increment,
             "snippet" => Self::Snippet,
             "render" => Self::Render,
+            "trim" => Self::Trim,
             _ => Self::Variable(val.to_string()),
         }
     }

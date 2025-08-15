@@ -51,6 +51,10 @@ impl Field {
             .collect()
     }
 
+    pub fn function(&self, ns: &str, name: &str) -> Option<&FieldFunction> {
+        self.functions.iter().find(|x| x.namespace == ns && x.name == name)
+    }
+
     /// Parses a Field definition from the input file contents.
     ///
     /// This method reads field definition syntax and constructs a Field instance

@@ -36,7 +36,40 @@ type [name] struct {
 
 [each query][br]
 [import sql]
-func [name](db *sql.DB, [each arg][name] [type][if sep],[/if][/each]) {
+func [name](db *sql.DB, [each arg][name] [type], [/each][trim], [/trim])
+[if returns_many]
+ (\[][struct_name], error) 
+[/if][if returns_one]
+ (*[struct_name], error) 
+[/if][if returns_none]
+ error 
+[/if]
+{[br]
+	[if returns_many]
+	values := make(\[][struct_name], 0)[br]
+	[/if]
 	rows, err := db.Query("[query]", [each arg][name][/each])
+	if err != nil {[br]
+		[if returns_none]
+		return err
+		[/if][if returns_one]
+		return nil, err
+		[/if][if returns_many]
+		return values, err
+		[/if]
+		[br]
+	}
+	defer rows.Close()[br]
+	[if returns_none]
+	return nil
+	[/if]
+	[if returns_many]
+	
+	return values, nil
+	[/if]
+	[if returns_one]
+	
+	return nil, nil
+	[/if][br]
 }
 [/each]

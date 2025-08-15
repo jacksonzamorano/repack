@@ -11,9 +11,3 @@ repack file.repack
 
 Clean files:
 repack file.repack --clean
-
-Build configuration or deploy scripts:
-repack file.repack --configure [environment]
-
-Build documentation files:
-repack file.repack --document

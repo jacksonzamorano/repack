@@ -170,7 +170,7 @@ impl ParseResult {
                             .position(|x| x.name == ext.field)
                         else {
                             errors.push(RepackError::from_field(
-                                RepackErrorKind::InvalidSuper,
+                                RepackErrorKind::FieldNotOnSuper,
                                 &objects[object_idx],
                                 &objects[object_idx].fields[field_idx],
                             ));

@@ -133,12 +133,21 @@ impl Query {
                             field_strings
                                 .push(format!("{}.{} AS {}", table, location.field, field.name))
                         } else {
-                            field_strings.push(format!(
-                                "{}.{} AS {}",
-                                strct.table_name.as_ref().unwrap(),
-                                field.name,
-                                field.name
-                            ))
+                            if let Some(alias) = field.function("db", "as") {
+                                let def = String::new();
+                                field_strings.push(format!(
+                                    "{} AS {}",
+                                    alias.args.first().unwrap_or(&def),
+                                    field.name
+                                ))
+                            } else {
+                                field_strings.push(format!(
+                                    "{}.{} AS {}",
+                                    strct.table_name.as_ref().unwrap(),
+                                    field.name,
+                                    field.name
+                                ))
+                            }
                         }
                     }
                     Some(field_strings.join(", "))
@@ -177,7 +186,11 @@ impl Query {
                                             .unwrap();
                                         // ^ This is safe to unwrap because we've already done the
                                         // checking.
-                                        Some(format!("{} {}", fe.table_name.clone().unwrap(), join.name))
+                                        Some(format!(
+                                            "{} {}",
+                                            fe.table_name.clone().unwrap(),
+                                            join.name
+                                        ))
                                     }
                                     "super" => Some(strct.table_name.clone().unwrap()),
                                     tn => {

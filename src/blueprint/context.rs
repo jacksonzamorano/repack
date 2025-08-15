@@ -1,8 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::syntax::{
-    CoreType, Field, FieldType, Output, ParseResult, Query, QueryArg, RepackEnum, RepackEnumCase,
-    RepackError, RepackErrorKind, RepackStruct,
+    CoreType, Field, FieldType, Output, ParseResult, Query, QueryArg, QueryReturn, RepackEnum,
+    RepackEnumCase, RepackError, RepackErrorKind, RepackStruct,
 };
 
 use super::{Blueprint, SnippetMainTokenName, SnippetSecondaryTokenName};
@@ -11,12 +11,14 @@ pub(crate) trait TokenConsumer {
     fn set_file_name(&mut self, filename: &str);
     fn import_point(&mut self);
     fn write(&mut self, value: &dyn AsRef<str>);
+    fn delete_trailing(&mut self, value: &dyn AsRef<str>);
     fn import(&mut self, value: String);
 }
 impl TokenConsumer for HashSet<String> {
     fn set_file_name(&mut self, filename: &str) {
         self.insert(filename.to_string());
     }
+    fn delete_trailing(&mut self, _value: &dyn AsRef<str>) {}
     fn write(&mut self, _value: &dyn AsRef<str>) {}
     fn import(&mut self, _value: String) {}
     fn import_point(&mut self) {}
@@ -25,6 +27,22 @@ impl TokenConsumer for String {
     fn set_file_name(&mut self, _filename: &str) {}
     fn write(&mut self, value: &dyn AsRef<str>) {
         self.push_str(value.as_ref());
+    }
+    fn delete_trailing(&mut self, value: &dyn AsRef<str>) {
+        if self.ends_with(value.as_ref()) {
+            let mut del_ct = 0;
+            let len = value.as_ref().chars().count();
+            if let Some(cutoff) = self.char_indices().rev().find_map(|(idx, _)| {
+                del_ct += 1;
+                if del_ct == len {
+                    return Some(idx);
+                } else {
+                    return None;
+                }
+            }) {
+                self.truncate(cutoff);
+            }
+        }
     }
     fn import(&mut self, _value: String) {}
     fn import_point(&mut self) {}
@@ -135,6 +153,14 @@ impl<'a> BlueprintExecutionContext<'a> {
         new.variables
             .insert("query".to_string(), q.render(obj, &result.objects)?);
         new.variables.insert("name".to_string(), q.name.to_string());
+        new.variables
+            .insert("struct_name".to_string(), obj.name.to_string());
+        new.flags
+            .insert("returns_many", matches!(q.ret_type, QueryReturn::Many));
+        new.flags
+            .insert("returns_one", matches!(q.ret_type, QueryReturn::One));
+        new.flags
+            .insert("returns_none", matches!(q.ret_type, QueryReturn::None));
         new.query = Some(q);
 
         Ok(new)
@@ -146,7 +172,8 @@ impl<'a> BlueprintExecutionContext<'a> {
         writer: &mut dyn TokenConsumer,
     ) -> Result<Self, RepackError> {
         let mut new = self.clone();
-        new.variables.insert("name".to_string(), arg.name.to_string());
+        new.variables
+            .insert("name".to_string(), arg.name.to_string());
         let resolved_type = match CoreType::from_string(&arg.typ) {
             Some(typ) => {
                 if let Some(link) = blueprint.links.get(&typ.to_string()) {
@@ -169,7 +196,8 @@ impl<'a> BlueprintExecutionContext<'a> {
                 &arg.typ
             }
         };
-        new.variables.insert("type".to_string(), resolved_type.to_string());
+        new.variables
+            .insert("type".to_string(), resolved_type.to_string());
 
         Ok(new)
     }

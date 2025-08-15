@@ -13,7 +13,7 @@
 [file]model.sql[/file]
 BEGIN;[br]
 
-[eachr object]
+[eachr object][br]
 DROP TABLE IF EXISTS [table_name];
 [/eachr]
 
@@ -22,23 +22,26 @@ DROP TYPE IF EXISTS [name];
 [/each]
 
 [each enum][br]
-CREATE TYPE [name] AS ENUM([each case]'[value]'[if sep], [/if][/each]);
+CREATE TYPE [name] AS ENUM([each case]'[value]', [/each][trim], [/trim]);
 [/each]
 
-[each object]
+[each object][br]
 CREATE TABLE [table_name] (
-[each field][br]
+[each field]
+	[nfunc db.as][br]
 	[name] [type][ifn optional] NOT NULL[/ifn][func db.default] DEFAULT [0][/func]
 	[func db.pk] PRIMARY KEY[/func]
 	[func db.generated] GENERATED ALWAYS AS [0][/func]
 	[func db.identity] GENERATED ALWAYS AS IDENTITY[/func]
-	[func db.unique] UNIQUE[/func]
+	[func db.unique] UNIQUE[/func],
 	[ref],
-	FOREIGN KEY ([name]) REFERENCES [foreign_table]([foreign_field])
+	FOREIGN KEY ([name]) REFERENCES [foreign_table]([foreign_field]),
 	[/ref]
-	[if sep],[/if]
-[/each][br]
+	[/nfunc]
+[/each]
+[trim],[/trim]
+[br]
 );
-[func db.index][br]CREATE INDEX ON [table_name] ([each arg][arg][if sep], [/if][/each]);[/func]
-[br][br][/each]
+[func db.index][br]CREATE INDEX ON [table_name] ([each arg][arg], [/each][trim], [/trim]);[/func]
+[/each]
 [br][br]COMMIT;

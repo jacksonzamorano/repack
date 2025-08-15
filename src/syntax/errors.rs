@@ -142,6 +142,7 @@ impl RepackError {
     /// # Arguments
     /// * `error` - The type of error that occurred
     /// * `obj` - The object where the error was found
+    #[allow(dead_code)]
     pub fn from_obj(error: RepackErrorKind, obj: &RepackStruct) -> RepackError {
         RepackError {
             error,

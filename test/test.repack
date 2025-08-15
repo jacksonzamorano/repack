@@ -24,6 +24,7 @@ struct User @users #model {
 	email string
 	user_type UserType
 	subscription_id string?
+	email_id string db:as("LOWER(name) || '_' || LOWER(email)")
 
 
 	query UserByEmail(_email string) = "SELECT $fields FROM $locations WHERE $email = $_email" : one
