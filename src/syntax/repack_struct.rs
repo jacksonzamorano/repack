@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use super::{
-    AutoQuery, AutoQueryType, Field, FieldType, FileContents, ObjectFunction, RepackError,
+    AutoInsertQuery, AutoUpdateQuery, Field, FieldType, FileContents, ObjectFunction, RepackError,
     RepackErrorKind, Token, query::Query,
 };
 
@@ -87,7 +87,8 @@ pub struct RepackStruct {
     pub functions: Vec<ObjectFunction>,
     pub queries: Vec<Query>,
     pub joins: Vec<RepackStructJoin>,
-    pub autoqueries: Vec<AutoQuery>,
+    pub autoinsertqueries: Vec<AutoInsertQuery>,
+    pub autoupdatequeries: Vec<AutoUpdateQuery>,
 }
 impl RepackStruct {
     /// Parses an Object definition from the input file contents.
@@ -122,7 +123,8 @@ impl RepackStruct {
         let mut functions = Vec::new();
         let mut queries = Vec::new();
         let mut joins = Vec::new();
-        let mut autoqueries = Vec::new();
+        let mut autoinsertqueries = Vec::new();
+        let mut autoupdatequeries = Vec::new();
 
         'header: while let Some(token) = contents.next() {
             match token {
@@ -182,15 +184,15 @@ impl RepackStruct {
                         use_snippets.push(snippet_name);
                     }
                 }
-                Token::Insert => match AutoQuery::parse(AutoQueryType::Insert, &name, contents) {
+                Token::Insert => match AutoInsertQuery::parse(&name, contents) {
                     Ok(i) => {
-                        autoqueries.push(i);
+                        autoinsertqueries.push(i);
                     }
                     Err(e) => panic!("{}", e.into_string()),
                 },
-                Token::Update => match AutoQuery::parse(AutoQueryType::Update, &name, contents) {
+                Token::Update => match AutoUpdateQuery::parse(&name, contents) {
                     Ok(i) => {
-                        autoqueries.push(i);
+                        autoupdatequeries.push(i);
                     }
                     Err(e) => panic!("{}", e.into_string()),
                 },
@@ -208,7 +210,8 @@ impl RepackStruct {
             functions,
             queries,
             joins,
-            autoqueries,
+            autoinsertqueries,
+            autoupdatequeries,
         }
     }
 

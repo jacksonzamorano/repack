@@ -256,8 +256,20 @@ impl ParseResult {
             }
 
             let mut autoq_idx = 0;
-            while autoq_idx < strcts[object_idx].autoqueries.len() {
-                match strcts[object_idx].autoqueries[autoq_idx].into_query(&strcts[object_idx]) {
+            while autoq_idx < strcts[object_idx].autoinsertqueries.len() {
+                match strcts[object_idx].autoinsertqueries[autoq_idx].into_query(&strcts[object_idx]) {
+                    Ok(val) => {
+                        strcts[object_idx].queries.push(val);
+                    }
+                    Err(e) => {
+                        errors.push(e)
+                    }
+                }
+                autoq_idx += 1;
+            } 
+            autoq_idx = 0;
+            while autoq_idx < strcts[object_idx].autoupdatequeries.len() {
+                match strcts[object_idx].autoupdatequeries[autoq_idx].into_query() {
                     Ok(val) => {
                         strcts[object_idx].queries.push(val);
                     }

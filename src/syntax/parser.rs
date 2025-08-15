@@ -217,6 +217,10 @@ impl FileContents {
         matches!(self.take(), Some(Token::Colon))
     }
 
+    pub fn peek_equals(&mut self) -> bool {
+        matches!(self.peek(), Some(Token::Equal))
+    }
+
     /// Advances the parsing position by one without returning the token.
     ///
     /// Used when a token needs to be consumed but its value is not needed,

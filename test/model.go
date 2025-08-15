@@ -1,7 +1,7 @@
 package main;
 import "time"
-import "database/sql"
 import "github.com/google/uuid"
+import "database/sql"
 
 
 type UserType string
@@ -49,14 +49,22 @@ func DeleteUserById(db *sql.DB, _id uuid.UUID) error {
 	defer rows.Close()
 	return nil
 }
-func CreateUser(db *sql.DB, __name string, __email string, __user_type UserType) (*User, error) {
-	rows, err := db.Query("WITH users AS (INSERT INTO users (name, email, user_type) VALUES ($1, $2, $3) RETURNING *) AS users SELECT users.id AS id, users.created_date AS created_date, users.last_login AS last_login, users.name AS name, users.email AS email, users.user_type AS user_type, users.subscription_id AS subscription_id, LOWER(name) || '_' || LOWER(email) AS email_id FROM users;", __name, __email, __user_type)
+func CreateUser(db *sql.DB, __id uuid.UUID, __name string, __email string, __user_type UserType) (*User, error) {
+	rows, err := db.Query("WITH users AS (INSERT INTO users (id, name, email, user_type) VALUES ($1, $2, $3, $4) RETURNING *) AS users SELECT users.id AS id, users.created_date AS created_date, users.last_login AS last_login, users.name AS name, users.email AS email, users.user_type AS user_type, users.subscription_id AS subscription_id, LOWER(name) || '_' || LOWER(email) AS email_id FROM users;", __id, __name, __email, __user_type)
 	if err != nil {
 		return nil, err		
 	}
 	defer rows.Close()
 	
 	return nil, nil
+}
+func UpdateUserEmail(db *sql.DB, _id uuid.UUID, _email string) error {
+	rows, err := db.Query("WITH users AS (UPDATE users SET users.email = $1 WHERE users.id = $2 RETURNING *) SELECT users.id AS id, users.created_date AS created_date, users.last_login AS last_login, users.name AS name, users.email AS email, users.user_type AS user_type, users.subscription_id AS subscription_id, LOWER(name) || '_' || LOWER(email) AS email_id FROM users;", _id, _email)
+	if err != nil {
+		return err		
+	}
+	defer rows.Close()
+	return nil
 }
 type Token struct {
 	Id uuid.UUID `json:"id"`

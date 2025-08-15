@@ -1,6 +1,6 @@
 use super::{FileContents, RepackError, RepackErrorKind, RepackStruct, Token};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct QueryArg {
     pub name: String,
     pub typ: String,
@@ -272,25 +272,17 @@ impl Query {
 }
 
 #[derive(Debug)]
-pub enum AutoQueryType {
-    Insert,
-    Update,
-}
-
-#[derive(Debug)]
-pub struct AutoQuery {
-    pub query_type: AutoQueryType,
+pub struct AutoInsertQuery {
     pub name: String,
     pub args: Vec<String>,
     pub ret_type: QueryReturn,
 }
 
-impl AutoQuery {
+impl AutoInsertQuery {
     pub fn parse(
-        query_type: AutoQueryType,
         obj_name: &str,
         reader: &mut FileContents,
-    ) -> Result<AutoQuery, RepackError> {
+    ) -> Result<AutoInsertQuery, RepackError> {
         let name = reader.take_literal().ok_or_else(|| {
             RepackError::global(RepackErrorKind::QueryInvalidSyntax, obj_name.to_string())
         })?;
@@ -325,8 +317,7 @@ impl AutoQuery {
             }
         }
 
-        Ok(AutoQuery {
-            query_type,
+        Ok(AutoInsertQuery {
             name,
             args,
             ret_type,
@@ -334,47 +325,109 @@ impl AutoQuery {
     }
 
     pub fn into_query(&self, strct: &RepackStruct) -> Result<Query, RepackError> {
-        Ok(match self.query_type {
-            AutoQueryType::Insert => {
-                let mut args = Vec::<QueryArg>::new();
-                let mut output = "WITH $table AS (INSERT INTO $table (".to_string();
-                let mut query_interpolate = String::new();
-                for (idx, selected_field) in self.args.iter().enumerate() {
-                    let Some(matching_field) =
-                        strct.fields.iter().find(|x| x.name == *selected_field)
-                    else {
-                        panic!("Field not found in struct.");
-                    };
-                    output.push_str(&selected_field);
-                    query_interpolate.push_str(&format!("$__{}", selected_field));
+        let mut args = Vec::<QueryArg>::new();
+        let mut output = "WITH $table AS (INSERT INTO $table (".to_string();
+        let mut query_interpolate = String::new();
+        for (idx, selected_field) in self.args.iter().enumerate() {
+            let Some(matching_field) = strct.fields.iter().find(|x| x.name == *selected_field)
+            else {
+                panic!("Field not found in struct.");
+            };
+            output.push_str(&selected_field);
+            query_interpolate.push_str(&format!("$__{}", selected_field));
 
-                    args.push(QueryArg {
-                        name: format!("__{}", selected_field),
-                        typ: matching_field.field_type.as_ref().unwrap().to_string(),
-                    });
-                    if idx + 1 != self.args.len() {
-                        query_interpolate.push_str(", ");
-                        output.push_str(", ");
+            args.push(QueryArg {
+                name: format!("__{}", selected_field),
+                typ: matching_field.field_type.as_ref().unwrap().to_string(),
+            });
+            if idx + 1 != self.args.len() {
+                query_interpolate.push_str(", ");
+                output.push_str(", ");
+            }
+        }
+        output.push_str(&format!(
+            ") VALUES ({}) RETURNING *) AS {} SELECT $fields FROM $locations",
+            query_interpolate,
+            strct.table_name.as_ref().unwrap()
+        ));
+        Ok(Query {
+            args,
+            name: self.name.clone(),
+            ret_type: self.ret_type.clone(),
+            contents: output,
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct AutoUpdateQuery {
+    pub name: String,
+    pub args: Vec<QueryArg>,
+    pub contents: String,
+    pub ret_type: QueryReturn,
+}
+impl AutoUpdateQuery {
+    pub fn parse(
+        obj_name: &str,
+        reader: &mut FileContents,
+    ) -> Result<AutoUpdateQuery, RepackError> {
+        let name = reader.take_literal().ok_or_else(|| {
+            RepackError::global(RepackErrorKind::QueryInvalidSyntax, obj_name.to_string())
+        })?;
+        let mut args = Vec::<QueryArg>::new();
+        let mut ret_type = QueryReturn::None;
+        let mut contents = String::new();
+        if matches!(reader.peek(), Some(Token::OpenParen)) {
+            loop {
+                match reader.peek() {
+                    Some(Token::Literal(_)) => args.push(QueryArg::parse(&name, reader)?),
+                    Some(Token::CloseParen) => {
+                        reader.skip();
+                        break;
+                    }
+                    _ => {
+                        reader.skip();
                     }
                 }
-                output.push_str(&format!(
-                    ") VALUES ({}) RETURNING *) AS {} SELECT $fields FROM $locations",
-                    query_interpolate,
-                    strct.table_name.as_ref().unwrap()
-                ));
-                Query {
-                    args,
-                    name: self.name.clone(),
-                    ret_type: self.ret_type.clone(),
-                    contents: output,
+            }
+        }
+        if reader.peek_equals() {
+            reader.skip();
+            contents = reader.take_literal().ok_or_else(|| {
+                RepackError::global(RepackErrorKind::QueryInvalidSyntax, obj_name.to_string())
+            })?;
+        }
+        if reader.take_colon() {
+            match reader.take() {
+                Some(Token::One) => ret_type = QueryReturn::One,
+                Some(Token::Many) => ret_type = QueryReturn::Many,
+                _ => {
+                    return Err(RepackError::global(
+                        RepackErrorKind::QueryInvalidSyntax,
+                        obj_name.to_string(),
+                    ));
                 }
             }
-            _ => Query {
-                args: Vec::new(),
-                name: self.name.clone(),
-                ret_type: self.ret_type.clone(),
-                contents: String::new(),
-            },
+        }
+
+        Ok(AutoUpdateQuery {
+            name,
+            args,
+            ret_type,
+            contents,
+        })
+    }
+
+    pub fn into_query(&self) -> Result<Query, RepackError> {
+        let nested_contents = format!(
+            "WITH $table AS (UPDATE $table {} RETURNING *) SELECT $fields FROM $locations",
+            self.contents
+        );
+        Ok(Query {
+            args: self.args.clone(),
+            name: self.name.clone(),
+            ret_type: self.ret_type.clone(),
+            contents: nested_contents,
         })
     }
 }
