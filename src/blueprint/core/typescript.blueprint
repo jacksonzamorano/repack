@@ -35,7 +35,7 @@ export type [name] =
 
 [file]index.ts[/file]
 
-[each object]
+[each struct]
 export type { [name] } from './[name]'[br]
 [/each]
 [each enum]

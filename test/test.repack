@@ -4,6 +4,7 @@ output postgres @test;
 output go @test {
 	package main
 }
+output typescript @"test/ts";
 
 snippet base {
 	id uuid db:pk
