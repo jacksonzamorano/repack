@@ -46,13 +46,14 @@ impl TokenConsumer for String {
     }
     fn import(&mut self, _value: String) {}
     fn import_point(&mut self) {}
+
 }
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct BlueprintExecutionContext<'a> {
     pub variables: HashMap<String, String>,
     pub flags: HashMap<&'a str, bool>,
-    pub object: Option<&'a RepackStruct>,
+    pub strct: Option<&'a RepackStruct>,
     pub field: Option<&'a Field>,
     pub enm: Option<&'a RepackEnum>,
     pub func_args: Option<&'a Vec<String>>,
@@ -63,25 +64,26 @@ impl<'a> BlueprintExecutionContext<'a> {
         BlueprintExecutionContext {
             variables: HashMap::new(),
             flags: HashMap::new(),
-            object: None,
+            strct: None,
             field: None,
             enm: None,
             func_args: None,
             query: None,
         }
     }
-    pub fn with_object(&self, obj: &'a RepackStruct) -> Self {
+    pub fn with_strct(&self, obj: &'a RepackStruct) -> Self {
         let mut variables = self.variables.clone();
-        let flags = self.flags.clone();
+        let mut flags = self.flags.clone();
         variables.insert("name".to_string(), obj.name.to_string());
         if let Some(tn) = obj.table_name.as_ref() {
             variables.insert("table_name".to_string(), tn.to_string());
         }
+        flags.insert("queries", !obj.queries.is_empty());
 
         Self {
             variables,
             flags,
-            object: Some(obj),
+            strct: Some(obj),
             ..Default::default()
         }
     }
@@ -125,7 +127,7 @@ impl<'a> BlueprintExecutionContext<'a> {
             }
         };
 
-        variables.insert("object_name".to_string(), obj.name.to_string());
+        variables.insert("struct_name".to_string(), obj.name.to_string());
         variables.insert("name".to_string(), field.name.to_string());
         variables.insert("type".to_string(), resolved_type.to_string());
         variables.insert(
@@ -138,7 +140,7 @@ impl<'a> BlueprintExecutionContext<'a> {
         Ok(Self {
             variables,
             flags,
-            object: Some(obj),
+            strct: Some(obj),
             field: Some(field),
             ..Default::default()
         })
@@ -151,7 +153,7 @@ impl<'a> BlueprintExecutionContext<'a> {
     ) -> Result<Self, RepackError> {
         let mut new = self.clone();
         new.variables
-            .insert("query".to_string(), q.render(obj, &result.objects)?);
+            .insert("query".to_string(), q.render(obj, &result.strcts)?);
         new.variables.insert("name".to_string(), q.name.to_string());
         new.variables
             .insert("struct_name".to_string(), obj.name.to_string());

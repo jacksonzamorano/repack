@@ -122,7 +122,7 @@ impl TokenConsumer for BlueprintBuildResult {
 pub struct BlueprintRenderer<'a> {
     /// The blueprint defining the target language templates and rules
     pub blueprint: &'a Blueprint,
-    /// The parsed schema containing objects, enums, and their relationships
+    /// The parsed schema containing structs, enums, and their relationships
     pub parse_result: &'a ParseResult,
     /// Output configuration specifying target location, categories, and options
     pub config: &'a Output,
@@ -134,7 +134,7 @@ impl<'a> BlueprintRenderer<'a> {
     /// Creates a new BlueprintRenderer with the necessary components for code generation.
     ///
     /// # Arguments
-    /// * `parse_result` - The parsed schema data containing objects and enums
+    /// * `parse_result` - The parsed schema data containing structs and enums
     /// * `blueprint` - The blueprint defining how to generate code for the target language
     /// * `config` - Output configuration specifying target settings and options
     ///
@@ -240,18 +240,18 @@ impl<'a> BlueprintRenderer<'a> {
             SnippetMainTokenName::Each | SnippetMainTokenName::Eachr => {
                 let rev = matches!(content.main_token(), SnippetMainTokenName::Eachr);
                 let iter_options: Vec<_> = match content.secondary_token() {
-                    SnippetSecondaryTokenName::Object => self
+                    SnippetSecondaryTokenName::Struct => self
                         .parse_result
-                        .included_objects(&self.config.categories, &self.config.exclude)
+                        .included_strcts(&self.config.categories, &self.config.exclude)
                         .into_iter()
-                        .map(|x| Ok(context.with_object(x)))
+                        .map(|x| Ok(context.with_strct(x)))
                         .collect(),
                     SnippetSecondaryTokenName::Field => {
-                        let Some(obj) = context.object else {
+                        let Some(obj) = context.strct else {
                             return Err(RepackError::from_lang_with_msg(
                                 RepackErrorKind::CannotCreateContext,
                                 self.config,
-                                "field in non-object context.".to_string(),
+                                "field in non-struct context.".to_string(),
                             ));
                         };
                         obj.fields
@@ -262,11 +262,11 @@ impl<'a> BlueprintRenderer<'a> {
                             .collect()
                     }
                     SnippetSecondaryTokenName::Query => {
-                        let Some(obj) = context.object else {
+                        let Some(obj) = context.strct else {
                             return Err(RepackError::from_lang_with_msg(
                                 RepackErrorKind::CannotCreateContext,
                                 self.config,
-                                "field in non-object context.".to_string(),
+                                "field in non-struct context.".to_string(),
                             ));
                         };
                         obj.queries
@@ -375,7 +375,7 @@ impl<'a> BlueprintRenderer<'a> {
                         self.render_tokens(content.contents, &updated_context, writer)?;
                     }
                 }
-                if let Some(obj) = context.object {
+                if let Some(obj) = context.strct {
                     for matched_fn in obj
                         .functions_in_namespace(namespace)
                         .iter()
@@ -412,7 +412,7 @@ impl<'a> BlueprintRenderer<'a> {
                     }
                     return Ok(());
                 }
-                if let Some(obj) = context.object {
+                if let Some(obj) = context.strct {
                     if !obj
                         .functions_in_namespace(namespace)
                         .iter()

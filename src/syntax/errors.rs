@@ -45,7 +45,7 @@ impl RepackErrorKind {
     pub fn as_string(&self) -> &'static str {
         match self {
             Self::CircularDependancy => "This definition creates a circular dependancy with:",
-            Self::ParentObjectDoesNotExist => "Parent object couldn't be found:",
+            Self::ParentObjectDoesNotExist => "Parent struct couldn't be found:",
             Self::TypeNotSupported => "Type is not allowed:",
             Self::CustomTypeNotDefined => "The custom type cannot be resolved:",
             Self::TypeNotResolved => "This type couldn't be resolved.",
@@ -61,7 +61,7 @@ impl RepackErrorKind {
             Self::UnknownSnippet => "Specified snippet does not exist:",
             Self::UnknownLink => "Requested import but no link was defined for ",
             Self::UnknownObject => {
-                "Attempted to resolve this dependancy but the object couldn't be found: "
+                "Attempted to resolve this dependancy but the struct couldn't be found: "
             }
             Self::UnknownError => "An unknown error occured.",
             Self::SyntaxError => "Error when parsing ",
@@ -80,7 +80,7 @@ impl RepackError {
     ///
     /// This method creates a comprehensive error message that includes:
     /// - Error code (E0001 format)
-    /// - Context location (language -> object.field)
+    /// - Context location (language -> struct.field)
     /// - Error description and details
     /// - Stack trace for nested errors
     ///
@@ -104,7 +104,7 @@ impl RepackError {
 /// Represents a complete error with context information for debugging.
 ///
 /// RepackError combines an error type with contextual information about where
-/// the error occurred (language, object, field) and provides detailed error
+/// the error occurred (language, struct, field) and provides detailed error
 /// messages with stack traces for complex nested errors.
 #[derive(Debug, Default)]
 pub struct RepackError {
@@ -119,7 +119,7 @@ pub struct RepackError {
 }
 
 impl RepackError {
-    /// Creates a global error without specific object or field context.
+    /// Creates a global error without specific struct or field context.
     ///
     /// Used for system-level errors like file I/O issues or blueprint loading problems.
     ///
@@ -134,14 +134,14 @@ impl RepackError {
             ..Default::default()
         }
     }
-    /// Creates an error associated with a specific object.
+    /// Creates an error associated with a specific struct.
     ///
-    /// Used for object-level validation errors like missing table names
+    /// Used for struct-level validation errors like missing table names
     /// or inheritance issues.
     ///
     /// # Arguments
     /// * `error` - The type of error that occurred
-    /// * `obj` - The object where the error was found
+    /// * `obj` - The struct where the error was found
     #[allow(dead_code)]
     pub fn from_obj(error: RepackErrorKind, obj: &RepackStruct) -> RepackError {
         RepackError {
@@ -165,14 +165,14 @@ impl RepackError {
         }
     }
 
-    /// Creates an error associated with a specific field in an object.
+    /// Creates an error associated with a specific field in an struct.
     ///
     /// Used for field-level validation errors like type resolution failures
     /// or invalid field configurations.
     ///
     /// # Arguments
     /// * `error` - The type of error that occurred
-    /// * `obj` - The object containing the problematic field
+    /// * `obj` - The struct containing the problematic field
     /// * `field` - The field where the error was found
     pub fn from_field(error: RepackErrorKind, obj: &RepackStruct, field: &Field) -> RepackError {
         RepackError {

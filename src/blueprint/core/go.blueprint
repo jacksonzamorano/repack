@@ -27,7 +27,7 @@ const (
 )
 [/each][br]
 
-[each object][br]
+[each struct][br]
 type [name] struct {
 	[each field][br]
 	[name.titlecase] [if optional]*[/if][if array]\[][/if][type] `json:"[name]"`

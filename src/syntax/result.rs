@@ -11,7 +11,7 @@ use super::{
 #[derive(Debug)]
 pub struct ParseResult {
     /// All parsed object definitions (structs)
-    pub objects: Vec<RepackStruct>,
+    pub strcts: Vec<RepackStruct>,
     /// Output configuration definitions specifying target languages and settings
     pub languages: Vec<Output>,
     /// All parsed enumeration definitions
@@ -39,7 +39,7 @@ impl ParseResult {
     pub fn from_contents(mut contents: FileContents) -> Result<ParseResult, Vec<RepackError>> {
         let mut errors = Vec::<RepackError>::new();
 
-        let mut objects = Vec::new();
+        let mut strcts = Vec::new();
         let mut snippets = Vec::new();
         let mut languages = Vec::new();
         let mut enums = Vec::new();
@@ -48,7 +48,7 @@ impl ParseResult {
         while let Some(token) = contents.next() {
             match *token {
                 Token::StructType => {
-                    objects.push(RepackStruct::read_from_contents(&mut contents));
+                    strcts.push(RepackStruct::read_from_contents(&mut contents));
                 }
                 Token::EnumType => {
                     enums.push(RepackEnum::read_from_contents(&mut contents));
@@ -78,43 +78,43 @@ impl ParseResult {
         // Expand all snippets.
         // This is important to do before dependancy checks
         // because snippets could introduce deps.
-        let mut object_snip_idx = 0;
-        while object_snip_idx < objects.len() {
+        let mut strct_snip_idx = 0;
+        while strct_snip_idx < strcts.len() {
             let mut snip_offset = 0;
             let mut snip_idx = 0;
-            while snip_idx < objects[object_snip_idx].use_snippets.iter().len() {
-                let snip_name = &objects[object_snip_idx].use_snippets[snip_idx];
+            while snip_idx < strcts[strct_snip_idx].use_snippets.iter().len() {
+                let snip_name = &strcts[strct_snip_idx].use_snippets[snip_idx];
                 let snippet = snippets
                     .iter()
                     .find(|snip| snip.name == *snip_name)
                     .ok_or_else(|| {
                         vec![RepackError::from_obj_with_msg(
                             RepackErrorKind::SnippetNotFound,
-                            &objects[object_snip_idx],
+                            &strcts[strct_snip_idx],
                             snip_name.to_string(),
                         )]
                     })?;
                 let snippet_fields = snippet.fields.clone();
                 for s in snippet_fields.into_iter() {
-                    objects[object_snip_idx].fields.insert(snip_offset, s);
+                    strcts[strct_snip_idx].fields.insert(snip_offset, s);
                     snip_offset += 1;
                 }
                 let mut snippet_fns = snippet.functions.clone();
-                objects[object_snip_idx].functions.append(&mut snippet_fns);
+                strcts[strct_snip_idx].functions.append(&mut snippet_fns);
                 snip_idx += 1;
             }
-            object_snip_idx += 1;
+            strct_snip_idx += 1;
         }
 
         // Rearrange all objects in dependancy order
         // for simple resolution.
         let mut i = 0;
-        while i < objects.len() {
+        while i < strcts.len() {
             let mut found_issue = false;
-            'dep_search: for dependancy in objects[i].depends_on() {
+            'dep_search: for dependancy in strcts[i].depends_on() {
                 let mut x = i;
-                while x < objects.len() {
-                    if objects[x].name == dependancy {
+                while x < strcts.len() {
+                    if strcts[x].name == dependancy {
                         found_issue = true;
                         break 'dep_search;
                     }
@@ -122,8 +122,8 @@ impl ParseResult {
                 }
             }
             if found_issue {
-                let dep = objects.remove(i);
-                objects.push(dep);
+                let dep = strcts.remove(i);
+                strcts.push(dep);
                 i = 0
             } else {
                 i += 1;
@@ -132,106 +132,106 @@ impl ParseResult {
 
         // Resolve references and do some error checking.
         let mut object_idx: usize = 0;
-        while object_idx < objects.len() {
+        while object_idx < strcts.len() {
             let mut field_idx: usize = 0;
 
-            if let Some(parent_obj_name) = &objects[object_idx].inherits {
+            if let Some(parent_obj_name) = &strcts[object_idx].inherits {
                 let Some(parent_obj_idx) =
-                    objects.iter().position(|obj| obj.name == *parent_obj_name)
+                    strcts.iter().position(|obj| obj.name == *parent_obj_name)
                 else {
                     errors.push(RepackError::from_obj_with_msg(
                         RepackErrorKind::ParentObjectDoesNotExist,
-                        &objects[object_idx],
+                        &strcts[object_idx],
                         parent_obj_name.to_string(),
                     ));
                     object_idx += 1;
                     continue;
                 };
-                objects[object_idx].table_name = objects[parent_obj_idx].table_name.clone();
+                strcts[object_idx].table_name = strcts[parent_obj_idx].table_name.clone();
             }
 
-            while field_idx < objects[object_idx].fields.len() {
-                if let Some(ext) = &objects[object_idx].fields[field_idx].field_location {
+            while field_idx < strcts[object_idx].fields.len() {
+                if let Some(ext) = &strcts[object_idx].fields[field_idx].field_location {
                     // This comes from a join or a super.
                     if ext.location == "super" {
-                        let Some(sup) = &objects[object_idx].inherits else {
+                        let Some(sup) = &strcts[object_idx].inherits else {
                             errors.push(RepackError::from_field(
                                 RepackErrorKind::InvalidSuper,
-                                &objects[object_idx],
-                                &objects[object_idx].fields[field_idx],
+                                &strcts[object_idx],
+                                &strcts[object_idx].fields[field_idx],
                             ));
                             field_idx += 1;
                             continue;
                         };
-                        let sup_idx = objects.iter().position(|x| x.name == *sup).unwrap();
-                        let Some(foreign_pos) = &objects[sup_idx]
+                        let sup_idx = strcts.iter().position(|x| x.name == *sup).unwrap();
+                        let Some(foreign_pos) = &strcts[sup_idx]
                             .fields
                             .iter()
                             .position(|x| x.name == ext.field)
                         else {
                             errors.push(RepackError::from_field(
                                 RepackErrorKind::FieldNotOnSuper,
-                                &objects[object_idx],
-                                &objects[object_idx].fields[field_idx],
+                                &strcts[object_idx],
+                                &strcts[object_idx].fields[field_idx],
                             ));
                             field_idx += 1;
                             continue;
                         };
-                        objects[object_idx].fields[field_idx].field_type =
-                            objects[sup_idx].fields[*foreign_pos].field_type.clone();
+                        strcts[object_idx].fields[field_idx].field_type =
+                            strcts[sup_idx].fields[*foreign_pos].field_type.clone();
                     } else {
-                        let Some(join_idx) = &objects[object_idx]
+                        let Some(join_idx) = &strcts[object_idx]
                             .joins
                             .iter()
                             .position(|x| x.name == ext.location)
                         else {
                             errors.push(RepackError::from_field(
                                 RepackErrorKind::InvalidJoin,
-                                &objects[object_idx],
-                                &objects[object_idx].fields[field_idx],
+                                &strcts[object_idx],
+                                &strcts[object_idx].fields[field_idx],
                             ));
                             field_idx += 1;
                             continue;
                         };
-                        let Some(joined_entity_idx) = &objects.iter().position(|x| {
-                            x.name == objects[object_idx].joins[*join_idx].foreign_entity
+                        let Some(joined_entity_idx) = &strcts.iter().position(|x| {
+                            x.name == strcts[object_idx].joins[*join_idx].foreign_entity
                         }) else {
                             errors.push(RepackError::from_field(
                                 RepackErrorKind::InvalidJoin,
-                                &objects[object_idx],
-                                &objects[object_idx].fields[field_idx],
+                                &strcts[object_idx],
+                                &strcts[object_idx].fields[field_idx],
                             ));
                             field_idx += 1;
                             continue;
                         };
-                        let Some(joined_field_idx) = &objects[*joined_entity_idx]
+                        let Some(joined_field_idx) = &strcts[*joined_entity_idx]
                             .fields
                             .iter()
                             .position(|x| x.name == ext.field)
                         else {
                             errors.push(RepackError::from_field(
                                 RepackErrorKind::FieldNotOnJoin,
-                                &objects[object_idx],
-                                &objects[object_idx].fields[field_idx],
+                                &strcts[object_idx],
+                                &strcts[object_idx].fields[field_idx],
                             ));
                             field_idx += 1;
                             continue;
                         };
-                        objects[object_idx].fields[field_idx].field_type =
-                            objects[*joined_entity_idx].fields[*joined_field_idx]
+                        strcts[object_idx].fields[field_idx].field_type =
+                            strcts[*joined_entity_idx].fields[*joined_field_idx]
                                 .field_type
                                 .clone();
                     }
                 } else {
                     // This is just a custom type, let's resolve it.
-                    let lookup_name = &objects[object_idx].fields[field_idx].field_type_string;
-                    if objects.iter().any(|obj| obj.name == *lookup_name) {
-                        objects[object_idx].fields[field_idx].field_type = Some(FieldType::Custom(
+                    let lookup_name = &strcts[object_idx].fields[field_idx].field_type_string;
+                    if strcts.iter().any(|obj| obj.name == *lookup_name) {
+                        strcts[object_idx].fields[field_idx].field_type = Some(FieldType::Custom(
                             lookup_name.clone(),
                             CustomFieldType::Object,
                         ));
                     } else if enums.iter().any(|en| en.name == *lookup_name) {
-                        objects[object_idx].fields[field_idx].field_type = Some(FieldType::Custom(
+                        strcts[object_idx].fields[field_idx].field_type = Some(FieldType::Custom(
                             lookup_name.clone(),
                             CustomFieldType::Enum,
                         ));
@@ -239,15 +239,15 @@ impl ParseResult {
                 }
                 // Ensure types are resolved
                 if let Some(FieldType::Custom(object_name, _)) =
-                    &objects[object_idx].fields[field_idx].field_type
+                    &strcts[object_idx].fields[field_idx].field_type
                 {
-                    if !objects.iter().any(|o| o.name == *object_name)
+                    if !strcts.iter().any(|o| o.name == *object_name)
                         && !enums.iter().any(|e| e.name == *object_name)
                     {
                         errors.push(RepackError::from_field_with_msg(
                             RepackErrorKind::CustomTypeNotDefined,
-                            &objects[object_idx],
-                            &objects[object_idx].fields[field_idx],
+                            &strcts[object_idx],
+                            &strcts[object_idx].fields[field_idx],
                             object_name.to_string(),
                         ));
                     }
@@ -257,7 +257,7 @@ impl ParseResult {
             object_idx += 1;
         }
 
-        for object in &objects {
+        for object in &strcts {
             if let Some(mut errs) = object.errors() {
                 errors.append(&mut errs);
             }
@@ -266,14 +266,14 @@ impl ParseResult {
             let mut errs = language.errors();
             errors.append(&mut errs);
         }
-        if let Err(e) = graph_valid(&objects) {
+        if let Err(e) = graph_valid(&strcts) {
             errors.push(e)
         }
         if !errors.is_empty() {
             Err(errors)
         } else {
             Ok(ParseResult {
-                objects,
+                strcts,
                 languages,
                 enums,
                 include_blueprints,
@@ -293,12 +293,12 @@ impl ParseResult {
     ///
     /// # Returns
     /// A vector of object references that match the filtering criteria
-    pub fn included_objects(
+    pub fn included_strcts(
         &self,
         categories: &[String],
         excludes: &[String],
     ) -> Vec<&RepackStruct> {
-        self.objects
+        self.strcts
             .iter()
             .filter(|obj| {
                 if obj.categories.is_empty() || categories.is_empty() {

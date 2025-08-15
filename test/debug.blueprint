@@ -10,7 +10,7 @@
 
 [file]debug.md[/file]
 
-[each object]
+[each struct]
 # [name]
 [br][br]
 ## Queries

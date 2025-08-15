@@ -10,7 +10,7 @@
 [define uuid]string[/define]
 [link custom]import type { $ } from './$'[/link]
 
-[ each object ]
+[each struct]
 [file][name].ts[/file]
 [imports]
 

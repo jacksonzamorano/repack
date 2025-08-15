@@ -2,13 +2,13 @@ use std::collections::VecDeque;
 
 use super::{RepackStruct, RepackError, RepackErrorKind};
 
-pub fn graph_valid(objects: &[RepackStruct]) -> Result<(), RepackError> {
+pub fn graph_valid(strcts: &[RepackStruct]) -> Result<(), RepackError> {
     let mut graph: VecDeque<Vec<String>> = VecDeque::new();
-    for obj in objects.iter() {
+    for obj in strcts.iter() {
         graph.push_back(vec![obj.name.clone()]);
     }
     while let Some(eval) = graph.pop_front() {
-        let Some(eval_object) = objects
+        let Some(eval_object) = strcts
             .iter()
             .find(|obj| *obj.name == *eval.last().unwrap())
         else {
