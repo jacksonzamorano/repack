@@ -71,7 +71,8 @@ pub struct RepackStruct {
     /// The list of fields/properties that belong to this object.
     pub fields: Vec<Field>,
     /// Optional parent object name for inheritance relationships.
-    /// Currently unused as inheritance is not yet implemented.
+    /// Inheritance is implemented: child shares table with parent, and `super.field` external
+    /// references resolve against the parent struct.
     pub inherits: Option<String>,
     /// Tags/categories for organizing and filtering objects during generation.
     /// Used by blueprints to selectively process certain object types.

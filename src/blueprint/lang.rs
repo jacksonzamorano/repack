@@ -34,7 +34,7 @@ pub enum SnippetMainTokenName {
     Variable(String),
 }
 impl SnippetMainTokenName {
-    pub(crate) fn from_string(val: &str) -> SnippetMainTokenName {
+    pub(crate) fn from_string(val: &str) -> SnippetMainTokenName { // Unknown tokens become Variable(.) allowing [name.transform]
         match val {
             "meta" => Self::Meta,
             "if" => Self::If,

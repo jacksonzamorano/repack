@@ -1,7 +1,7 @@
 package main;
+import "github.com/google/uuid"
 import "time"
 import "database/sql"
-import "github.com/google/uuid"
 
 
 type UserType string
@@ -22,14 +22,21 @@ type User struct {
 	SubscriptionId *string `json:"subscription_id"`
 	EmailId string `json:"email_id"`
 }
+func ScanUser(val *User, row *sql.Rows) error {
+	if err := row.Scan(&val.Id, &val.CreatedDate, &val.LastLogin, &val.Name, &val.Email, &val.UserType, &val.SubscriptionId, &val.EmailId); err != nil {
+		return err
+	}
+	return nil
+}
+
 func UserByEmail(db *sql.DB, _email string) (*User, error) {
 	rows, err := db.Query("SELECT users.id AS id, users.created_date AS created_date, users.last_login AS last_login, users.name AS name, users.email AS email, users.user_type AS user_type, users.subscription_id AS subscription_id, LOWER(name) || '_' || LOWER(email) AS email_id FROM users WHERE users.email = $1;", _email)
 	if err != nil {
 		return nil, err		
 	}
 	defer rows.Close()
-	
-	return nil, nil
+	var value User;
+	return &value, ScanUser(&value, rows)
 }
 func UsersByType(db *sql.DB, _typ UserType) ([]User, error) {
 	values := make([]User, 0)
@@ -38,7 +45,13 @@ func UsersByType(db *sql.DB, _typ UserType) ([]User, error) {
 		return values, err		
 	}
 	defer rows.Close()
-	
+	for rows.Next() {
+		var value User
+		if err := ScanUser(&value, rows); err != nil {
+			return values, err
+		}
+		values = append(values, value)
+	}
 	return values, nil
 }
 func DeleteUserById(db *sql.DB, _id uuid.UUID) error {
@@ -55,8 +68,8 @@ func CreateUser(db *sql.DB, __id uuid.UUID, __name string, __email string, __use
 		return nil, err		
 	}
 	defer rows.Close()
-	
-	return nil, nil
+	var value User;
+	return &value, ScanUser(&value, rows)
 }
 func UpdateUserEmail(db *sql.DB, _id uuid.UUID, _email string) error {
 	rows, err := db.Query("WITH users AS (UPDATE users SET email = $1 WHERE id = $2 RETURNING *) SELECT users.id AS id, users.created_date AS created_date, users.last_login AS last_login, users.name AS name, users.email AS email, users.user_type AS user_type, users.subscription_id AS subscription_id, LOWER(name) || '_' || LOWER(email) AS email_id FROM users;", _id, _email)
@@ -76,6 +89,13 @@ type UserWithToken struct {
 	UserId uuid.UUID `json:"user_id"`
 	TokenValue uuid.UUID `json:"token_value"`
 }
+func ScanUserWithToken(val *UserWithToken, row *sql.Rows) error {
+	if err := row.Scan(&val.UserId, &val.TokenValue); err != nil {
+		return err
+	}
+	return nil
+}
+
 func UserToken(db *sql.DB, _id uuid.UUID) ([]UserWithToken, error) {
 	values := make([]UserWithToken, 0)
 	rows, err := db.Query("SELECT users.id AS user_id, t.token_value AS token_value FROM users INNER JOIN tokens t ON users.id = t.user_id WHERE users.id = $1;", _id)
@@ -83,6 +103,12 @@ func UserToken(db *sql.DB, _id uuid.UUID) ([]UserWithToken, error) {
 		return values, err		
 	}
 	defer rows.Close()
-	
+	for rows.Next() {
+		var value UserWithToken
+		if err := ScanUserWithToken(&value, rows); err != nil {
+			return values, err
+		}
+		values = append(values, value)
+	}
 	return values, nil
 }

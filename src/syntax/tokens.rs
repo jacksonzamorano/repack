@@ -29,14 +29,14 @@ pub enum Token {
     StructType,
     SnippetType,
     EnumType,
-    Where,
+    Where, // deprecated: retained for legacy tokenization, not in public spec
     Import,
-    With,
+    With, // deprecated: retained for legacy tokenization, not in public spec
     Blueprint,
     Query,
     Join,
     Insert,
-    Except,
+    Except, // deprecated: retained for legacy tokenization, not in public spec
     Update,
     One,
     Many,

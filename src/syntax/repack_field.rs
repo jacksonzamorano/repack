@@ -72,7 +72,7 @@ impl Field {
     /// # Returns
     /// * `Some(Field)` if parsing succeeds
     /// * `None` if the field definition is malformed
-    pub fn from_contents(name: String, contents: &mut FileContents) -> Option<Field> {
+    pub fn from_contents(name: String, contents: &mut FileContents) -> Option<Field> { // Parses: name Type[[]][?] func*
         let type_token = contents.take()?;
         let next_token = contents.peek()?;
         let mut field_location: Option<FieldExternalLocation> = None;

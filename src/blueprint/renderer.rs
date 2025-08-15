@@ -449,7 +449,7 @@ impl<'a> BlueprintRenderer<'a> {
             SnippetMainTokenName::PlaceImports => {
                 writer.import_point();
             }
-            SnippetMainTokenName::Trim => {
+            SnippetMainTokenName::Trim => { // Deletes trailing matching sequence (used to drop final commas)
                 let mut trim_contents = String::new();
                 self.render_tokens(content.contents, context, &mut trim_contents)?;
                 writer.delete_trailing(&trim_contents);
@@ -468,7 +468,7 @@ impl<'a> BlueprintRenderer<'a> {
             SnippetMainTokenName::Break => {
                 writer.write(&"\n");
             }
-            SnippetMainTokenName::Increment => {
+            SnippetMainTokenName::Increment => { // Global counter increment; variable of same name outputs current value
                 let name = &content.details.secondary_token;
                 if let Some(glob) = self.global_counters.get_mut(name) {
                     *glob += 1
@@ -476,7 +476,7 @@ impl<'a> BlueprintRenderer<'a> {
                     self.global_counters.insert(name.to_string(), 1);
                 }
             }
-            SnippetMainTokenName::Render => {
+            SnippetMainTokenName::Render => { // Inline snippet literal insertion
                 let mut snippet_name = String::new();
                 self.render_tokens(content.contents, context, &mut snippet_name)?;
                 if let Some(snippet) = self.blueprint.snippets.get(&snippet_name) {

@@ -1,353 +1,289 @@
-# Repack
-
-**Schema-first code generation for multiple target languages**
-
-Repack is a robust code generation tool that lets you define your data models once in a simple schema language, then generate consistent, type-safe code across multiple programming languages and formats.
-
-## Overview
-
-Write your data structures once, generate everywhere:
-
-```repack
-enum UserType #model {
-    Admin
-    User
-    Guest
-}
-
-struct User @users #model {
-    id uuid
-    name string
-    email string?
-    user_type UserType
-    tags string[]
-}
-
-output rust @./generated/rust #model;
-output typescript @./generated/ts #model;
-output postgres @./generated/sql #model;
-```
-
-This generates Rust structs, TypeScript interfaces, and PostgreSQL schemas from a single definition.
-
-## Installation
-
-Build from source:
-
-```bash
-git clone https://github.com/jacksonzamorano/repack
-cd repack
-cargo build --release
-```
-
-## Quick Start
-
-1. **Create a schema file** (`example.repack`):
-
-```repack
-enum Status #model {
-    Active
-    Inactive
-}
-
-struct User @users #model {
-    id uuid
-    created_date datetime
-    name string
-    email string
-    status Status
-}
-
-output rust @./generated #model;
-```
-
-2. **Generate code**:
-
-```bash
-repack build example.repack
-```
-
-3. **View generated Rust code** (`generated/model.rs`):
-
-```rust
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum Status {
-    Active,
-    Inactive,
-}
-
-#[derive(Debug, Clone)]
-pub struct User {
-    pub id: Uuid,
-    pub created_date: DateTime<Utc>,
-    pub name: String,
-    pub email: String,
-    pub status: Status,
-}
-```
-
-## Core Concepts
-
-### Data Types
-
-Repack supports 8 built-in types:
-
-- `string` - UTF-8 text
-- `int32` - 32-bit signed integer  
-- `int64` - 64-bit signed integer
-- `float64` - 64-bit floating point
-- `boolean` - True/false value
-- `datetime` - Timestamp with timezone
-- `uuid` - UUID v4 identifier
-- `bytes` - Byte array
-
-### Field Modifiers
-
-- `field_name type` - Required field
-- `field_name type?` - Optional/nullable field  
-- `field_name type[]` - Array of values
-
-### Object Types
-
-**Struct**: Basic data structures
-```repack
-struct ApiResponse #api {
-    users User[]
-    total_count int32
-}
-```
-
-**Enum**: Fixed set of values
-```repack
-enum Priority #model {
-    Low
-    Medium  
-    High
-}
-```
-
-**Snippet**: Reusable field collections
-```repack
-snippet timestamps {
-    created_at datetime
-    updated_at datetime?
-}
-
-struct Post #model {
-    !timestamps  // Include snippet
-    title string
-    content string
-}
-```
-
-### Categories and Filtering
-
-Use categories (`#tag`) to control what gets generated:
-
-```repack
-output rust @./backend #model #internal;
-output typescript @./frontend #model #api;
-
-enum Status #model #api {    // Generated for both
-    Active
-    Inactive  
-}
-
-struct InternalData #internal {  // Only in Rust output
-    secret_key string
-}
-
-struct ApiResponse #api {        // Only in TypeScript output
-    data Status[]
-}
-```
-
-### Table Names and References
-
-```repack
-struct User @users #model {      // @users = table name
-    id uuid
-    email string
-    role_id uuid ref(Role.id)    // Foreign key reference
-}
-
-struct Role @roles #model {
-    id uuid
-    name string
-}
-```
-
-## Commands
-
-### Build Commands
-
-```bash
-# Generate all code files
-repack build schema.repack
-
-# Clean generated files  
-repack clean schema.repack
-
-# Generate documentation
-repack document schema.repack
-
-# Generate configuration files
-repack configure environment schema.repack
-```
-
-### Output Configuration
-
-```repack
-# Basic output
-output rust @./src/models #model;
-
-# Multiple outputs
-output rust @./backend #model;
-output typescript @./frontend #api;
-output postgres @./database #model;
-output markdown @./docs #model;
-```
-
-## Built-in Blueprints
-
-Repack includes blueprints for:
-
-- **rust** - Rust structs with derive traits
-- **typescript** - TypeScript interfaces  
-- **postgres** - PostgreSQL DDL with tables/indexes
-- **go** - Go structs with JSON tags
-- **markdown** - Documentation generation
-
-Each blueprint maps repack types to language-specific equivalents:
-
-| Repack Type | Rust | TypeScript | PostgreSQL |
-|-------------|------|------------|------------|
-| `string` | `String` | `string` | `TEXT` |
-| `int32` | `i32` | `number` | `INTEGER` |
-| `int64` | `i64` | `number` | `BIGINT` |
-| `boolean` | `bool` | `boolean` | `BOOLEAN` |
-| `datetime` | `DateTime<Utc>` | `Date` | `TIMESTAMPTZ` |
-| `uuid` | `Uuid` | `string` | `UUID` |
-
-## Real-World Example
-
-```repack
-snippet audit_fields {
-    created_at datetime
-    updated_at datetime?
-    created_by uuid
-}
-
-enum OrderStatus #model #api {
-    Pending
-    Confirmed
-    Shipped
-    Delivered
-    Cancelled
-}
-
-struct Customer @customers #model {
-    !audit_fields
-    id uuid
-    email string
-    first_name string
-    last_name string
-}
-
-struct Order @orders #model #api {
-    !audit_fields
-    id uuid
-    customer_id uuid ref(Customer.id)
-    status OrderStatus
-    total_amount float64
-    items OrderItem[]
-}
-
-struct OrderItem #model {
-    product_name string
-    quantity int32
-    unit_price float64
-}
-
-struct OrderSummary #api {
-    order_id uuid
-    customer_name string
-    status OrderStatus
-    total_amount float64
-    item_count int32
-}
-
-output rust @./src/models #model;
-output typescript @./frontend/types #api;
-output postgres @./database #model;
-```
-
-This generates:
-- Complete Rust structs with proper types
-- TypeScript interfaces for frontend APIs
-- PostgreSQL tables with foreign keys
-- Consistent field names and types across all outputs
-
-## Advanced Features
-
-### Functions and Methods
-
-```repack
-struct User @users #model {
-    id uuid
-    name string
-    
-    database: find_by_email(email: string) {
-        query "SELECT * FROM users WHERE email = $1"
-    }
-}
-```
-
-### Inheritance (Planned)
-
-```repack
-struct BaseEntity {
-    id uuid
-    created_at datetime
-}
-
-struct User: BaseEntity @users #model {
-    name string
-    email string
-}
-```
-
-## Project Structure
-
-```
-src/
-├── main.rs              # CLI entry point and command handling
-├── syntax/              # Schema parsing and type system
-│   ├── parser.rs        # Tokenization and file parsing
-│   ├── types.rs         # Core and custom type definitions  
-│   ├── repack_struct.rs # Object/struct parsing
-│   └── repack_enum.rs   # Enum parsing
-└── blueprint/           # Code generation system
-    ├── renderer.rs      # Template rendering engine
-    ├── store.rs         # Blueprint loading and management
-    └── core/            # Built-in language blueprints
-        ├── rust.blueprint
-        ├── typescript.blueprint
-        └── postgres.blueprint
-```
-
-## Contributing
-
-Repack is open source (GPL-3.0). Contributions welcome:
-
-1. **Bug Reports**: File issues with reproduction steps
-2. **Feature Requests**: Propose new language blueprints or syntax features
-3. **Blueprint Development**: Create blueprints for new target languages
-
-## License
-
-Licensed under GPL-3.0. See [LICENSE.txt](LICENSE.txt) for details.
+# Repack Language & Blueprint Specification
+
+Authoritative specification for the Repack schema language ("Repack") and the Blueprint templating language. This document omits roadmap, marketing, and non-speculative content.
+
+## 1. Repack Schema Language
+
+### 1.1 Lexical Elements
+Identifiers: /[A-Za-z_][A-Za-z0-9_]*/
+Strings: double-quoted sequences preserving inner content.
+Comments: // to end-of-line.
+Whitespace: insignificant except inside string literals.
+
+### 1.2 Keywords
+Reserved (recognized as tokens):
+- output
+- struct
+- enum
+- snippet
+- import
+- blueprint
+- query
+- insert
+- update
+- one
+- many
+- join
+
+Deprecated (tokenized but not part of public spec): where, with, except.
+
+### 1.3 Primitive Types
+string, int64, int32, float64, boolean, datetime, uuid, bytes
+
+### 1.4 Type Shapes
+Exactly four canonical shapes:
+- T (required scalar)
+- T? (optional scalar)
+- T[] (required array)
+- T[]? (optional array)  // Array marker precedes optional marker.
+
+### 1.5 Field Forms
+fieldName TypeShape
+fieldName External.Location( )?  (See 1.9) where External.Location can itself be array/optional with suffixes.
+
+### 1.6 Object Kinds
+struct Name [: Parent]? [@table]? [#category]* { ... }
+- Inheritance: single parent; table name inherited automatically.
+- Categories: arbitrary tags used for output filtering.
+- @table: associates table name with struct for query/table output.
+
+### 1.7 Enums
+enum Name [#category]* { CaseA CaseB ... }
+Enum cases optionally may have explicit string value by writing a second literal on the same line: CaseA "custom".
+
+### 1.8 Snippets
+snippet Name { fields / functions }
+Included inside struct body with: !snippetName (single token after '!'). Fields/functions merged in-place prior to dependency resolution.
+
+### 1.9 External Field References
+Syntax: fieldName OtherStruct.otherField
+Special location name "super" indicates the parent struct when using inheritance.
+During resolution the referenced field's resolved type is copied.
+
+### 1.10 Functions (Field / Struct)
+Syntax inside a struct body or after a field definition:
+namespace:funcName(arg1, arg2)
+Parentheses optional if zero args.
+Parsed as Literal(namespace) Colon Literal(funcName) [OpenParen args CloseParen]. Stored with namespace, name, arg list.
+
+### 1.11 Joins
+join(name ForeignStruct) = predicateTemplate
+- name: local join alias
+- ForeignStruct: referenced struct name
+- predicateTemplate: literal captured token sequence (single literal token) possibly containing interpolation variables:
+  - $name => "<foreign_table> <joinAlias>"
+  - $super => parent table name (when inheritance used)
+  - $joinAlias => emits joinAlias
+Used to build $locations expansion (see 1.13). Query builder expands joins into location clause segments.
+
+### 1.12 Queries
+Queries attach to a struct. Three forms:
+1. Manual:
+   query Name(argName type ...)= SQLLiteral [: one|many]?
+2. Auto Insert:
+   insert Name(field1, field2, ...) [: one|many]?  // Generates WITH $table AS (INSERT ... RETURNING *) SELECT $fields FROM $locations
+3. Auto Update:
+   update Name(argName type ...)= Fragment [: one|many]? // Fragment inserted after UPDATE $table; becomes WITH $table AS (UPDATE $table Fragment RETURNING *) SELECT $fields FROM $locations
+Return annotation semantics:
+- omitted => returns_none
+- : one => returns_one
+- : many => returns_many
+Arguments create positional parameters during interpolation.
+
+### 1.13 Query Interpolation Variables
+Within query contents (after parsing, before emission):
+- $fields: comma-separated "<table>.<col> AS <alias>" entries for all fields, respecting external locations and db:as alias functions.
+- $locations: base table plus each join expanded from join predicates.
+- $table: the struct's table name.
+- $fieldName / $#fieldName: field reference; isolated variant ($#) emits only column, non-isolated emits qualified form (table.column) considering join/super mapping.
+- $argName: converted to positional $1,$2,... in order of first appearance.
+Unknown interpolation yields [err: name].
+
+### 1.14 Inheritance
+struct Child: Parent { ... }
+- Parent must precede or be resolvable; its @table propagates to child.
+- External reference syntax super.field references parent's field.
+
+### 1.15 Validation & Resolution Steps
+1. Parse declarations.
+2. Expand snippet inclusions.
+3. Reorder structs to satisfy dependency ordering.
+4. Resolve inheritance table propagation.
+5. Resolve external field references (super or join alias) & copy types.
+6. Resolve custom field types (structs, enums).
+7. Generate auto queries (insert/update) into struct query list.
+8. Accumulate errors (duplicate fields, unresolved types, invalid references, etc.).
+
+### 1.16 Output Configuration
+output blueprintId @location [#category]* [!excludeName]* [key=value]*;
+- profile (blueprintId) must match loaded blueprint id.
+- Categories filter included structs/enums (logical OR). Empty categories => include all.
+- Exclusions remove named structs/enums.
+- key=value options become initial variables in blueprint context.
+
+### 1.17 Imports / Blueprints
+import "path/or/pattern*"  (relative to current file root; * loads all .repack files in folder)
+blueprint path/to/file.blueprint (queued for later loading)
+
+### 1.18 Error Codes
+Error kinds (E#### codes map to enum order):
+- CircularDependancy
+- ParentObjectDoesNotExist
+- CustomTypeNotDefined
+- TypeNotResolved
+- SnippetNotFound
+- DuplicateFieldNames
+- CannotCreateContext
+- FunctionInvalidSyntax
+- TypeNotSupported
+- CannotRead
+- CannotWrite
+- SnippetNotClosed
+- UnknownSnippet
+- VariableNotInScope
+- InvalidVariableModifier
+- UnknownLink
+- UnknownObject
+- QueryArgInvalidSyntax
+- QueryInvalidSyntax
+- InvalidSuper
+- FieldNotOnSuper
+- InvalidJoin
+- FieldNotOnJoin
+- SyntaxError
+- UnknownError
+
+## 2. Blueprint Templating Language
+Blueprints define target generation via bracketed directives.
+
+### 2.1 Token Forms
+General block: [main secondary optional_inline_contents] ... [/main]
+Auto-close tokens (no closing tag): variable, imports, import, increment, br.
+Escaping: prefix '[' with '\\' to treat literally.
+
+### 2.2 Main Tokens
+meta, file, if, ifn, each, eachr, define, func, nfunc, join, ref, link, import, trim, imports, br, exec, increment, snippet, render, variable (any unrecognized main token treated as variable reference), plus internal typedef (define) and TypeDef handling.
+(Note: join/ref main tokens are currently parsed; rendering branch for join iteration not implemented intentionally.)
+
+### 2.3 Secondary Tokens
+id, name, kind, struct, field, enum, case, debug, arg, query, join, and any primitive type names (string,int32,int64,float64,boolean,datetime,uuid,bytes). Others become Arbitrary.
+
+### 2.4 Iteration
+[each struct] ... [/each]
+[each field] ... [/each] (requires struct context)
+[each enum] ... [/each]
+[each case] ... [/each] (requires enum context)
+[each query] ... [/each] (requires struct context)
+[each arg] ... [/each] (inside func or query arg context)
+Reverse order: eachr (same secondary semantics).
+Each iteration sets flag sep = true on all but last element (useful for commas).
+
+### 2.5 Conditionals
+[if flag]...[/if] executes if context.flags[flag]==true.
+[ifn flag] inverse.
+Flags defined:
+- queries (struct has queries)
+- optional, array (field modifiers)
+- returns_many, returns_one, returns_none (query return type)
+- has_args (function invocation context)
+- sep (iteration separator helper)
+
+### 2.6 Variables
+[name], [table_name], [struct_name], [type], [type_raw], [enum_name], [value], [query], numeric indices for function args ([0], [1], ...), [arg] inside arg iteration.
+Transform modifiers via dotted suffix: uppercase, lowercase, titlecase, camelcase, split_period_first, split_period_last, split_dash_first, split_dash_last.
+
+### 2.7 Imports
+[link key]content[/link] defines link mapping.
+[import key] places import (deduped per file).
+[imports] designates insertion point for all collected imports for current file (emitted with surrounding blank lines; each import on its own line).
+
+### 2.8 File Selection
+[file]filename[/file] or [file] sets currently active output file (filename may be built from nested variables rendered inside block contents if inline contents empty and body present).
+
+### 2.9 Snippets & Render
+[snippet name] ... [/snippet] defines reusable inline snippet (captured literal content only, no nested variable expansion at definition time; expanded at [render]).
+[render]snippetName[/render] inserts snippet literal.
+
+### 2.10 Functions
+[func ns.name] body [/func] executes body once per matching struct or field function with that namespace/name. Inside body: [each arg] iterates argument strings; numeric variables 0..N and flag has_args available.
+[nfunc ns.name] executes body if no matching function exists in current field/struct context.
+
+### 2.11 Query Context
+Within [each query] iteration, [query] variable contains fully rendered SQL (with interpolation expansion and trailing semicolon); flags returns_many / returns_one / returns_none set; [each arg] yields query args in order.
+
+### 2.12 Trimming / Breaks / Increment
+[trim]content[/trim] deletes matching trailing content from most recent write (used to remove last commas / separators).
+[br] inserts newline.
+[increment counterName] increments named global counter; referencing [counterName] outputs numeric value.
+
+### 2.13 Exec
+[exec]shell script here[/exec] prompts user (y/N) before executing script via sh -s. Output suppressed except errors.
+
+### 2.14 Variable Resolution Errors
+Unknown variable => VariableNotInScope error.
+Unknown modifier => InvalidVariableModifier.
+Unknown link => UnknownLink.
+Unknown snippet at render => UnknownSnippet.
+
+### 2.15 Type Definitions
+[define primitive]TargetType[/define] maps primitive to blueprint-local representation (used during field/query arg rendering).
+[link primitive] may supply import template (with $ placeholder replaced by primitive name).
+Custom (non-primitive) types use [link custom] pattern with $ substituted for type name if present.
+
+## 3. Grammar (EBNF Summary)
+
+Schema := { Declaration }
+Declaration := StructDecl | EnumDecl | SnippetDecl | OutputDecl | ImportDecl | BlueprintDecl
+StructDecl := 'struct' Ident [':' Ident] [TableOpt] { Category } '{' StructBody '}'
+EnumDecl := 'enum' Ident { Category } '{' EnumBody '}'
+SnippetDecl := 'snippet' Ident '{' SnippetBody '}'
+OutputDecl := 'output' Ident [LocationOpt] { Category } { Exclusion } { Option } ';'
+ImportDecl := 'import' StringLiteral
+BlueprintDecl := 'blueprint' StringLiteral
+TableOpt := '@' Ident
+Category := '#' Ident
+Exclusion := '!' Ident
+LocationOpt := '@' PathLike
+Option := Ident '=' Ident
+StructBody := { StructItem }
+StructItem := FieldDecl | FunctionDecl | SnippetUse | QueryDecl | AutoInsertDecl | AutoUpdateDecl | JoinDecl
+FieldDecl := Ident FieldTypeSpec FieldFunctions NewLine
+FieldTypeSpec := (Ident ['.' Ident]) ArrayOpt OptOpt
+ArrayOpt := '[]'?  // Represented as '[' ']' tokens.
+OptOpt := '?'?
+SnippetUse := '!' Ident
+FunctionDecl := Namespace ':' Ident ['(' ArgList ')']
+FieldFunctions := { FunctionDecl }
+ArgList := Ident { ',' Ident }
+QueryDecl := 'query' Ident ['(' QueryArgList ')'] '=' StringLiteral [ReturnType]
+QueryArgList := QueryArg { QueryArg }
+QueryArg := Ident Ident
+AutoInsertDecl := 'insert' Ident ['(' Ident { ',' Ident } ')'] [ReturnType]
+AutoUpdateDecl := 'update' Ident ['(' QueryArgList ')'] '=' StringLiteral [ReturnType]
+JoinDecl := 'join' '(' Ident Ident ')' '=' StringLiteral
+ReturnType := ':' ('one' | 'many')
+EnumBody := { EnumCase }
+EnumCase := Ident [Ident]
+SnippetBody := { FieldDecl | FunctionDecl }
+
+## 4. Implementation Notes
+- Tokenization treats strings as single Literal tokens (contents without quotes).
+- Query / update fragments store contents as single literal; update fragment internally rewrites '$' to '$#' to force isolated interpolation for user-provided fragments.
+- Snippet expansion occurs before dependency ordering and type resolution.
+- Auto insert/update queries transformed into full manual queries prior to query rendering contexts.
+- Joins influence only $locations string; no direct iteration directive currently used in core blueprints.
+
+## 5. Differences vs Internal Tokens
+Internal tokens where/with/except exist for historical reasons but are not part of public syntax surface and should not be used.
+
+## 6. Error Handling Contract
+Parsing stops only after full pass; aggregated errors returned. Each error formatted: [E####] (profile -> context) message details stack. Blueprint snippet nesting adds contextual stack lines.
+
+## 7. Security Considerations
+[exec] execution requires explicit interactive confirmation to mitigate unintended script execution.
+
+## 8. Determinism
+Blueprint rendering order follows token sequence; import collection is per-file and order-insensitive (HashSet) but emitted unsorted; consumers should not rely on ordering of imports.
 
 ---
-
-**Eliminate boilerplate. Define once, generate everywhere.**
+End of specification.

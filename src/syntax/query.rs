@@ -90,6 +90,15 @@ impl Query {
         })
     }
 
+    /// Renders the query contents into a finalized SQL string with positional parameters.
+    ///
+    /// Interpolation rules:
+    /// - $fields => comma list of table-qualified columns with AS aliases.
+    /// - $locations => base table plus JOIN fragments derived from struct joins.
+    /// - $table => base table name.
+    /// - $name / $#name => field reference (qualified vs isolated column name).
+    /// - $argName => replaced with next positional parameter index ($1,$2,... in first appearance order).
+    /// Unrecognized variables render as [err: name]. A trailing semicolon is appended.
     pub fn render(
         &self,
         strct: &RepackStruct,

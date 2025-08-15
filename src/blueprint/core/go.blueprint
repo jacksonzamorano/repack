@@ -34,6 +34,15 @@ type [name] struct {
 	[/each][br]
 }
 
+[if queries][br]
+func Scan[name](val *[name], row *sql.Rows) error {
+	if err := row.Scan([each field][nfunc orm.noread]&val.[name.titlecase][if sep], [/if][/nfunc][/each]); err != nil {
+		return err
+	}
+	return nil
+}[br]
+[/if]
+
 [each query][br]
 [import sql]
 func [name](db *sql.DB, [each arg][name] [type], [/each][trim], [/trim])
@@ -64,12 +73,18 @@ func [name](db *sql.DB, [each arg][name] [type], [/each][trim], [/trim])
 	return nil
 	[/if]
 	[if returns_many]
-	
+	for rows.Next() {
+		var value [struct_name][br]
+		if err := Scan[struct_name](&value, rows); err != nil {
+			return values, err
+		}
+		values = append(values, value)
+	}
 	return values, nil
 	[/if]
 	[if returns_one]
-	
-	return nil, nil
+	var value [struct_name];
+	return &value, Scan[struct_name](&value, rows)
 	[/if][br]
 }
 [/each]
