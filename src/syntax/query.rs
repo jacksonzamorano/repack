@@ -105,11 +105,11 @@ impl Query {
         let mut last_c = ' ';
         loop {
             if let Some(c) = iter.next() {
-                if c.is_alphabetic() || c == '_' || c == '$' {
+                if c.is_alphabetic() || c == '_' || c == '$' || c == '#' {
                     buf.push(c);
                     continue;
                 }
-                if !(c.is_alphabetic() || c == '_' || c == '$') && !buf.starts_with('$') {
+                if !(c.is_alphabetic() || c == '_' || c == '$' || c == '#') && !buf.starts_with('$') {
                     output.push_str(&buf);
                     output.push(c);
                     buf.clear();
@@ -129,8 +129,15 @@ impl Query {
                 output.push_str(&buf);
                 break;
             }
+            let mut isolated = false;
+            let mut target = &buf[1..];
+            let next = target.chars().next().unwrap();
+            if next == '#' {
+                target = &buf[2..];
+                isolated = true;
+            }
             // We know it's a variable - let's interpolate
-            let result = match &buf[1..] {
+            let result = match target {
                 "fields" => {
                     let mut field_strings = Vec::<String>::new();
                     for field in &strct.fields {
@@ -236,13 +243,21 @@ impl Query {
                             } else {
                                 &location.location
                             };
-                            Some(format!("{}.{}", table, location.field))
+                            if isolated {
+                                Some(location.field.clone())
+                            } else {
+                                Some(format!("{}.{}", table, location.field))
+                            }
                         } else {
-                            Some(format!(
-                                "{}.{}",
-                                strct.table_name.as_ref().unwrap(),
-                                field.name
-                            ))
+                            if isolated {
+                                Some(field.name.clone())
+                            } else {
+                                Some(format!(
+                                    "{}.{}",
+                                    strct.table_name.as_ref().unwrap(),
+                                    field.name
+                                ))
+                            }
                         }
                     } else if let Some(arg) = self.args.iter().find(|x| x.name == val) {
                         if let Some(idx) = pos_args.iter().position(|x| *x == arg.name) {
@@ -393,9 +408,12 @@ impl AutoUpdateQuery {
         }
         if reader.peek_equals() {
             reader.skip();
-            contents = reader.take_literal().ok_or_else(|| {
-                RepackError::global(RepackErrorKind::QueryInvalidSyntax, obj_name.to_string())
-            })?;
+            contents = reader
+                .take_literal()
+                .ok_or_else(|| {
+                    RepackError::global(RepackErrorKind::QueryInvalidSyntax, obj_name.to_string())
+                })?
+                .replace("$", "$#");
         }
         if reader.take_colon() {
             match reader.take() {
@@ -419,10 +437,7 @@ impl AutoUpdateQuery {
     }
 
     pub fn into_query(&self) -> Result<Query, RepackError> {
-        let nested_contents = format!(
-            "WITH $table AS (UPDATE $table {} RETURNING *) SELECT $fields FROM $locations",
-            self.contents
-        );
+        let nested_contents = format!("WITH $table AS (UPDATE $table {} RETURNING *) SELECT $fields FROM $locations", self.contents);
         Ok(Query {
             args: self.args.clone(),
             name: self.name.clone(),

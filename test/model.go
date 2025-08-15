@@ -1,7 +1,7 @@
 package main;
 import "time"
-import "github.com/google/uuid"
 import "database/sql"
+import "github.com/google/uuid"
 
 
 type UserType string
@@ -59,7 +59,7 @@ func CreateUser(db *sql.DB, __id uuid.UUID, __name string, __email string, __use
 	return nil, nil
 }
 func UpdateUserEmail(db *sql.DB, _id uuid.UUID, _email string) error {
-	rows, err := db.Query("WITH users AS (UPDATE users SET users.email = $1 WHERE users.id = $2 RETURNING *) SELECT users.id AS id, users.created_date AS created_date, users.last_login AS last_login, users.name AS name, users.email AS email, users.user_type AS user_type, users.subscription_id AS subscription_id, LOWER(name) || '_' || LOWER(email) AS email_id FROM users;", _id, _email)
+	rows, err := db.Query("WITH users AS (UPDATE users SET email = $1 WHERE id = $2 RETURNING *) SELECT users.id AS id, users.created_date AS created_date, users.last_login AS last_login, users.name AS name, users.email AS email, users.user_type AS user_type, users.subscription_id AS subscription_id, LOWER(name) || '_' || LOWER(email) AS email_id FROM users;", _id, _email)
 	if err != nil {
 		return err		
 	}
