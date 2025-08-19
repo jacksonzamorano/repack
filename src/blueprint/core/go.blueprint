@@ -84,6 +84,9 @@ func [name](db *sql.DB, [each arg][name] [type], [/each][trim], [/trim])
 	[/if]
 	[if returns_one]
 	var value [struct_name];
+	if !rows.Next() {
+		return nil, nil
+	}
 	return &value, Scan[struct_name](&value, rows)
 	[/if][br]
 }

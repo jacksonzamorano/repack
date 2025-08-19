@@ -382,9 +382,8 @@ impl AutoInsertQuery {
             }
         }
         output.push_str(&format!(
-            ") VALUES ({}) RETURNING *) AS {} SELECT $fields FROM $locations",
+            ") VALUES ({}) RETURNING *) SELECT $fields FROM $locations",
             query_interpolate,
-            strct.table_name.as_ref().unwrap()
         ));
         Ok(Query {
             args,
