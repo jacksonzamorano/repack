@@ -17,7 +17,7 @@ CREATE TABLE users (
 CREATE TABLE tokens (
 	id UUID NOT NULL PRIMARY KEY,
 	created_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-	user_id UUID NOT NULL,
+	user_id UUID NOT NULL,	FOREIGN KEY (user_id_to_users_id) REFERENCES users(id),
 	token_value UUID NOT NULL
 );
 CREATE TABLE users (

@@ -38,7 +38,7 @@ struct User @users #model {
 
 struct Token @tokens #model {
 	!base
-	user_id uuid ref(User.id)
+	user_id uuid db:fk("users", "id")
 	token_value uuid
 }
 

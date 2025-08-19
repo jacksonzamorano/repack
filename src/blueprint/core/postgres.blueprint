@@ -34,9 +34,9 @@ CREATE TABLE [table_name] (
 	[func db.generated] GENERATED ALWAYS AS [0][/func]
 	[func db.identity] GENERATED ALWAYS AS IDENTITY[/func]
 	[func db.unique] UNIQUE[/func],
-	[ref],
-	FOREIGN KEY ([name]) REFERENCES [foreign_table]([foreign_field]),
-	[/ref]
+	[func db.fk][br]
+	FOREIGN KEY ([name]_to_[0]_[1]) REFERENCES [0]([1]),
+	[/func]
 	[/nfunc]
 [/each]
 [trim],[/trim]
