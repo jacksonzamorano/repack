@@ -47,24 +47,18 @@ impl ParseResult {
 
         while let Some(token) = contents.next() {
             match *token {
-                Token::StructType => {
-                    match RepackStruct::read_from_contents(&mut contents) {
-                        Ok(s) => strcts.push(s),
-                        Err(e) => return Err(vec![e]),
-                    }
-                }
-                Token::EnumType => {
-                    match RepackEnum::read_from_contents(&mut contents) {
-                        Ok(e) => enums.push(e),
-                        Err(e) => return Err(vec![e]),
-                    }
-                }
-                Token::SnippetType => {
-                    match Snippet::read_from_contents(&mut contents) {
-                        Ok(s) => snippets.push(s),
-                        Err(e) => return Err(vec![e]),
-                    }
-                }
+                Token::StructType => match RepackStruct::read_from_contents(&mut contents) {
+                    Ok(s) => strcts.push(s),
+                    Err(e) => return Err(vec![e]),
+                },
+                Token::EnumType => match RepackEnum::read_from_contents(&mut contents) {
+                    Ok(e) => enums.push(e),
+                    Err(e) => return Err(vec![e]),
+                },
+                Token::SnippetType => match Snippet::read_from_contents(&mut contents) {
+                    Ok(s) => snippets.push(s),
+                    Err(e) => return Err(vec![e]),
+                },
                 Token::OutputType => {
                     if let Some(language) = language::Output::from_contents(&mut contents) {
                         languages.push(language);
@@ -123,7 +117,13 @@ impl ParseResult {
             'dep_search: for dependancy in strcts[i].depends_on() {
                 let mut x = i;
                 while x < strcts.len() {
-                    if strcts[x].name == dependancy {
+                    if strcts[x].name == dependancy
+                        || strcts[x]
+                            .table_name
+                            .as_ref()
+                            .map(|x| *x == dependancy)
+                            .unwrap_or(false)
+                    {
                         found_issue = true;
                         break 'dep_search;
                     }
@@ -272,25 +272,22 @@ impl ParseResult {
 
             let mut autoq_idx = 0;
             while autoq_idx < strcts[object_idx].autoinsertqueries.len() {
-                match strcts[object_idx].autoinsertqueries[autoq_idx].to_query(&strcts[object_idx]) {
+                match strcts[object_idx].autoinsertqueries[autoq_idx].to_query(&strcts[object_idx])
+                {
                     Ok(val) => {
                         strcts[object_idx].queries.push(val);
                     }
-                    Err(e) => {
-                        errors.push(e)
-                    }
+                    Err(e) => errors.push(e),
                 }
                 autoq_idx += 1;
-            } 
+            }
             autoq_idx = 0;
             while autoq_idx < strcts[object_idx].autoupdatequeries.len() {
                 match strcts[object_idx].autoupdatequeries[autoq_idx].to_query() {
                     Ok(val) => {
                         strcts[object_idx].queries.push(val);
                     }
-                    Err(e) => {
-                        errors.push(e)
-                    }
+                    Err(e) => errors.push(e),
                 }
                 autoq_idx += 1;
             }

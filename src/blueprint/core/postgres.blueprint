@@ -35,7 +35,7 @@ CREATE TABLE [table_name] (
 	[func db.identity] GENERATED ALWAYS AS IDENTITY[/func]
 	[func db.unique] UNIQUE[/func],
 	[func db.fk][br]
-	FOREIGN KEY ([name]_to_[0]_[1]) REFERENCES [0]([1]),
+	FOREIGN KEY ([name]) REFERENCES [0]([1]),
 	[/func]
 	[/nfunc]
 [/each]
