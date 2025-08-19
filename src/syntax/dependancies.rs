@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use super::{RepackStruct, RepackError, RepackErrorKind};
+use super::{RepackError, RepackErrorKind, RepackStruct};
 
 pub fn graph_valid(strcts: &[RepackStruct]) -> Result<(), RepackError> {
     let mut graph: VecDeque<Vec<String>> = VecDeque::new();
@@ -8,10 +8,15 @@ pub fn graph_valid(strcts: &[RepackStruct]) -> Result<(), RepackError> {
         graph.push_back(vec![obj.name.clone()]);
     }
     while let Some(eval) = graph.pop_front() {
-        let Some(eval_object) = strcts
-            .iter()
-            .find(|obj| *obj.name == *eval.last().unwrap())
-        else {
+        let name = eval.last().unwrap();
+        let Some(eval_object) = strcts.iter().find(|obj| {
+            *obj.name == *name
+                || obj
+                    .table_name
+                    .as_ref()
+                    .map(|x| *x == *name)
+                    .unwrap_or(false)
+        }) else {
             return Err(RepackError::global(
                 RepackErrorKind::UnknownObject,
                 format!("'{}' => '{}'", eval.last().unwrap(), eval.first().unwrap()),

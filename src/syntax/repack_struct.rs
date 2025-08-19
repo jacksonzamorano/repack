@@ -112,13 +112,13 @@ impl RepackStruct {
         let Some(name_opt) = contents.next() else {
             return Err(RepackError::global(
                 RepackErrorKind::ParseIncomplete,
-                "struct name".to_string()
+                "struct name".to_string(),
             ));
         };
         let Token::Literal(name_ref) = name_opt else {
             return Err(RepackError::global(
                 RepackErrorKind::ParseIncomplete,
-                format!("{name_opt:?}")
+                format!("{name_opt:?}"),
             ));
         };
         let name = name_ref.to_string();
@@ -176,7 +176,7 @@ impl RepackStruct {
                         } else {
                             return Err(RepackError::global(
                                 RepackErrorKind::ParseIncomplete,
-                                format!("field in {name}")
+                                format!("field in {name}"),
                             ));
                         }
                     }
@@ -287,6 +287,12 @@ impl RepackStruct {
                 }
                 _ => {}
             }
+            match field.function("db", "fk").and_then(|x| x.args.first()) {
+                Some(val) => {
+                    dependencies.insert(val.to_string());
+                }
+                _ => {}
+            };
         }
         dependencies.into_iter().collect()
     }
