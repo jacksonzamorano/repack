@@ -13,13 +13,8 @@
 [file]model.sql[/file]
 BEGIN;[br]
 
-[eachr object]
-[if record][br]
+[eachr struct][br]
 DROP TABLE IF EXISTS [table_name];
-[/if]
-[if syn][br]
-DROP VIEW IF EXISTS [name];
-[/if]
 [/eachr]
 
 [each enum][br]
@@ -27,38 +22,26 @@ DROP TYPE IF EXISTS [name];
 [/each]
 
 [each enum][br]
-CREATE TYPE [name] AS ENUM([each case]'[value]'[if sep], [/if][/each]);
+CREATE TYPE [name] AS ENUM([each case]'[value]', [/each][trim], [/trim]);
 [/each]
 
-[each object]
-[if record][br][br]
+[each struct][br]
 CREATE TABLE [table_name] (
-[each field][br]
+[each field]
+	[nfunc db.as][br]
 	[name] [type][ifn optional] NOT NULL[/ifn][func db.default] DEFAULT [0][/func]
 	[func db.pk] PRIMARY KEY[/func]
 	[func db.generated] GENERATED ALWAYS AS [0][/func]
 	[func db.identity] GENERATED ALWAYS AS IDENTITY[/func]
-	[func db.unique] UNIQUE[/func]
-	[ref],
-	FOREIGN KEY ([name]) REFERENCES [foreign_table]([foreign_field])
-	[/ref]
-	[if sep],[/if]
-[/each][br]
-);
-[func db.index][br]CREATE INDEX ON [table_name] ([each arg][arg][if sep], [/if][/each]);[/func]
-[/if]
-
-[if syn][br][br]
-CREATE VIEW [name] AS
-SELECT
-[each field][br]
-	[ref_table].[ref_field] AS [name][if sep],[/if]
-[/each][br]
-FROM [table_name]
-[each join][br]
-INNER JOIN [ref_table] [name] ON [local_entity].[local_field] = [name].[ref_field]
-[/each];
-[/if]
+	[func db.unique] UNIQUE[/func],
+	[func db.fk][br]
+	FOREIGN KEY ([name]_to_[0]_[1]) REFERENCES [0]([1]),
+	[/func]
+	[/nfunc]
 [/each]
-
+[trim],[/trim]
+[br]
+);
+[func db.index][br]CREATE INDEX ON [table_name] ([each arg][arg], [/each][trim], [/trim]);[/func]
+[/each]
 [br][br]COMMIT;

@@ -1,7 +1,7 @@
-use super::{FileContents, Token};
+use super::{FileContents, Token, RepackError, RepackErrorKind};
 
 #[derive(Debug)]
-pub struct EnumCase {
+pub struct RepackEnumCase {
     pub name: String,
     pub value: Option<String>,
 }
@@ -12,15 +12,15 @@ pub struct EnumCase {
 /// They are useful for representing status codes, categories, or any field
 /// that should be restricted to a predefined set of values.
 #[derive(Debug)]
-pub struct Enum {
+pub struct RepackEnum {
     /// The unique name identifier for this enumeration
     pub name: String,
     /// Tags/categories for organizing and filtering enums during generation
     pub categories: Vec<String>,
     /// The list of possible values this enum can take
-    pub options: Vec<EnumCase>,
+    pub options: Vec<RepackEnumCase>,
 }
-impl Enum {
+impl RepackEnum {
     /// Parses an Enum definition from the input file contents.
     ///
     /// This method reads the enum definition syntax and constructs an Enum instance
@@ -35,12 +35,18 @@ impl Enum {
     ///
     /// # Panics
     /// Panics if the expected enum name is missing or malformed
-    pub fn read_from_contents(contents: &mut FileContents) -> Enum {
+    pub fn read_from_contents(contents: &mut FileContents) -> Result<RepackEnum, RepackError> {
         let Some(name_opt) = contents.next() else {
-            panic!("Read enum name, expected a name but got end of file.");
+            return Err(RepackError::global(
+                RepackErrorKind::ParseIncomplete,
+                "enum name".to_string()
+            ));
         };
         let Token::Literal(name_ref) = name_opt else {
-            panic!("Read enum name, expected a name but got {name_opt:?}");
+            return Err(RepackError::global(
+                RepackErrorKind::ParseIncomplete,
+                format!("{name_opt:?}")
+            ));
         };
         let name = name_ref.to_string();
         let mut options = Vec::new();
@@ -66,7 +72,7 @@ impl Enum {
                     break 'cmd;
                 }
                 Token::Literal(lit) => {
-                    let mut cs = EnumCase {
+                    let mut cs = RepackEnumCase {
                         name: lit,
                         value: None,
                     };
@@ -77,10 +83,10 @@ impl Enum {
             }
         }
 
-        Enum {
+        Ok(RepackEnum {
             name,
             categories,
             options,
-        }
+        })
     }
 }

@@ -1,34 +1,14 @@
-blueprint "output_config.blueprint"
-
-output markdown @test;
-output postgres @test/postgres #model #view;
-output typescript @test/typescript #model #view;
-output rust @test/rust #model #view;
-output go @test/go #model #view {
+blueprint "debug.blueprint"
+output debug @test;
+output postgres @test;
+output go @test {
 	package main
 }
-output "md-config" @test;
+output typescript @"test/ts";
 
 snippet base {
 	id uuid db:pk
 	created_date datetime db:default("NOW()")
-}
-
-configuration ApiDeployment {
-	host_ip
-	db_username
-	db_password
-}
-
-instance Production: ApiDeployment @prod {
-	host_ip "192.168.0.1"
-	db_username "admin"
-	db_password "test"
-}
-instance Staging: ApiDeployment @staging {
-	host_ip "10.0.0.1"
-	db_username "admin2"
-	db_password "test2"
 }
 
 enum UserType #model {
@@ -37,28 +17,35 @@ enum UserType #model {
 	Guest
 }
 
-record User @users #model {
+struct User @users #model {
 	!base
+
 	last_login datetime?
 	name string
+	email string
 	user_type UserType
 	subscription_id string?
+	email_id string db:as("LOWER(name) || '_' || LOWER(email)")
+
+
+	query UserByEmail(_email string) = "SELECT $fields FROM $locations WHERE $email = $_email" : one
+	query UsersByType(_typ UserType) = "SELECT $fields FROM $locations WHERE $user_type = $_typ" : many
+	query DeleteUserById(_id uuid) = "DELETE FROM $table WHERE $id = $_id"
+	update UpdateUserEmail(_id uuid, _email string) = "SET $email = $_email WHERE $id = $_id"
+
+	insert CreateUser (id, name, email, user_type) : one
 }
 
-record ContactInfo @contacts #model {
+struct Token @tokens #model {
 	!base
-	email string
-	user_id ref(User.id)
-	db:index("email")
-	db:index("user_id")
-	db:index("user_id", "id")
+	user_id uuid db:fk("users", "id")
+	token_value uuid
 }
 
-synthetic FullUser: ContactInfo #model {
-	*
-	name from(user_id.name)
-}
+struct UserWithToken: User {
+	join(t Token) = "INNER JOIN $name ON $super.id = $t.user_id"
+	user_id super.id
+	token_value t.token_value
 
-struct UserList {
-	users User[]
+	query UserToken(_id uuid) = "SELECT $fields FROM $locations WHERE $user_id = $_id" : many
 }

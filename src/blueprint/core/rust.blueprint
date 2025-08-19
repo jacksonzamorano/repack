@@ -17,16 +17,18 @@
 [each object]
 pub struct [name] {
 [each field]
-	pub [name]: [if optional]Optional<[/if][if array]Vec<[/if][type][if array]>[/if][if optional]>[/if][if sep],[/if]
+	pub [name]: [if optional]Optional<[/if][if array]Vec<[/if][type][if array]>[/if][if optional]>[/if],
 [/each]
+[trim],[/trim]
 }
 [/each]
 
 [each enum]
 pub enum [name] {
-[each case]
-	[name][if sep],[/if]
+[each case][br]
+	[name],
 [/each]
+[trim],[/trim]
 }
 impl [name] {
 	pub fn from_string(val: &str) -> Option<Self> {

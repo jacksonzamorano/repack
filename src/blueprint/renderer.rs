@@ -8,11 +8,11 @@ use std::{
 
 use crate::{
     Console,
-    syntax::{FieldReferenceKind, Output, ParseResult, RepackError, RepackErrorKind},
+    syntax::{Output, ParseResult, RepackError, RepackErrorKind},
 };
 
 use super::{
-    Blueprint, BlueprintExecutionContext, FlyToken, SnippetMainTokenName, SnippetReference,
+    Blueprint, BlueprintExecutionContext, BlueprintToken, SnippetMainTokenName, SnippetReference,
     SnippetSecondaryTokenName, TokenConsumer,
 };
 
@@ -21,6 +21,7 @@ use super::{
 /// DeliveryUnit allows the rendering system to handle both regular text content
 /// and special placeholders like import statements that need to be processed
 /// and positioned correctly in the final output.
+#[derive(Debug)]
 enum DeliveryUnit {
     /// Regular text content to be written directly to the output file
     Text(String),
@@ -47,6 +48,9 @@ impl TokenConsumer for BlueprintBuildResult {
         self.current_file_name = Some(filename.to_string());
     }
     fn write(&mut self, value: &dyn AsRef<str>) {
+        if value.as_ref().is_empty() {
+            return;
+        }
         if let Some(file) = &self.current_file_name {
             if let Some(current) = self.contents.get_mut(file) {
                 current.push(DeliveryUnit::Text(value.as_ref().to_string()));
@@ -55,6 +59,34 @@ impl TokenConsumer for BlueprintBuildResult {
                     file.to_string(),
                     vec![DeliveryUnit::Text(value.as_ref().to_string())],
                 );
+            }
+        }
+    }
+    fn delete_trailing(&mut self, value: &dyn AsRef<str>) {
+        let Some(filename) = &self.current_file_name else {
+            return;
+        };
+        let Some(latest_file) = self.contents.get_mut(filename) else {
+            return;
+        };
+        let Some(latest_du) = latest_file.iter_mut().rev().find_map(|x| match x {
+            DeliveryUnit::Text(t) => Some(t),
+            _ => None,
+        }) else {
+            return;
+        };
+        if latest_du.ends_with(value.as_ref()) {
+            let mut del_ct = 0;
+            let len = value.as_ref().chars().count();
+            if let Some(cutoff) = latest_du.char_indices().rev().find_map(|(idx, _)| {
+                del_ct += 1;
+                if del_ct == len {
+                    Some(idx)
+                } else {
+                    None
+                }
+            }) {
+                latest_du.truncate(cutoff);
             }
         }
     }
@@ -90,7 +122,7 @@ impl TokenConsumer for BlueprintBuildResult {
 pub struct BlueprintRenderer<'a> {
     /// The blueprint defining the target language templates and rules
     pub blueprint: &'a Blueprint,
-    /// The parsed schema containing objects, enums, and their relationships
+    /// The parsed schema containing structs, enums, and their relationships
     pub parse_result: &'a ParseResult,
     /// Output configuration specifying target location, categories, and options
     pub config: &'a Output,
@@ -102,7 +134,7 @@ impl<'a> BlueprintRenderer<'a> {
     /// Creates a new BlueprintRenderer with the necessary components for code generation.
     ///
     /// # Arguments
-    /// * `parse_result` - The parsed schema data containing objects and enums
+    /// * `parse_result` - The parsed schema data containing structs and enums
     /// * `blueprint` - The blueprint defining how to generate code for the target language
     /// * `config` - Output configuration specifying target settings and options
     ///
@@ -124,7 +156,7 @@ impl<'a> BlueprintRenderer<'a> {
 
     fn render_tokens<'b>(
         &mut self,
-        content: &'b [FlyToken],
+        content: &'b [BlueprintToken],
         context: &'b BlueprintExecutionContext<'b>,
         writer: &'b mut dyn TokenConsumer,
     ) -> Result<(), RepackError> {
@@ -132,11 +164,11 @@ impl<'a> BlueprintRenderer<'a> {
         while index < content.len() {
             let c = &content[index];
             match c {
-                FlyToken::Literal(lit_val) => {
+                BlueprintToken::Literal(lit_val) => {
                     writer.write(&lit_val);
                     index += 1;
                 }
-                FlyToken::Snippet(snip) => {
+                BlueprintToken::Snippet(snip) => {
                     index += 1;
                     let starting_at = index;
                     let mut embed_count = 1;
@@ -145,7 +177,7 @@ impl<'a> BlueprintRenderer<'a> {
                         while index < content.len() {
                             let in_block = &content[index];
                             match &in_block {
-                                FlyToken::Close(close) => {
+                                BlueprintToken::Close(close) => {
                                     if *close == snip.main_token {
                                         embed_count -= 1;
                                         if embed_count == 0 {
@@ -153,7 +185,7 @@ impl<'a> BlueprintRenderer<'a> {
                                         }
                                     }
                                 }
-                                FlyToken::Snippet(embedded)
+                                BlueprintToken::Snippet(embedded)
                                     if embedded.main_token == snip.main_token =>
                                 {
                                     embed_count += 1;
@@ -208,18 +240,18 @@ impl<'a> BlueprintRenderer<'a> {
             SnippetMainTokenName::Each | SnippetMainTokenName::Eachr => {
                 let rev = matches!(content.main_token(), SnippetMainTokenName::Eachr);
                 let iter_options: Vec<_> = match content.secondary_token() {
-                    SnippetSecondaryTokenName::Object => self
+                    SnippetSecondaryTokenName::Struct => self
                         .parse_result
-                        .included_objects(&self.config.categories, &self.config.exclude)
+                        .included_strcts(&self.config.categories, &self.config.exclude)
                         .into_iter()
-                        .map(|x| Ok(context.with_object(x)))
+                        .map(|x| Ok(context.with_strct(x)))
                         .collect(),
                     SnippetSecondaryTokenName::Field => {
-                        let Some(obj) = context.object else {
+                        let Some(obj) = context.strct else {
                             return Err(RepackError::from_lang_with_msg(
                                 RepackErrorKind::CannotCreateContext,
                                 self.config,
-                                "field in non-object context.".to_string(),
+                                "field in non-struct context.".to_string(),
                             ));
                         };
                         obj.fields
@@ -229,17 +261,17 @@ impl<'a> BlueprintRenderer<'a> {
                             })
                             .collect()
                     }
-                    SnippetSecondaryTokenName::Join => {
-                        let Some(obj) = context.object else {
+                    SnippetSecondaryTokenName::Query => {
+                        let Some(obj) = context.strct else {
                             return Err(RepackError::from_lang_with_msg(
                                 RepackErrorKind::CannotCreateContext,
                                 self.config,
-                                "join in non-object context.".to_string(),
+                                "field in non-struct context.".to_string(),
                             ));
                         };
-                        obj.joins
+                        obj.queries
                             .iter()
-                            .map(|j| context.with_join(obj, j))
+                            .map(|field| context.with_query(obj, field, self.parse_result))
                             .collect()
                     }
                     SnippetSecondaryTokenName::Enum => self
@@ -262,35 +294,28 @@ impl<'a> BlueprintRenderer<'a> {
                             .collect()
                     }
                     SnippetSecondaryTokenName::Arg => {
-                        let Some(args) = context.func_args else {
+                        if let Some(args) = context.func_args {
+                            args.iter().map(|x| context.with_func_arg(x)).collect()
+                        } else if let Some(query) = context.query {
+                            query
+                                .args
+                                .iter()
+                                .map(|x| context.with_query_arg(x, self.blueprint, writer))
+                                .collect()
+                        } else {
                             return Err(RepackError::from_lang_with_msg(
                                 RepackErrorKind::CannotCreateContext,
                                 self.config,
                                 "args in non-func context".to_string(),
                             ));
-                        };
-                        args.iter().map(|x| context.with_func_arg(x)).collect()
+                        }
                     }
                     _ => {
-                        let instances = self
-                            .parse_result
-                            .configuration_instances
-                            .iter()
-                            .filter(|cs| cs.configuration == content.details.secondary_token)
-                            .collect::<Vec<_>>();
-                        if !instances.is_empty() {
-                            instances
-                                .iter()
-                                .filter(|x| x.environment == self.filter)
-                                .map(|x| context.with_instance(x))
-                                .collect()
-                        } else {
-                            return Err(RepackError::from_lang_with_msg(
-                                RepackErrorKind::VariableNotInScope,
-                                self.config,
-                                content.details.secondary_token.to_string(),
-                            ));
-                        }
+                        return Err(RepackError::from_lang_with_msg(
+                            RepackErrorKind::VariableNotInScope,
+                            self.config,
+                            content.details.secondary_token.to_string(),
+                        ));
                     }
                 };
                 let len = iter_options.len();
@@ -350,7 +375,7 @@ impl<'a> BlueprintRenderer<'a> {
                         self.render_tokens(content.contents, &updated_context, writer)?;
                     }
                 }
-                if let Some(obj) = context.object {
+                if let Some(obj) = context.strct {
                     for matched_fn in obj
                         .functions_in_namespace(namespace)
                         .iter()
@@ -387,7 +412,7 @@ impl<'a> BlueprintRenderer<'a> {
                     }
                     return Ok(());
                 }
-                if let Some(obj) = context.object {
+                if let Some(obj) = context.strct {
                     if !obj
                         .functions_in_namespace(namespace)
                         .iter()
@@ -398,45 +423,9 @@ impl<'a> BlueprintRenderer<'a> {
                     return Ok(());
                 }
             }
-            SnippetMainTokenName::Ref => {
-                if let Some(field) = context.field {
-                    if let Some(obj) = context.object {
-                        let mut u_context = context.clone();
-                        if let Some(tn) = obj.table_name.as_ref() {
-                            u_context
-                                .variables
-                                .insert("local_entity".to_string(), tn.to_string());
-                        }
-                        if let FieldReferenceKind::FieldType(entity_name) =
-                            &field.location.reference
-                        {
-                            if let Some(entity) = self
-                                .parse_result
-                                .objects
-                                .iter()
-                                .find(|x| x.name == *entity_name)
-                            {
-                                if let Some(e_tn) = entity.table_name.as_ref() {
-                                    u_context
-                                        .variables
-                                        .insert("foreign_table".to_string(), e_tn.to_string());
-                                }
-                            }
-                            u_context
-                                .variables
-                                .insert("foreign_entity".to_string(), entity_name.to_string());
-                            u_context.variables.insert(
-                                "foreign_field".to_string(),
-                                field.location.name.to_string(),
-                            );
-                            self.render_tokens(content.contents, &u_context, writer)?;
-                        };
-                    }
-                }
-            }
             SnippetMainTokenName::Exec => {
                 let mut exec_reader = String::new();
-                self.render_tokens(content.contents, &context, &mut exec_reader)?;
+                self.render_tokens(content.contents, context, &mut exec_reader)?;
                 Console::update_msg(&format!(
                     "{} would like to run a command. [y/N]",
                     self.blueprint.name
@@ -450,15 +439,30 @@ impl<'a> BlueprintRenderer<'a> {
                         .stdout(Stdio::null())
                         .stderr(Stdio::inherit())
                         .spawn()
-                        .unwrap();
+                        .map_err(|e| RepackError::global(
+                            RepackErrorKind::ProcessExecutionFailed,
+                            e.to_string()
+                        ))?;
                     if let Some(stdin) = exec.stdin.as_mut() {
-                        stdin.write_all(exec_reader.as_bytes()).unwrap();
+                        stdin.write_all(exec_reader.as_bytes())
+                            .map_err(|e| RepackError::global(
+                                RepackErrorKind::ProcessExecutionFailed,
+                                e.to_string()
+                            ))?;
                     }
-                    exec.wait().unwrap();
+                    exec.wait().map_err(|e| RepackError::global(
+                        RepackErrorKind::ProcessExecutionFailed,
+                        e.to_string()
+                    ))?;
                 }
             }
             SnippetMainTokenName::PlaceImports => {
                 writer.import_point();
+            }
+            SnippetMainTokenName::Trim => { // Deletes trailing matching sequence (used to drop final commas)
+                let mut trim_contents = String::new();
+                self.render_tokens(content.contents, context, &mut trim_contents)?;
+                writer.delete_trailing(&trim_contents);
             }
             SnippetMainTokenName::Import => {
                 if let Some(import) = self.blueprint.links.get(&content.details.secondary_token) {
@@ -474,7 +478,7 @@ impl<'a> BlueprintRenderer<'a> {
             SnippetMainTokenName::Break => {
                 writer.write(&"\n");
             }
-            SnippetMainTokenName::Increment => {
+            SnippetMainTokenName::Increment => { // Global counter increment; variable of same name outputs current value
                 let name = &content.details.secondary_token;
                 if let Some(glob) = self.global_counters.get_mut(name) {
                     *glob += 1
@@ -482,9 +486,24 @@ impl<'a> BlueprintRenderer<'a> {
                     self.global_counters.insert(name.to_string(), 1);
                 }
             }
+            SnippetMainTokenName::Render => { // Inline snippet literal insertion
+                let mut snippet_name = String::new();
+                self.render_tokens(content.contents, context, &mut snippet_name)?;
+                if let Some(snippet) = self.blueprint.snippets.get(&snippet_name) {
+                    writer.write(snippet);
+                } else {
+                    return Err(RepackError::global(
+                        RepackErrorKind::UnknownSnippet,
+                        snippet_name.to_string(),
+                    ));
+                }
+            }
             SnippetMainTokenName::Variable(var) => {
                 let mut components = var.split(".");
-                let name = components.next().unwrap();
+                let name = components.next().ok_or_else(|| RepackError::global(
+                    RepackErrorKind::ParseIncomplete,
+                    format!("variable '{var}'")
+                ))?;
                 if let Some(glob) = self.global_counters.get(name) {
                     writer.write(&glob.to_string());
                 } else if let Some(mut res) = context.variables.get(name).map(|x| x.to_string()) {
@@ -530,11 +549,11 @@ impl<'a> BlueprintRenderer<'a> {
                                     .join("")
                             }
                             "split_period_first" => {
-                                res = res.split(".").next().unwrap().to_string()
+                                res = res.split(".").next().unwrap_or("").to_string()
                             }
-                            "split_period_last" => res = res.split(".").last().unwrap().to_string(),
-                            "split_dash_first" => res = res.split("-").next().unwrap().to_string(),
-                            "split_dash_last" => res = res.split("-").last().unwrap().to_string(),
+                            "split_period_last" => res = res.split(".").last().unwrap_or("").to_string(),
+                            "split_dash_first" => res = res.split("-").next().unwrap_or("").to_string(),
+                            "split_dash_last" => res = res.split("-").last().unwrap_or("").to_string(),
                             _ => {
                                 return Err(RepackError::from_lang_with_msg(
                                     RepackErrorKind::InvalidVariableModifier,
@@ -578,7 +597,10 @@ impl<'a> BlueprintRenderer<'a> {
                 .insert(opt.0.to_string(), opt.1.to_string());
         }
         _ = &self.render_tokens(&self.blueprint.tokens, &context, &mut files)?;
-        let mut path = current_dir().unwrap();
+        let mut path = current_dir().map_err(|_| RepackError::global(
+            RepackErrorKind::PathNotValid,
+            String::new()
+        ))?;
         if let Some(loc) = &self.config.location {
             path.push(loc);
         }
@@ -631,7 +653,10 @@ impl<'a> BlueprintRenderer<'a> {
             &BlueprintExecutionContext::new(),
             &mut files,
         )?;
-        let mut path = current_dir().unwrap();
+        let mut path = current_dir().map_err(|_| RepackError::global(
+            RepackErrorKind::PathNotValid,
+            String::new()
+        ))?;
         if let Some(loc) = &self.config.location {
             path.push(loc);
         }

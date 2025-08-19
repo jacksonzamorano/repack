@@ -1,6 +1,6 @@
-use crate::blueprint::SnippetDetails;
+use crate::blueprint::BlueprintSnippetDetails;
 
-use super::{ConfigurationInstance, Field, Object, Output};
+use super::{Field, Output, RepackStruct};
 
 /// Enumeration of all possible error types that can occur during schema processing.
 ///
@@ -11,37 +11,33 @@ use super::{ConfigurationInstance, Field, Object, Output};
 #[repr(u32)]
 pub enum RepackErrorKind {
     CircularDependancy,
-    RefFieldUnresolvable,
-    JoinFieldUnresolvable,
     ParentObjectDoesNotExist,
-    TableNameNotAllowed,
-    NoTableName,
-    CannotReuse,
-    CannotInherit,
-    NoFields,
-    ManyNotAllowed,
-    CustomTypeNotAllowed,
     CustomTypeNotDefined,
     TypeNotResolved,
     SnippetNotFound,
     DuplicateFieldNames,
-    UnknownExplicitJoin,
-    JoinObjectNotFound,
-    JoinFieldNotFound,
-    JoinNoTableName,
     CannotCreateContext,
     FunctionInvalidSyntax,
     TypeNotSupported,
     CannotRead,
     CannotWrite,
     SnippetNotClosed,
+    UnknownSnippet,
     VariableNotInScope,
     InvalidVariableModifier,
-    UnknownConfiguration,
-    MissingConfigurationField,
-    ExtraConfigurationField,
     UnknownLink,
     UnknownObject,
+    QueryArgInvalidSyntax,
+    QueryInvalidSyntax,
+    InvalidSuper,
+    FieldNotOnSuper,
+    InvalidJoin,
+    FieldNotOnJoin,
+    SyntaxError,
+    ProcessExecutionFailed,
+    PathNotValid,
+    ParseIncomplete,
+    FieldNotFound,
     UnknownError,
 }
 impl Default for RepackErrorKind {
@@ -53,25 +49,12 @@ impl RepackErrorKind {
     pub fn as_string(&self) -> &'static str {
         match self {
             Self::CircularDependancy => "This definition creates a circular dependancy with:",
-            Self::RefFieldUnresolvable => "Could not resolve the 'ref' reference:",
-            Self::JoinFieldUnresolvable => "Could not resolve the 'from' reference:",
-            Self::ParentObjectDoesNotExist => "Parent object couldn't be found:",
-            Self::TableNameNotAllowed => "Table name isn't allowed in this context.",
-            Self::NoTableName => "Table name is required in this context.",
-            Self::CannotReuse => "Reuse is not available in this context.",
-            Self::CannotInherit => "Inherit is not available in this context.",
-            Self::NoFields => "No fields were found in this object.",
-            Self::ManyNotAllowed => "Arrays aren't allowed in this context.",
-            Self::CustomTypeNotAllowed => "Custom types are not available in this context.",
+            Self::ParentObjectDoesNotExist => "Parent struct couldn't be found:",
             Self::TypeNotSupported => "Type is not allowed:",
             Self::CustomTypeNotDefined => "The custom type cannot be resolved:",
             Self::TypeNotResolved => "This type couldn't be resolved.",
             Self::SnippetNotFound => "Expected to use snippet, but it couldn't be found:",
             Self::DuplicateFieldNames => "A field already exists with this name.",
-            Self::UnknownExplicitJoin => "Unknown explicit join:",
-            Self::JoinObjectNotFound => "Tried to join but the object was not found:",
-            Self::JoinFieldNotFound => "Tried to join but the field was not found:",
-            Self::JoinNoTableName => "Table name is required in a join, this entity does not: ",
             Self::CannotCreateContext => "Cannot create a context:",
             Self::FunctionInvalidSyntax => "Function syntax is not vaild:",
             Self::CannotRead => "Cannot read the file:",
@@ -79,14 +62,23 @@ impl RepackErrorKind {
             Self::SnippetNotClosed => "Block was not closed:",
             Self::VariableNotInScope => "Variable was not found in scope:",
             Self::InvalidVariableModifier => "Unknown variable modifier specified:",
-            Self::UnknownConfiguration => "Unknown configuration:",
-            Self::MissingConfigurationField => "Expected configuration field but it wasn't found:",
-            Self::ExtraConfigurationField => "An extra configuration field was found:",
+            Self::UnknownSnippet => "Specified snippet does not exist:",
             Self::UnknownLink => "Requested import but no link was defined for ",
             Self::UnknownObject => {
-                "Attempted to resolve this dependancy but the object couldn't be found: "
+                "Attempted to resolve this dependancy but the struct couldn't be found: "
             }
             Self::UnknownError => "An unknown error occured.",
+            Self::SyntaxError => "Error when parsing ",
+            Self::QueryInvalidSyntax => "Invalid query syntax.",
+            Self::QueryArgInvalidSyntax => "Invalid query argument syntax.",
+            Self::InvalidSuper => "Cannot use super without an inheritance.",
+            Self::FieldNotOnSuper => "Field does not exist in this super.",
+            Self::InvalidJoin => "Joined entity not found.",
+            Self::FieldNotOnJoin => "Field does not exist in this join.",
+            Self::ProcessExecutionFailed => "Process execution failed:",
+            Self::PathNotValid => "Path could not be converted to string:",
+            Self::ParseIncomplete => "Parsing failed, expected token not found:",
+            Self::FieldNotFound => "Field could not be found:",
         }
     }
 }
@@ -96,7 +88,7 @@ impl RepackError {
     ///
     /// This method creates a comprehensive error message that includes:
     /// - Error code (E0001 format)
-    /// - Context location (language -> object.field)
+    /// - Context location (language -> struct.field)
     /// - Error description and details
     /// - Stack trace for nested errors
     ///
@@ -120,7 +112,7 @@ impl RepackError {
 /// Represents a complete error with context information for debugging.
 ///
 /// RepackError combines an error type with contextual information about where
-/// the error occurred (language, object, field) and provides detailed error
+/// the error occurred (language, struct, field) and provides detailed error
 /// messages with stack traces for complex nested errors.
 #[derive(Debug, Default)]
 pub struct RepackError {
@@ -135,7 +127,7 @@ pub struct RepackError {
 }
 
 impl RepackError {
-    /// Creates a global error without specific object or field context.
+    /// Creates a global error without specific struct or field context.
     ///
     /// Used for system-level errors like file I/O issues or blueprint loading problems.
     ///
@@ -150,15 +142,16 @@ impl RepackError {
             ..Default::default()
         }
     }
-    /// Creates an error associated with a specific object.
+    /// Creates an error associated with a specific struct.
     ///
-    /// Used for object-level validation errors like missing table names
+    /// Used for struct-level validation errors like missing table names
     /// or inheritance issues.
     ///
     /// # Arguments
     /// * `error` - The type of error that occurred
-    /// * `obj` - The object where the error was found
-    pub fn from_obj(error: RepackErrorKind, obj: &Object) -> RepackError {
+    /// * `obj` - The struct where the error was found
+    #[allow(dead_code)]
+    pub fn from_obj(error: RepackErrorKind, obj: &RepackStruct) -> RepackError {
         RepackError {
             error,
             specifier: format!(" ({})", obj.name),
@@ -167,7 +160,11 @@ impl RepackError {
         }
     }
 
-    pub fn from_obj_with_msg(error: RepackErrorKind, obj: &Object, msg: String) -> RepackError {
+    pub fn from_obj_with_msg(
+        error: RepackErrorKind,
+        obj: &RepackStruct,
+        msg: String,
+    ) -> RepackError {
         RepackError {
             error,
             specifier: format!(" ({})", obj.name),
@@ -176,16 +173,16 @@ impl RepackError {
         }
     }
 
-    /// Creates an error associated with a specific field in an object.
+    /// Creates an error associated with a specific field in an struct.
     ///
     /// Used for field-level validation errors like type resolution failures
     /// or invalid field configurations.
     ///
     /// # Arguments
     /// * `error` - The type of error that occurred
-    /// * `obj` - The object containing the problematic field
+    /// * `obj` - The struct containing the problematic field
     /// * `field` - The field where the error was found
-    pub fn from_field(error: RepackErrorKind, obj: &Object, field: &Field) -> RepackError {
+    pub fn from_field(error: RepackErrorKind, obj: &RepackStruct, field: &Field) -> RepackError {
         RepackError {
             error,
             specifier: format!(" ({}.{})", obj.name, field.name),
@@ -196,7 +193,7 @@ impl RepackError {
 
     pub fn from_field_with_msg(
         error: RepackErrorKind,
-        obj: &Object,
+        obj: &RepackStruct,
         field: &Field,
         msg: String,
     ) -> RepackError {
@@ -219,7 +216,11 @@ impl RepackError {
     }
 
     #[allow(dead_code)]
-    pub fn from_lang_with_obj(error: RepackErrorKind, lang: &Output, obj: &Object) -> RepackError {
+    pub fn from_lang_with_obj(
+        error: RepackErrorKind,
+        lang: &Output,
+        obj: &RepackStruct,
+    ) -> RepackError {
         RepackError {
             error,
             specifier: format!(" ({} -> {})", lang.profile, obj.name),
@@ -232,7 +233,7 @@ impl RepackError {
     pub fn from_lang_with_obj_msg(
         error: RepackErrorKind,
         lang: &Output,
-        obj: &Object,
+        obj: &RepackStruct,
         msg: String,
     ) -> RepackError {
         RepackError {
@@ -246,7 +247,7 @@ impl RepackError {
     pub fn from_lang_with_obj_field_msg(
         error: RepackErrorKind,
         lang: &Output,
-        obj: &Object,
+        obj: &RepackStruct,
         field: &Field,
         msg: String,
     ) -> RepackError {
@@ -267,20 +268,7 @@ impl RepackError {
         }
     }
 
-    pub fn from_instance_with_msg(
-        error: RepackErrorKind,
-        instance: &ConfigurationInstance,
-        msg: String,
-    ) -> RepackError {
-        RepackError {
-            error,
-            specifier: format!(" ({})", instance.name),
-            error_details: Some(msg),
-            stack: Vec::new(),
-        }
-    }
-
-    pub fn add_to_stack(&mut self, snip: &SnippetDetails) {
+    pub fn add_to_stack(&mut self, snip: &BlueprintSnippetDetails) {
         self.stack
             .push(format!("\t- {} {}", snip.main_token, snip.secondary_token));
     }

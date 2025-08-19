@@ -20,7 +20,7 @@
 ---[br][br]
 
 # Objects
-[each object][br]
+[each struct][br]
 ## [name]
 [if record][br]
 **Record**: *This object is a record. A table (called `[table_name]`) will store the data.*

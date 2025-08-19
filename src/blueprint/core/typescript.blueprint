@@ -10,7 +10,7 @@
 [define uuid]string[/define]
 [link custom]import type { $ } from './$'[/link]
 
-[ each object ]
+[each struct]
 [file][name].ts[/file]
 [imports]
 
@@ -27,14 +27,15 @@ export interface [name] {
 export type [name] = 
 
 [each case]
-'[name]'[if sep] | [/if]
+'[name]' | 
 [/each]
+[trim] | [/trim]
 
 [/each]
 
 [file]index.ts[/file]
 
-[each object]
+[each struct]
 export type { [name] } from './[name]'[br]
 [/each]
 [each enum]

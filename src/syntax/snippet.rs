@@ -1,4 +1,4 @@
-use super::{Field, FileContents, ObjectFunction, Token};
+use super::{Field, FileContents, ObjectFunction, Token, RepackError, RepackErrorKind};
 
 #[derive(Debug)]
 pub struct Snippet {
@@ -8,12 +8,18 @@ pub struct Snippet {
 }
 
 impl Snippet {
-    pub fn read_from_contents(contents: &mut FileContents) -> Snippet {
+    pub fn read_from_contents(contents: &mut FileContents) -> Result<Snippet, RepackError> {
         let Some(name_opt) = contents.next() else {
-            panic!("Read record type, expected a name but got end of file.");
+            return Err(RepackError::global(
+                RepackErrorKind::ParseIncomplete,
+                "snippet name".to_string()
+            ));
         };
         let Token::Literal(name_ref) = name_opt else {
-            panic!("Read record type, expected a name but got {name_opt:?}");
+            return Err(RepackError::global(
+                RepackErrorKind::ParseIncomplete,
+                format!("{name_opt:?}")
+            ));
         };
         let name = name_ref.to_string();
         let mut fields = Vec::new();
@@ -47,6 +53,6 @@ impl Snippet {
             }
         }
 
-        Snippet { name, fields, functions }
+        Ok(Snippet { name, fields, functions })
     }
 }
