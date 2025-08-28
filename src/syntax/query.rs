@@ -106,8 +106,6 @@ impl Query {
     ) -> Result<String, RepackError> {
         let mut output = String::new();
 
-        let mut pos_args: Vec<String> = Vec::new();
-
         let mut buf = String::new();
         let mut iter = self.contents.chars();
         let mut ct = true;
@@ -118,7 +116,8 @@ impl Query {
                     buf.push(c);
                     continue;
                 }
-                if !(c.is_alphabetic() || c == '_' || c == '$' || c == '#' || buf.starts_with('$')) {
+                if !(c.is_alphabetic() || c == '_' || c == '$' || c == '#' || buf.starts_with('$'))
+                {
                     output.push_str(&buf);
                     output.push(c);
                     buf.clear();
@@ -140,10 +139,12 @@ impl Query {
             }
             let mut isolated = false;
             let mut target = &buf[1..];
-            let next = target.chars().next().ok_or_else(|| RepackError::global(
-                RepackErrorKind::ParseIncomplete,
-                format!("query variable '{buf}'")
-            ))?;
+            let next = target.chars().next().ok_or_else(|| {
+                RepackError::global(
+                    RepackErrorKind::ParseIncomplete,
+                    format!("query variable '{buf}'"),
+                )
+            })?;
             if next == '#' {
                 target = &buf[2..];
                 isolated = true;
@@ -155,10 +156,12 @@ impl Query {
                     for field in &strct.fields {
                         if let Some(location) = &field.field_location {
                             let table = if location.location == "super" {
-                                strct.table_name.as_ref().ok_or_else(|| RepackError::from_obj(
-                                    RepackErrorKind::ParentObjectDoesNotExist,
-                                    strct
-                                ))?
+                                strct.table_name.as_ref().ok_or_else(|| {
+                                    RepackError::from_obj(
+                                        RepackErrorKind::ParentObjectDoesNotExist,
+                                        strct,
+                                    )
+                                })?
                             } else {
                                 &location.location
                             };
@@ -270,14 +273,8 @@ impl Query {
                                 field.name
                             ))
                         }
-                    } else if let Some(arg) = self.args.iter().find(|x| x.name == val) {
-                        if let Some(idx) = pos_args.iter().position(|x| *x == arg.name) {
-                            Some(format!("${}", idx + 1))
-                        } else {
-                            pos_args.push(arg.name.clone());
-                            let idx = pos_args.len();
-                            Some(format!("${idx}"))
-                        }
+                    } else if let Some(idx) = self.args.iter().position(|x| x.name == val) {
+                        Some(format!("${}", idx + 1))
                     } else {
                         Some(format!("[err: {val}]"))
                     }
@@ -360,7 +357,7 @@ impl AutoInsertQuery {
                 return Err(RepackError::from_obj_with_msg(
                     RepackErrorKind::FieldNotFound,
                     strct,
-                    selected_field.to_string()
+                    selected_field.to_string(),
                 ));
             };
             output.push_str(selected_field);
@@ -368,12 +365,16 @@ impl AutoInsertQuery {
 
             args.push(QueryArg {
                 name: format!("__{selected_field}"),
-                typ: matching_field.field_type.as_ref()
-                    .ok_or_else(|| RepackError::from_field(
-                        RepackErrorKind::TypeNotResolved,
-                        strct,
-                        matching_field
-                    ))?
+                typ: matching_field
+                    .field_type
+                    .as_ref()
+                    .ok_or_else(|| {
+                        RepackError::from_field(
+                            RepackErrorKind::TypeNotResolved,
+                            strct,
+                            matching_field,
+                        )
+                    })?
                     .to_string(),
             });
             if idx + 1 != self.args.len() {
@@ -457,7 +458,10 @@ impl AutoUpdateQuery {
     }
 
     pub fn to_query(&self) -> Result<Query, RepackError> {
-        let nested_contents = format!("WITH $table AS (UPDATE $table {} RETURNING *) SELECT $fields FROM $locations", self.contents);
+        let nested_contents = format!(
+            "WITH $table AS (UPDATE $table {} RETURNING *) SELECT $fields FROM $locations",
+            self.contents
+        );
         Ok(Query {
             args: self.args.clone(),
             name: self.name.clone(),

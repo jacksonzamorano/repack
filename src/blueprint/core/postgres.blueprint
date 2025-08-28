@@ -29,7 +29,7 @@ CREATE TYPE [name] AS ENUM([each case]'[value]', [/each][trim], [/trim]);
 CREATE TABLE [table_name] (
 [each field]
 	[nfunc db.as][br]
-	[name] [type][ifn optional] NOT NULL[/ifn][func db.default] DEFAULT [0][/func]
+	[name] [type][if array] ARRAY[/if][ifn optional] NOT NULL[/ifn][func db.default] DEFAULT [0][/func]
 	[func db.pk] PRIMARY KEY[/func]
 	[func db.generated] GENERATED ALWAYS AS [0][/func]
 	[func db.identity] GENERATED ALWAYS AS IDENTITY[/func]
