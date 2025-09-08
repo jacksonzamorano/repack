@@ -80,11 +80,7 @@ impl TokenConsumer for BlueprintBuildResult {
             let len = value.as_ref().chars().count();
             if let Some(cutoff) = latest_du.char_indices().rev().find_map(|(idx, _)| {
                 del_ct += 1;
-                if del_ct == len {
-                    Some(idx)
-                } else {
-                    None
-                }
+                if del_ct == len { Some(idx) } else { None }
             }) {
                 latest_du.truncate(cutoff);
             }
@@ -439,27 +435,30 @@ impl<'a> BlueprintRenderer<'a> {
                         .stdout(Stdio::null())
                         .stderr(Stdio::inherit())
                         .spawn()
-                        .map_err(|e| RepackError::global(
-                            RepackErrorKind::ProcessExecutionFailed,
-                            e.to_string()
-                        ))?;
-                    if let Some(stdin) = exec.stdin.as_mut() {
-                        stdin.write_all(exec_reader.as_bytes())
-                            .map_err(|e| RepackError::global(
+                        .map_err(|e| {
+                            RepackError::global(
                                 RepackErrorKind::ProcessExecutionFailed,
-                                e.to_string()
-                            ))?;
+                                e.to_string(),
+                            )
+                        })?;
+                    if let Some(stdin) = exec.stdin.as_mut() {
+                        stdin.write_all(exec_reader.as_bytes()).map_err(|e| {
+                            RepackError::global(
+                                RepackErrorKind::ProcessExecutionFailed,
+                                e.to_string(),
+                            )
+                        })?;
                     }
-                    exec.wait().map_err(|e| RepackError::global(
-                        RepackErrorKind::ProcessExecutionFailed,
-                        e.to_string()
-                    ))?;
+                    exec.wait().map_err(|e| {
+                        RepackError::global(RepackErrorKind::ProcessExecutionFailed, e.to_string())
+                    })?;
                 }
             }
             SnippetMainTokenName::PlaceImports => {
                 writer.import_point();
             }
-            SnippetMainTokenName::Trim => { // Deletes trailing matching sequence (used to drop final commas)
+            SnippetMainTokenName::Trim => {
+                // Deletes trailing matching sequence (used to drop final commas)
                 let mut trim_contents = String::new();
                 self.render_tokens(content.contents, context, &mut trim_contents)?;
                 writer.delete_trailing(&trim_contents);
@@ -478,7 +477,8 @@ impl<'a> BlueprintRenderer<'a> {
             SnippetMainTokenName::Break => {
                 writer.write(&"\n");
             }
-            SnippetMainTokenName::Increment => { // Global counter increment; variable of same name outputs current value
+            SnippetMainTokenName::Increment => {
+                // Global counter increment; variable of same name outputs current value
                 let name = &content.details.secondary_token;
                 if let Some(glob) = self.global_counters.get_mut(name) {
                     *glob += 1
@@ -486,7 +486,8 @@ impl<'a> BlueprintRenderer<'a> {
                     self.global_counters.insert(name.to_string(), 1);
                 }
             }
-            SnippetMainTokenName::Render => { // Inline snippet literal insertion
+            SnippetMainTokenName::Render => {
+                // Inline snippet literal insertion
                 let mut snippet_name = String::new();
                 self.render_tokens(content.contents, context, &mut snippet_name)?;
                 if let Some(snippet) = self.blueprint.snippets.get(&snippet_name) {
@@ -500,10 +501,12 @@ impl<'a> BlueprintRenderer<'a> {
             }
             SnippetMainTokenName::Variable(var) => {
                 let mut components = var.split(".");
-                let name = components.next().ok_or_else(|| RepackError::global(
-                    RepackErrorKind::ParseIncomplete,
-                    format!("variable '{var}'")
-                ))?;
+                let name = components.next().ok_or_else(|| {
+                    RepackError::global(
+                        RepackErrorKind::ParseIncomplete,
+                        format!("variable '{var}'"),
+                    )
+                })?;
                 if let Some(glob) = self.global_counters.get(name) {
                     writer.write(&glob.to_string());
                 } else if let Some(mut res) = context.variables.get(name).map(|x| x.to_string()) {
@@ -526,6 +529,19 @@ impl<'a> BlueprintRenderer<'a> {
                                     })
                                     .collect::<Vec<_>>()
                                     .join("")
+                            }
+                            "firstlower" => {
+                                res = res
+                                    .chars()
+                                    .enumerate()
+                                    .map(|(i, x)| {
+                                        if i == 0 {
+                                            return x.to_ascii_lowercase();
+                                        } else {
+                                            return x;
+                                        }
+                                    })
+                                    .collect()
                             }
                             "camelcase" => {
                                 res = res
@@ -551,9 +567,15 @@ impl<'a> BlueprintRenderer<'a> {
                             "split_period_first" => {
                                 res = res.split(".").next().unwrap_or("").to_string()
                             }
-                            "split_period_last" => res = res.split(".").last().unwrap_or("").to_string(),
-                            "split_dash_first" => res = res.split("-").next().unwrap_or("").to_string(),
-                            "split_dash_last" => res = res.split("-").last().unwrap_or("").to_string(),
+                            "split_period_last" => {
+                                res = res.split(".").last().unwrap_or("").to_string()
+                            }
+                            "split_dash_first" => {
+                                res = res.split("-").next().unwrap_or("").to_string()
+                            }
+                            "split_dash_last" => {
+                                res = res.split("-").last().unwrap_or("").to_string()
+                            }
                             _ => {
                                 return Err(RepackError::from_lang_with_msg(
                                     RepackErrorKind::InvalidVariableModifier,
@@ -597,10 +619,8 @@ impl<'a> BlueprintRenderer<'a> {
                 .insert(opt.0.to_string(), opt.1.to_string());
         }
         _ = &self.render_tokens(&self.blueprint.tokens, &context, &mut files)?;
-        let mut path = current_dir().map_err(|_| RepackError::global(
-            RepackErrorKind::PathNotValid,
-            String::new()
-        ))?;
+        let mut path = current_dir()
+            .map_err(|_| RepackError::global(RepackErrorKind::PathNotValid, String::new()))?;
         if let Some(loc) = &self.config.location {
             path.push(loc);
         }
@@ -653,10 +673,8 @@ impl<'a> BlueprintRenderer<'a> {
             &BlueprintExecutionContext::new(),
             &mut files,
         )?;
-        let mut path = current_dir().map_err(|_| RepackError::global(
-            RepackErrorKind::PathNotValid,
-            String::new()
-        ))?;
+        let mut path = current_dir()
+            .map_err(|_| RepackError::global(RepackErrorKind::PathNotValid, String::new()))?;
         if let Some(loc) = &self.config.location {
             path.push(loc);
         }

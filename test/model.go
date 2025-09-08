@@ -1,7 +1,7 @@
 package main;
-import "github.com/google/uuid"
-import "database/sql"
 import "time"
+import "database/sql"
+import "github.com/google/uuid"
 
 
 type UserType string

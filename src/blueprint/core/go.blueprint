@@ -30,7 +30,7 @@ const (
 [each struct][br]
 type [name] struct {
 	[each field][br]
-	[name.titlecase] [if optional]*[/if][if array]\[][/if][type] `json:"[name]"`
+	[name.titlecase] [if optional][nfunc go.nopointer]*[/nfunc][/if][if array]\[][/if][type] `json:"[name][func go.omitempty],omitempty[/func]"`
 	[/each][br]
 }
 
