@@ -1,8 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::syntax::{
-    CoreType, Field, FieldType, Output, ParseResult, Query, QueryArg, QueryReturn, RepackEnum,
-    RepackEnumCase, RepackError, RepackErrorKind, RepackStruct,
+    CoreType, CustomFieldType, Field, FieldType, Output, ParseResult, Query, QueryArg, QueryReturn,
+    RepackEnum, RepackEnumCase, RepackError, RepackErrorKind, RepackStruct,
 };
 
 use super::{Blueprint, SnippetMainTokenName, SnippetSecondaryTokenName};
@@ -34,11 +34,7 @@ impl TokenConsumer for String {
             let len = value.as_ref().chars().count();
             if let Some(cutoff) = self.char_indices().rev().find_map(|(idx, _)| {
                 del_ct += 1;
-                if del_ct == len {
-                    Some(idx)
-                } else {
-                    None
-                }
+                if del_ct == len { Some(idx) } else { None }
             }) {
                 self.truncate(cutoff);
             }
@@ -46,7 +42,6 @@ impl TokenConsumer for String {
     }
     fn import(&mut self, _value: String) {}
     fn import_point(&mut self) {}
-
 }
 
 #[derive(Debug, Clone, Default)]
@@ -98,40 +93,43 @@ impl<'a> BlueprintExecutionContext<'a> {
         let mut variables = self.variables.clone();
         let mut flags = self.flags.clone();
 
-        let resolved_type = match field.field_type.as_ref() {
+        let (resolved_type, resolved_entity_type) = match field.field_type.as_ref() {
             Some(field_type) => match field_type {
-            FieldType::Core(typ) => {
-                if let Some(link) = blueprint.links.get(&typ.to_string()) {
-                    writer.import(link.replace("$", &typ.to_string()))
+                FieldType::Core(typ) => {
+                    if let Some(link) = blueprint.links.get(&typ.to_string()) {
+                        writer.import(link.replace("$", &typ.to_string()))
+                    }
+                    (
+                        blueprint
+                            .utilities
+                            .get(&(
+                                SnippetMainTokenName::TypeDef,
+                                SnippetSecondaryTokenName::from_type(typ),
+                            ))
+                            .ok_or_else(|| {
+                                RepackError::from_lang_with_obj_field_msg(
+                                    RepackErrorKind::TypeNotSupported,
+                                    config,
+                                    obj,
+                                    field,
+                                    typ.to_string(),
+                                )
+                            })?,
+                        &CustomFieldType::Object,
+                    )
                 }
-                blueprint
-                    .utilities
-                    .get(&(
-                        SnippetMainTokenName::TypeDef,
-                        SnippetSecondaryTokenName::from_type(typ),
-                    ))
-                    .ok_or_else(|| {
-                        RepackError::from_lang_with_obj_field_msg(
-                            RepackErrorKind::TypeNotSupported,
-                            config,
-                            obj,
-                            field,
-                            typ.to_string(),
-                        )
-                    })?
-            }
-            FieldType::Custom(typ, _) => {
-                if let Some(link) = blueprint.links.get("custom") {
-                    writer.import(link.replace("$", typ))
+                FieldType::Custom(typ, ent_typ) => {
+                    if let Some(link) = blueprint.links.get("custom") {
+                        writer.import(link.replace("$", typ))
+                    }
+                    (typ, ent_typ)
                 }
-                typ
-            }
-            }
+            },
             None => {
                 return Err(RepackError::from_field(
                     RepackErrorKind::TypeNotResolved,
                     obj,
-                    field
+                    field,
                 ));
             }
         };
@@ -141,10 +139,18 @@ impl<'a> BlueprintExecutionContext<'a> {
         variables.insert("type".to_string(), resolved_type.to_string());
         variables.insert(
             "type_raw".to_string(),
-            field.field_type.as_ref().unwrap_or(&FieldType::Core(crate::syntax::CoreType::String)).to_string(),
+            field
+                .field_type
+                .as_ref()
+                .unwrap_or(&FieldType::Core(crate::syntax::CoreType::String))
+                .to_string(),
         );
         flags.insert("optional", field.optional);
         flags.insert("array", field.array);
+        flags.insert(
+            "enum",
+            matches!(resolved_entity_type, CustomFieldType::Enum),
+        );
 
         Ok(Self {
             variables,
