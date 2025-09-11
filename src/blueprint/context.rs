@@ -115,14 +115,14 @@ impl<'a> BlueprintExecutionContext<'a> {
                                     typ.to_string(),
                                 )
                             })?,
-                        &CustomFieldType::Object,
+                        None,
                     )
                 }
                 FieldType::Custom(typ, ent_typ) => {
                     if let Some(link) = blueprint.links.get("custom") {
                         writer.import(link.replace("$", typ))
                     }
-                    (typ, ent_typ)
+                    (typ, Some(ent_typ))
                 }
             },
             None => {
@@ -149,8 +149,13 @@ impl<'a> BlueprintExecutionContext<'a> {
         flags.insert("array", field.array);
         flags.insert(
             "enum",
-            matches!(resolved_entity_type, CustomFieldType::Enum),
+            matches!(resolved_entity_type, Some(CustomFieldType::Enum)),
         );
+        flags.insert(
+            "object",
+            matches!(resolved_entity_type, Some(CustomFieldType::Object)),
+        );
+        flags.insert("core", matches!(resolved_entity_type, None));
 
         Ok(Self {
             variables,
