@@ -194,6 +194,10 @@ impl ParseResult {
                         };
                         strcts[object_idx].fields[field_idx].field_type =
                             strcts[sup_idx].fields[*foreign_pos].field_type.clone();
+                        strcts[object_idx].fields[field_idx].optional =
+                            strcts[sup_idx].fields[*foreign_pos].optional;
+                        strcts[object_idx].fields[field_idx].array =
+                            strcts[sup_idx].fields[*foreign_pos].array;
                     } else {
                         let Some(join_idx) = &strcts[object_idx]
                             .joins
@@ -236,6 +240,10 @@ impl ParseResult {
                             strcts[*joined_entity_idx].fields[*joined_field_idx]
                                 .field_type
                                 .clone();
+                        strcts[object_idx].fields[field_idx].optional =
+                            strcts[*joined_entity_idx].fields[*joined_field_idx].optional;
+                        strcts[object_idx].fields[field_idx].array =
+                            strcts[*joined_entity_idx].fields[*joined_field_idx].array;
                     }
                 } else {
                     // This is just a custom type, let's resolve it.

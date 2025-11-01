@@ -220,6 +220,8 @@ impl<'a> BlueprintExecutionContext<'a> {
         };
         new.variables
             .insert("type".to_string(), resolved_type.to_string());
+        new.flags.insert("optional", arg.optional);
+        new.flags.insert("array", arg.array);
 
         Ok(new)
     }

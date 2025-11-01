@@ -4,6 +4,8 @@ use super::{FileContents, RepackError, RepackErrorKind, RepackStruct, Token};
 pub struct QueryArg {
     pub name: String,
     pub typ: String,
+    pub optional: bool,
+    pub array: bool,
 }
 impl QueryArg {
     fn parse(query_name: &str, reader: &mut FileContents) -> Result<QueryArg, RepackError> {
@@ -19,7 +21,23 @@ impl QueryArg {
                 query_name.to_string(),
             )
         })?;
-        Ok(QueryArg { name, typ })
+        let mut optional = false;
+        let mut array = false;
+        if matches!(reader.peek(), Some(Token::OpenBracket)) {
+            array = true;
+            reader.skip();
+            reader.skip();
+        }
+        if matches!(reader.peek(), Some(Token::Question)) {
+            optional = true;
+            reader.skip();
+        }
+        Ok(QueryArg {
+            name,
+            typ,
+            optional,
+            array,
+        })
     }
 }
 
@@ -376,6 +394,8 @@ impl AutoInsertQuery {
                         )
                     })?
                     .to_string(),
+                optional: matching_field.optional,
+                array: matching_field.array,
             });
             if idx + 1 != self.args.len() {
                 query_interpolate.push_str(", ");
